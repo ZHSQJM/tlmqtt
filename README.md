@@ -2,8 +2,11 @@
 
 #### 说明
 - tlmqtt-auth 认证模块
+- tlmqtt-bootstrap 启动辅助
+- tlmqtt-bridge  数据桥接
 - tlmqtt-common 公共模板
-- tlmqtt
+- tlmqtt-core 核心方法
+- tlmqtt-store 数据存储
 #### 功能
 - 完全独立的mqtt3.1.1 协议解析
 - qos 0,1,2的消息支持

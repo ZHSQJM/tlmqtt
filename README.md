@@ -17,7 +17,6 @@
 #### 后续功能
 - acl 权限控制
 - 页面展示
-- 数据桥接
 - 共享订阅
 - 系统订阅
 - mqtt5.0协议支持
@@ -65,28 +64,28 @@ auth:
 ```
 上述启动方式使用的就是配置文件中默认的配置
 
+#### 定制化启动
 ```java
   TlBootstrap bootstrap = new TlBootstrap();
   bootstrap.setServer(TlWebSocketServer.class)
-            .setDelay(1) //重发消息延迟时间
+           .setDelay(1) //重发消息延迟时间
            .setPort(18883) //启动的端口
-            .setAuth(true) //是否开启认证
-            .setHttpEntity(httpEntity) //http认证集合
-            .setSqlEntity(sqlEntity) //sql认证集合
-            .setFixUser(fixUsers) //固定认证集合
-         //   存储配置
-            .setPublishService(new MemoryPublishServiceImpl()) //publish消息的存储
-            .setRetainService(new MemoryRetainServiceImpl()) //retain消息的存储
-            .setPubrelService(new MemoryPubrelServiceImpl()) // pubrel消息的存储
-            .setSessionService(new MemorySessionServiceImpl()) // session消息的存储
+           .setAuth(true) //是否开启认证
+           .setHttpEntity(httpEntity) //http认证集合
+           .setSqlEntity(sqlEntity) //sql认证集合
+           .setFixUser(fixUsers) //固定认证集合
+           //   存储配置
+           .setPublishService(new MemoryPublishServiceImpl()) //publish消息的存储
+           .setRetainService(new MemoryRetainServiceImpl()) //retain消息的存储
+           .setPubrelService(new MemoryPubrelServiceImpl()) // pubrel消息的存储
+           .setSessionService(new MemorySessionServiceImpl()) // session消息的存储
            .setSsl(true) //是否开启ssl
-            .setCertPath("") //ssl证书
-            .setPrivatePath("") //ssl私钥
+           .setCertPath("") //ssl证书
+           .setPrivatePath("") //ssl私钥
            .addAuthEntity(sqlEntityInfo) //添加认证实体
-            .addAuthEntity(httpInfo) //添加认证实体
-
-            .addKafkaBridge(new TlKafkaInfo()) // 添加kafka配置
-             .addMysqlBridge(new MySqlInfo()) //添加mysql配置
-            .addBridgeEntity(new KafkaBridgeObserver()) //添加桥接器
+           .addAuthEntity(httpInfo) //添加认证实体
+           .addKafkaBridge(new TlKafkaInfo()) // 添加kafka配置
+           .addMysqlBridge(new MySqlInfo()) //添加mysql配置
+           .addBridgeEntity(new KafkaBridgeObserver()) //添加桥接器
            .addAuthentication(new NoneA())//添加认证器
 ```

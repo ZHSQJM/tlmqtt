@@ -1,0 +1,14 @@
+syntax= "proto3";
+
+option java_package = "com.iot.service.mqtt.model.proto";
+option java_outer_classname = "TlSubClient";
+
+message Client{
+
+    int32 qos = 1;
+
+    string client_id = 2;
+
+    string topic = 3;
+
+}

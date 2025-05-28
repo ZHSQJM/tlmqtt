@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+
+option java_package = "com.iot.service.mqtt.model.proto";
+option java_outer_classname = "TlMqttSession";
+// MQTT会话信息（对应Java TlMqttSession）
+message Session {
+  // 基础字段
+  string client_id = 1;       // 客户端标识（必填）
+  int32 qos = 2;            // 遗嘱消息QoS等级（根据业务需求是否optional）
+  bool clean_session = 3;     // 清除会话标志（proto3默认false）
+  repeated string topics = 4; // 订阅主题集合（自动去重建议）
+  int32 mqtt_version =5;// 协议版本（默认3.1.1）
+
+  // 注：proto3中所有字段默认optional，required已废弃
+}

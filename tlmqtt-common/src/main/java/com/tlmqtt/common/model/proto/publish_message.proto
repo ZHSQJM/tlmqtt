@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option java_package = "com.iot.service.mqtt.model.proto";
+option java_outer_classname = "PublishMessage";
+
+
+message PubMessage {
+    // 消息id
+    int64 message_id = 1;
+    // 主题
+    string topic = 2;
+    // 客户端
+    string client_id = 3;
+    // 消息内容
+    string message = 4;
+    // qos
+    int32 qos = 5;
+    // 是否是保留消息
+    bool retain = 6;
+    // 是否是重复消息
+    bool dup = 7;
+}

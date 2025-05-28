@@ -1,0 +1,11 @@
+syntax= "proto3";
+
+option java_package = "com.iot.service.mqtt.model.proto";
+option java_outer_classname = "PubrelMessage";
+
+message RelMessage{
+
+    int64 message_id = 1;
+    // 客户端
+    string client_id = 2;
+}

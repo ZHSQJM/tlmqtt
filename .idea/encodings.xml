@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-auth/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-auth/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-boot/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-boot/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-bootstrap/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-bootstrap/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-bridge/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-bridge/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-common/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-common/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-core/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-core/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-store/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/tlmqtt-store/src/main/resources" charset="UTF-8" />
+  </component>
+</project>

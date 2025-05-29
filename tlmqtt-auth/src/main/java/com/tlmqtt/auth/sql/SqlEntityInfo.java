@@ -1,6 +1,7 @@
 package com.tlmqtt.auth.sql;
 
 import lombok.Data;
+import lombok.experimental.Accessors;
 
 /**
  * @Author: hszhou
@@ -8,6 +9,7 @@ import lombok.Data;
  * @Description: 数据库对象实体类
  */
 @Data
+@Accessors(chain = true)
 public class SqlEntityInfo {
 
     /**地址*/

@@ -58,9 +58,9 @@ public class KafkaBridgeObserver  implements EventHandler<PublishMessage> {
                 event.toString());
             try {
                 RecordMetadata metadata = producer.send(record).get();
-                log.info("消息发送成功，partition:{}, offset:{}", metadata.partition(), metadata.offset());
+                log.debug("send kafka message success，partition:{}, offset:{}", metadata.partition(), metadata.offset());
             }catch (Exception e) {
-                log.error("消息发送失败", e);
+                log.error("send kafka error", e);
             }
         }
     }

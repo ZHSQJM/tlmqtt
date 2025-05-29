@@ -1,8 +1,4 @@
 spring:
-  profiles:
-    active: dev
-  application:
-    name: protocol-service
   redis:
     host: localhost
     port: 6379
@@ -23,8 +19,7 @@ logging:
     com.tlmqtt.boot.store: info
     com.tlmqtt.core.retry: info
     root: info
-    #io.lettuce.core: DEBUG  # 显示命令发送和响应时间
-    #org.springframework.data.redis.reactive: DEBUG
+
 management:
   endpoints:
     web:

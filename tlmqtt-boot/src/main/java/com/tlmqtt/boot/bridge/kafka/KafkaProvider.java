@@ -1,6 +1,5 @@
 package com.tlmqtt.boot.bridge.kafka;
 
-import com.tlmqtt.bridge.db.TlMySqlInfo;
 import com.tlmqtt.bridge.kafka.TlKafkaInfo;
 
 /**

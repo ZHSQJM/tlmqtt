@@ -1,8 +1,6 @@
 package com.tlmqtt.boot.bridge.mysql;
 
-import com.tlmqtt.auth.http.HttpEntityInfo;
 import com.tlmqtt.bridge.db.TlMySqlInfo;
-import org.apache.http.client.methods.HttpGet;
 
 /**
  * @Author: hszhou
@@ -27,7 +25,7 @@ public class MysqlProvider {
             .setPassword("kangni")
             .setDatabase("watson")
             .setTable("mqtt_msg")
-           .setDriverClassName("com.mysql.cj.jdbc.Driver");;
+           .setDriverClassName("com.mysql.cj.jdbc.Driver");
         return mySqlInfo;
     }
 }

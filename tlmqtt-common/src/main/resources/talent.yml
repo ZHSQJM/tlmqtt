@@ -2,7 +2,7 @@ session:
   timeout: 5 #session会话超时时间 如果过了这个时间还没连接 那么就不保持会话
   delay: 5 #ack消息确定 30s后没有收到确定就重发
 port:
-  mqtt: 18883 # mqtt的默认端口
+  mqtt: 1883 # mqtt的默认端口
   sslMqtt: 8883 # mqtt的ssl断开
   websocket: 8083 #websocket的端口
   sslWebsocket: 8084

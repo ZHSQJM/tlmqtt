@@ -21,6 +21,6 @@ public class TlMqttHeartBeatReq extends AbstractTlMessage {
 
     @Override
     public MqttMessageType getMessageType() {
-        return MqttMessageType.PINGRESP;
+        return MqttMessageType.PINGREQ;
     }
 }

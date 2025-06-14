@@ -1,21 +1,24 @@
-package com.tlmqtt.core;
+package com.tlmqtt.core.server;
 
-import com.lmax.disruptor.EventHandler;
 import com.tlmqtt.auth.AbstractTlAuthentication;
 import com.tlmqtt.auth.AuthenticationManager;
 import com.tlmqtt.auth.http.HttpEntityInfo;
 import com.tlmqtt.auth.sql.SqlEntityInfo;
 import com.tlmqtt.bridge.TlBridgeManager;
 import com.tlmqtt.bridge.db.TlMySqlInfo;
-import com.tlmqtt.bridge.kafka.KafkaBridgeObserver;
 import com.tlmqtt.bridge.kafka.TlKafkaInfo;
-import com.tlmqtt.common.model.entity.PublishMessage;
+import com.tlmqtt.common.config.MqttConfiguration;
+import com.tlmqtt.common.config.TlMqttProperties;
+import com.tlmqtt.common.config.TlPortProperties;
+import com.tlmqtt.common.config.TlSslProperties;
 import com.tlmqtt.common.model.entity.TlUser;
+import com.tlmqtt.core.manager.TlStoreManager;
 import com.tlmqtt.store.service.*;
 import com.tlmqtt.store.service.impl.DefaultSubscriptionServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * @Author: hszhou
@@ -26,26 +29,39 @@ import java.util.List;
 public class TlBootstrap {
 
 
-    private AbstractTlServer tlMqttServer;
+    private final TlServer tlServer;
 
+    private boolean enableSocket;
 
+    private boolean enableWebsocket;
+
+    private int port;
+
+    private int webSocketPort;
 
     public TlBootstrap() {
+
+        MqttConfiguration mqttConfiguration = new MqttConfiguration();
+        TlMqttProperties mqttProperties = mqttConfiguration.getMqttProperties();
+        TlPortProperties portProperties = mqttProperties.getPort();
+
+        TlSslProperties sslProperties = mqttProperties.getSsl();
+        boolean ssl = sslProperties.isEnabled();
+        this.port = portProperties.getMqtt();
+        this.webSocketPort = portProperties.getWebsocket();
+        if (ssl) {
+            this.port = portProperties.getSslMqtt();
+            this.webSocketPort = portProperties.getSslWebsocket();
+            setCertPath(sslProperties.getCertPath());
+            setPrivatePath(sslProperties.getPrivatePath());
+        }
+        this.enableSocket = false;
+        this.enableWebsocket = false;
+        this.tlServer = new TlServer();
     }
 
 
 
-    /**
-     * 设置启动端口
-     * @author hszhou
-     * @datetime: 2025-05-21 13:19:16
-     * @param port 启动端口
-     * @return TlBootstrap
-     **/
-    public TlBootstrap setPort(int port){
-        tlMqttServer.setPort(port);
-        return this;
-    }
 
     /**
      * 是否开启认证
@@ -56,7 +72,7 @@ public class TlBootstrap {
      **/
     public TlBootstrap setAuth(Boolean auth){
 
-        tlMqttServer.getAuthenticationManager().setAuth(auth);
+        tlServer.getAuthenticationManager().setAuth(auth);
         return this;
     }
 
@@ -68,7 +84,7 @@ public class TlBootstrap {
      * @return TlBootstrap
      **/
     public TlBootstrap setHttpEntity(List<HttpEntityInfo> httpEntityInfos) {
-        tlMqttServer.getAuthenticationManager().addHttpEntity(()->httpEntityInfos);
+        tlServer.getAuthenticationManager().addHttpEntity(()->httpEntityInfos);
         return this;
     }
 
@@ -80,7 +96,7 @@ public class TlBootstrap {
      * @return TlBootstrap
      **/
     public TlBootstrap setSqlEntity(List<SqlEntityInfo> sqlEntityInfos) {
-        tlMqttServer.getAuthenticationManager().addSqlEntity(()->sqlEntityInfos);
+        tlServer.getAuthenticationManager().addSqlEntity(()->sqlEntityInfos);
         return this;
     }
 
@@ -92,7 +108,7 @@ public class TlBootstrap {
      * @return TlBootstrap
      **/
     public TlBootstrap setFixUser(List<TlUser> fixUsers) {
-        tlMqttServer.getAuthenticationManager().addFixUsers(fixUsers);
+        tlServer.getAuthenticationManager().addFixUsers(fixUsers);
         return this;
     }
 
@@ -105,7 +121,7 @@ public class TlBootstrap {
      * @return TlBootstrap
      **/
     public TlBootstrap setPublishService(PublishService publishService) {
-        tlMqttServer.getStoreManager().setPublishService(publishService);
+        tlServer.getStoreManager().setPublishService(publishService);
         return this;
     }
 
@@ -118,7 +134,7 @@ public class TlBootstrap {
      * @return TlBootstrap
      **/
     public TlBootstrap setPubrelService(PubrelService pubrelService) {
-        tlMqttServer.getStoreManager().setPubrelService(pubrelService);
+        tlServer.getStoreManager().setPubrelService(pubrelService);
         return this;
     }
 
@@ -130,86 +146,106 @@ public class TlBootstrap {
      * @return TlBootstrap
      **/
     public TlBootstrap setRetainService(RetainService retainService) {
-         tlMqttServer.getStoreManager().setRetainService(retainService);
+        tlServer.getStoreManager().setRetainService(retainService);
         return this;
     }
 
     public TlBootstrap setSessionService(SessionService sessionService) {
-      tlMqttServer.getStoreManager().setSessionService(sessionService);
-      tlMqttServer.getStoreManager().setSubscriptionService(new DefaultSubscriptionServiceImpl(sessionService));
+        tlServer.getStoreManager().setSessionService(sessionService);
+        tlServer.getStoreManager().setSubscriptionService(new DefaultSubscriptionServiceImpl(sessionService));
       return this;
     }
 
-
-
     public TlBootstrap setDelay(int delay){
-        tlMqttServer.getStoreManager().getRetryService().setDelay(delay);
+        tlServer.getRetryManager().setDelay(delay);
         return this;
     }
 
     public TlBootstrap setSsl(boolean b) {
-        tlMqttServer.setSsl(b);
+        tlServer.setSsl(b);
         return this;
     }
 
     public TlBootstrap setCertPath(String certPath ) {
-        tlMqttServer.setCertPath(certPath);
+        tlServer.setCertPath(certPath);
         return this;
     }
 
     public TlBootstrap setPrivatePath(String privatePath) {
-        tlMqttServer.setCertPath(privatePath);
+        tlServer.setCertPath(privatePath);
         return this;
     }
 
     public TlBootstrap addAuthEntity(Object object) {
-        tlMqttServer.getAuthenticationManager().add(object);
+        tlServer.getAuthenticationManager().add(object);
         return this;
     }
 
 
     public TlBootstrap addBridgeKafka(TlKafkaInfo kafkaInfo) {
-        tlMqttServer.getBridgeManager().addKafkaInfo(kafkaInfo);
+        tlServer.getBridgeManager().addKafkaInfo(kafkaInfo);
         return this;
     }
     public TlBootstrap addBridgeMysql(TlMySqlInfo tlMySqlInfo) {
-        tlMqttServer.getBridgeManager().addMysqlInfo(tlMySqlInfo);
-        return this;
-    }
-    public TlBootstrap addHandler(EventHandler<PublishMessage> handler) {
-
-        tlMqttServer.getBridgeManager().addHandler(handler);
+        tlServer.getBridgeManager().addMysqlInfo(tlMySqlInfo);
         return this;
     }
 
     public TlBootstrap addAuthentication(AbstractTlAuthentication authentication) {
-        tlMqttServer.getAuthenticationManager().addAuthentication(authentication);
+        tlServer.getAuthenticationManager().addAuthentication(authentication);
         return this;
     }
 
-
     public TlStoreManager getStoreManager(){
-        return tlMqttServer.getStoreManager();
+        return tlServer.getStoreManager();
     }
 
     public TlBridgeManager getBridgeManager(){
-        return tlMqttServer.getBridgeManager();
+        return tlServer.getBridgeManager();
     }
 
     public AuthenticationManager getAuthenticationManager(){
-       return tlMqttServer.getAuthenticationManager();
+       return tlServer.getAuthenticationManager();
     }
 
     public void start(){
-        tlMqttServer.start();
+
+        if (!enableSocket && !enableWebsocket) {
+            throw new IllegalStateException("At least one service type needs to be enabled");
+        }
+        if(this.enableSocket){
+            CompletableFuture.runAsync(()->  tlServer.startSocket(port));
+        }
+        if(this.enableWebsocket){
+            CompletableFuture.runAsync(()->  tlServer.startWebsocket(webSocketPort));
+        }
     }
 
-    public TlBootstrap setServer(Class<? extends AbstractTlServer> clazz) {
-        try {
-            tlMqttServer = clazz.getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            log.error("init fail",e);
+
+    public TlBootstrap socket() {
+
+        if(this.enableSocket){
+            throw new IllegalStateException("The socket is already configured");
         }
+        this.enableSocket = true;
+        return this;
+    }
+    public TlBootstrap socket(int port) {
+
+        this.port = port;
+        socket();
+        return this;
+    }
+    public TlBootstrap websocket() {
+        if(this.enableWebsocket){
+            throw new IllegalStateException("The webSocket is already configured");
+        }
+        this.enableWebsocket = true;
+        return this;
+    }
+    public TlBootstrap websocket(int port) {
+        this.webSocketPort = port;
+        websocket();
         return this;
     }
 

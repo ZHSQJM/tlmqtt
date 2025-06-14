@@ -15,9 +15,11 @@ server:
   port: 8001
 logging:
   level:
-    com.tlmqtt.core.handler: info
+    com.tlmqtt.core.handler: debug
+    com.tlmqtt.core.message: debug
     com.tlmqtt.boot.store: info
-    com.tlmqtt.core.retry: info
+    com.tlmqtt.core.retry: debug
+    com.tlmqtt.core.manager: debug
     root: info
 
 management:

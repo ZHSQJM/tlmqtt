@@ -1,6 +1,6 @@
 package com.tlmqtt.boot.config;
 
-import com.tlmqtt.core.TlBootstrap;
+import com.tlmqtt.core.server.TlBootstrap;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

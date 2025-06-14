@@ -1,5 +1,6 @@
 package com.tlmqtt.core.retry;
 
+import com.tlmqtt.common.enums.MqttMessageType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

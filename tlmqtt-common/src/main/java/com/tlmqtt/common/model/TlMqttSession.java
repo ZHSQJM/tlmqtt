@@ -2,6 +2,7 @@ package com.tlmqtt.common.model;
 
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
+import io.netty.channel.ChannelHandlerContext;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -27,9 +28,15 @@ public class TlMqttSession {
     /**协议版本*/
     private MqttVersion mqttVersion;
 
-    public static TlMqttSession build(String clientId, Boolean cleanSession){
+    private String username;
+
+    private String ip;
+
+    public static TlMqttSession build(String clientId, Boolean cleanSession,String username,String ip){
         TlMqttSession session=new TlMqttSession();
         session.setClientId(clientId);
+        session.setIp(ip);
+        session.setUsername(username);
         session.setCleanSession(cleanSession);
         session.setMqttVersion(MqttVersion.MQTT_3_1_1);
         return session;

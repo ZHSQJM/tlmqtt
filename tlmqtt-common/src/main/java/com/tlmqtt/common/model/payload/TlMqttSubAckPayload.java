@@ -20,13 +20,22 @@ public class TlMqttSubAckPayload {
 
     private int[] codes;
 
-    public static TlMqttSubAckPayload build(List<TlTopic> topics) {
-        int[] codes = new int[topics.size()];
-        for (int i = 0; i < topics.size(); i++) {
-            codes[i]=topics.get(i).getQos();
-        }
+    public static TlMqttSubAckPayload build(int[] codes) {
+//        int[] codes = new int[topics.size()+failure.size()];
+//        for (int i = 0; i < topics.size(); i++) {
+//            codes[i]=topics.get(i).getQos();
+//        }
+//        for (int i = 0; i < failure.size(); i++) {
+//            codes[i+topics.size()]=0x80;
+//        }
 
        return new TlMqttSubAckPayload(codes);
+    }
+
+    public static TlMqttSubAckPayload buildFailure() {
+        int[] codes = new int[1];
+        codes [0] = 0x80;
+        return new TlMqttSubAckPayload(codes);
     }
 
 }

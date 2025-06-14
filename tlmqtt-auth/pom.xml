@@ -6,11 +6,11 @@
     <parent>
         <groupId>com.talent</groupId>
         <artifactId>tl-mqtt</artifactId>
-        <version>1.0.0</version>
+        <version>1.1.0</version>
     </parent>
 
     <artifactId>tlmqtt-auth</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -22,7 +22,7 @@
         <dependency>
             <groupId>com.talent</groupId>
             <artifactId>tlmqtt-common</artifactId>
-            <version>1.0.0</version>
+            <version>1.1.0</version>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>

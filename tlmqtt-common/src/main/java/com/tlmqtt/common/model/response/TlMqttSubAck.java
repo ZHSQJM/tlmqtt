@@ -30,10 +30,10 @@ public class TlMqttSubAck {
 
     private TlMqttSubAckPayload payload;
 
-    public static TlMqttSubAck of(List<TlTopic> topics, int messageId) {
+    public static TlMqttSubAck of(int[] codes,int messageId) {
         TlMqttFixedHead fixedHead = TlMqttFixedHead.build(MqttMessageType.SUBACK);
         TlMqttSubAckVariableHead variableHead = TlMqttSubAckVariableHead.of(messageId);
-        TlMqttSubAckPayload payload = TlMqttSubAckPayload.build(topics);
+        TlMqttSubAckPayload payload = TlMqttSubAckPayload.build(codes);
         return new TlMqttSubAck(fixedHead, variableHead, payload);
     }
 }

@@ -1,15 +1,19 @@
-package com.tlmqtt.core;
+package com.tlmqtt.core.server;
 
 import com.tlmqtt.auth.AuthenticationManager;
+import com.tlmqtt.auth.acl.AclManager;
 import com.tlmqtt.bridge.TlBridgeManager;
 import com.tlmqtt.common.config.*;
 import com.tlmqtt.common.model.entity.TlUser;
-import com.tlmqtt.core.channel.ChannelManager;
+import com.tlmqtt.core.codec.MqttWebSocketCodec;
+import com.tlmqtt.core.manager.TlStoreManager;
+import com.tlmqtt.core.manager.ChannelManager;
 import com.tlmqtt.core.codec.TlMqttMessageCodec;
 import com.tlmqtt.core.codec.decoder.*;
 import com.tlmqtt.core.codec.encoder.*;
 import com.tlmqtt.core.handler.*;
-import com.tlmqtt.core.retry.RetryService;
+import com.tlmqtt.core.manager.RetryManager;
+import com.tlmqtt.core.message.TlMessageService;
 import com.tlmqtt.store.service.*;
 import com.tlmqtt.store.service.impl.*;
 import io.netty.bootstrap.ServerBootstrap;
@@ -19,9 +23,14 @@ import io.netty.channel.ChannelPipeline;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpContentCompressor;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpServerCodec;
+import io.netty.handler.codec.http.websocketx.WebSocketServerProtocolHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+import io.netty.handler.timeout.IdleStateHandler;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -32,14 +41,12 @@ import java.io.InputStream;
 import java.util.List;
 
 /**
- * 添加编解码器
- *
  * @Author hszhou
  * @Date 2025/5/13 16:34
  * @Description 服务启动抽象类
  */
 @Slf4j
-public abstract class AbstractTlServer {
+public class TlServer {
 
     private final NioEventLoopGroup bossGroup;
 
@@ -65,10 +72,6 @@ public abstract class AbstractTlServer {
 
     private final TlMqttUnSubscribeDecoder unSubscribeDecoder;
 
-    private final TlHeartbeatEventTriggered heartbeatEventTriggered;
-
-    private final TlMqttExceptionHandler exceptionHandler;
-
     private final TlMqttConnackEncoder connackEncoder;
 
     private final TlMqttHeaderBeatEncoder headerBeatEncoder;
@@ -87,54 +90,54 @@ public abstract class AbstractTlServer {
 
     private final TlMqttUnSubAckEncoder unSubAckEncoder;
 
+    private final TlHeartbeatEventTriggered heartbeatEventTriggered;
+
+    private final TlConnectEventHandler connectEventHandler;
+
+    private final TlDisconnectEventHandler disconnectEventHandler;
+
+    private final TlHeartBeatEventHandler heartBeatEventHandler;
+
+    private final TlPubAckEventHandler pubAckEventHandler;
+
+    private final TlPubCompEventHandler pubCompEventHandler;
+
+    private final TlPublishEventHandler publishEventHandler;
+
+    private final TlPubRecEventHandler pubRecEventHandler;
+
+    private final TlPubRelEventHandler pubRelEventHandler;
+
+    private final TlSubscribeEventHandler subscribeEventHandler;
+
+    private final TlUnSubscribeEventHandler unSubscribeEventHandler;
+
+    private final TlExceptionHandler exceptionHandler;
+
     @Getter
     private final TlStoreManager storeManager;
-
     @Getter
     private final TlBridgeManager bridgeManager;
-
+    @Getter
+    private final RetryManager retryManager;
     @Getter
     private final AuthenticationManager authenticationManager;
-
-    private final TlMqttConnectHandler connectHandler;
-
-    private final TlMqttDisconnectHandler disconnectHandler;
-
-    private final TlMqttPubAckHandler pubAckHandler;
-
-    private final TlMqttPubCompHandler pubCompHandler;
-
-    private final TlMqttPublishHandler publishHandler;
-
-    private final TlMqttPubRecHandler pubRecHandler;
-
-    private final TlMqttPubRelHandler pubRelHandler;
-
-    private final TlMqttSubScribeHandler subScribeHandler;
-
-    private final TlMqttUnSubScribeHandler unSubScribeHandler;
-
-    private final TlMqttHeartBeatHandler heartbeatHandler;
 
     private SslContext sslContext;
 
     @Setter
     private boolean ssl;
-
     @Setter
     private String certPath;
 
     private String privatePath;
 
-    @Setter
-    private int port;
 
-    public AbstractTlServer() {
+    public TlServer() {
 
         bossGroup = new NioEventLoopGroup();
         workerGroup = new NioEventLoopGroup();
-        heartbeatEventTriggered = new TlHeartbeatEventTriggered();
-        exceptionHandler = new TlMqttExceptionHandler();
+
         connectDecoder = new TlMqttConnectDecoder();
         disConnectDecoder = new TlMqttDisConnectDecoder();
         heartBeatDecoder = new TlMqttHeartBeatDecoder();
@@ -161,28 +164,33 @@ public abstract class AbstractTlServer {
         TlAuthProperties auth = mqttProperties.getAuth();
         boolean enabled = auth.isEnabled();
         List<TlUser> user = auth.getUser();
+
         PublishService publishService = new DefaultPublishServiceImpl();
         PubrelService pubrelService = new DefaultPubrelServiceImpl();
         RetainService retainService = new DefaultRetainServiceImpl();
         SessionService sessionService = new DefaultSessionServiceImpl();
         SubscriptionService subscriptionService = new DefaultSubscriptionServiceImpl(sessionService);
         ChannelManager channelManager = new ChannelManager();
-        RetryService retryService = new RetryService(channelManager, delay);
-        storeManager = new TlStoreManager(sessionService, subscriptionService, channelManager, retryService,
-            publishService, pubrelService, retainService);
+        AclManager aclManager = new AclManager();
+        retryManager = new RetryManager(channelManager, delay);
+        storeManager = new TlStoreManager(sessionService, subscriptionService, publishService, pubrelService, retainService);
+        TlMessageService messageService = new TlMessageService(storeManager, channelManager,retryManager);
         bridgeManager = new TlBridgeManager();
         authenticationManager = new AuthenticationManager(enabled);
         authenticationManager.addFixUsers(user);
-        connectHandler = new TlMqttConnectHandler(storeManager, authenticationManager, channelManager);
-        disconnectHandler = new TlMqttDisconnectHandler( storeManager, channelManager);
-        pubAckHandler = new TlMqttPubAckHandler(storeManager);
-        pubCompHandler = new TlMqttPubCompHandler(storeManager);
-        publishHandler = new TlMqttPublishHandler(storeManager,  channelManager, bridgeManager);
-        pubRecHandler = new TlMqttPubRecHandler(storeManager);
-        pubRelHandler = new TlMqttPubRelHandler(storeManager);
-        subScribeHandler = new TlMqttSubScribeHandler(storeManager);
-        unSubScribeHandler = new TlMqttUnSubScribeHandler(storeManager);
-        heartbeatHandler = new TlMqttHeartBeatHandler();
+
+        heartbeatEventTriggered = new TlHeartbeatEventTriggered();
+        exceptionHandler = new TlExceptionHandler(storeManager,channelManager,messageService);
+        connectEventHandler = new TlConnectEventHandler(storeManager,channelManager, authenticationManager,retryManager);
+        disconnectEventHandler = new TlDisconnectEventHandler();
+        heartBeatEventHandler = new TlHeartBeatEventHandler();
+        pubAckEventHandler = new TlPubAckEventHandler(storeManager, retryManager);
+        pubCompEventHandler = new TlPubCompEventHandler(storeManager, retryManager);
+        publishEventHandler = new TlPublishEventHandler(storeManager, aclManager, bridgeManager, messageService);
+        pubRecEventHandler = new TlPubRecEventHandler(storeManager, retryManager);
+        pubRelEventHandler = new TlPubRelEventHandler(messageService);
+        subscribeEventHandler = new TlSubscribeEventHandler(storeManager, aclManager);
+        unSubscribeEventHandler = new TlUnSubscribeEventHandler(storeManager);
 
     }
 
@@ -197,7 +205,7 @@ public abstract class AbstractTlServer {
         }
     }
 
-    public void start() {
+    public void startSocket(int port) {
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         initSsl();
@@ -209,17 +217,11 @@ public abstract class AbstractTlServer {
                     if (ssl) {
                         pipeline.addFirst("ssl", sslContext.newHandler(ch.alloc()));
                     }
-                    addPipeline(pipeline);
-                    pipeline.addLast(
-                            new TlMqttMessageCodec(connectDecoder, disConnectDecoder, heartBeatDecoder, pubAckDecoder,
-                                pubCompDecoder, publishDecoder, pubRecDecoder, pubRelDecoder, subscribeDecoder,
-                                unSubscribeDecoder))
-                        .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder,
-                            pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder)
-                        .addLast(connectHandler, disconnectHandler, pubAckHandler, pubCompHandler, publishHandler,
-                            pubRecHandler, pubRelHandler, subScribeHandler, unSubScribeHandler, heartbeatHandler);
-
-                    pipeline.addLast(heartbeatEventTriggered, exceptionHandler);
+                    pipeline.addLast(new TlMqttMessageCodec(connectDecoder, disConnectDecoder, heartBeatDecoder, pubAckDecoder,pubCompDecoder, publishDecoder, pubRecDecoder, pubRelDecoder, subscribeDecoder, unSubscribeDecoder))
+                            .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder, pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder)
+                            .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler,
+                                pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
+                            .addLast(heartbeatEventTriggered,exceptionHandler);
                 }
             });
         try {
@@ -236,12 +238,57 @@ public abstract class AbstractTlServer {
         }
     }
 
+    public void startWebsocket(int port) {
+
+        ServerBootstrap bootstrap = new ServerBootstrap();
+        initSsl();
+        bootstrap.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
+            .childHandler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(SocketChannel ch) throws Exception {
+                    ChannelPipeline pipeline = ch.pipeline();
+                    if (ssl) {
+                        pipeline.addFirst("ssl", sslContext.newHandler(ch.alloc()));
+                    }
+                    addPipeline(pipeline);
+                    pipeline.addLast(new TlMqttMessageCodec(connectDecoder, disConnectDecoder, heartBeatDecoder, pubAckDecoder,pubCompDecoder, publishDecoder, pubRecDecoder, pubRelDecoder, subscribeDecoder, unSubscribeDecoder))
+                        .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder, pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder)
+                        .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler,
+                            pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
+                        .addLast(heartbeatEventTriggered,exceptionHandler);
+                }
+            });
+        try {
+            ChannelFuture channelFuture = bootstrap.bind(port).sync();
+            log.info("websocket server start success on port【{}】", port);
+            channelFuture.channel().closeFuture().sync();
+        }
+        catch (Exception e) {
+            log.error("websocket server start error", e);
+        }
+        finally {
+            bossGroup.shutdownGracefully();
+            workerGroup.shutdownGracefully();
+        }
+    }
+
     /**
      * 添加管道
      *
      * @param pipeline 添加管道
      */
-    public abstract void addPipeline(ChannelPipeline pipeline);
+    public  void addPipeline(ChannelPipeline pipeline){
+        // Netty提供的心跳检测
+        pipeline.addFirst("idle", new IdleStateHandler(0, 0, 10));
+        // 将请求和应答消息编码或解码为HTTP消息
+        pipeline.addLast("http-codec", new HttpServerCodec());
+        // 将HTTP消息的多个部分合成一条完整的HTTP消息
+        pipeline.addLast("aggregator", new HttpObjectAggregator(1048576));
+        // 将HTTP消息进行压缩编码
+        pipeline.addLast("compressor ", new HttpContentCompressor());
+        pipeline.addLast("protocol", new WebSocketServerProtocolHandler("/mqtt", "mqtt,mqttv3.1,mqttv3.1.1", true, 65536));
+        pipeline.addLast("mqttWebSocket", new MqttWebSocketCodec());
+    };
 
     /**
      * 构建证书

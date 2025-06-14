@@ -63,7 +63,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         variableHead.setUsernameFlag(usernameFlag > 0);
         short keepAlive = buf.readShort();
         variableHead.setKeepAlive(keepAlive);
-        log.debug("parse【CONNECT】message :protocol=【{}】,version=【{}】,reserved=【{}】,cleanSession=【{}】," +
+        log.trace("Parse【CONNECT】message :protocol=【{}】,version=【{}】,reserved=【{}】,cleanSession=【{}】," +
                         "willFlag=【{}】,willQos=【{}】,willRetain=【{}】,usernameFlag=【{}】,keepAlive=【{}】",
                 new String(protocolName), version, reserved, clearSession,
                 willFlag, willQos, willRetain, usernameFlag, keepAlive);
@@ -108,7 +108,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
             password = new String(passwordByte);
             connectPayload.setPassword(password);
         }
-        log.debug("parse【CONNECT】payload: clientId=【{}】,willFlag=【{}】,willTopic=【{}】，retain=【{}】，username=【{}】", clientId, willFlag, willQos, willTopic, username);
+        log.trace("Parse【CONNECT】payload: clientId=【{}】,willFlag=【{}】,willTopic=【{}】，retain=【{}】，username=【{}】", clientId, willFlag, willQos, willTopic, username);
         return connectPayload;
     }
 }

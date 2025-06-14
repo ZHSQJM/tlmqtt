@@ -3,7 +3,7 @@ package com.tlmqtt.common.enums;
 /**
  * @Author: hszhou
  * @Date: 2025/5/14 14:50
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @Description: mqtt的消息类型
  */
 public enum MqttMessageType {
 

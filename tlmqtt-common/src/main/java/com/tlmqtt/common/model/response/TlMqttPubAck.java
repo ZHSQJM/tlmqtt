@@ -2,6 +2,7 @@ package com.tlmqtt.common.model.response;
 
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
+import com.tlmqtt.common.model.request.AbstractTlMessage;
 import com.tlmqtt.common.model.variable.TlMqttPubAckVariableHead;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,4 +29,6 @@ public class TlMqttPubAck  {
         TlMqttPubAckVariableHead tlMqttPubAckVariableHead = TlMqttPubAckVariableHead.build(messageId);
         return new TlMqttPubAck(fixedHead,tlMqttPubAckVariableHead);
     }
+
+
 }

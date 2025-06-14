@@ -20,7 +20,7 @@ public class TlMqttHeartBeatDecoder  extends AbstractTlMqttDecoder{
 
     TlMqttFixedHead decodeFixedHeader(int remainingLength) {
         TlMqttFixedHead fixedHead = new TlMqttFixedHead();
-        fixedHead.setMessageType(MqttMessageType.PINGRESP);
+        fixedHead.setMessageType(MqttMessageType.PINGREQ);
         fixedHead.setLength(remainingLength);
         return fixedHead;
     }

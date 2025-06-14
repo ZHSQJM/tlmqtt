@@ -27,26 +27,37 @@ import java.util.concurrent.ThreadFactory;
 @Slf4j
 public class TlBridgeManager {
 
-
     public final Disruptor<PublishMessage> disruptor;
-
-    private  final TlBridgeProducer producer;
 
     private final KafkaBridgeObserver kafkaBridgeObserver;
 
     private final MySqlBridgeObserver mySqlBridgeObserver;
+
+    private final   RingBuffer<PublishMessage> ringBuffer;
 
     public TlBridgeManager() {
         disruptor = new Disruptor<>(PublishMessage::new, 16, new DefaultThreadFactory("tl-mqtt-bridge"), ProducerType.MULTI,new YieldingWaitStrategy());
         kafkaBridgeObserver = new KafkaBridgeObserver();
         mySqlBridgeObserver = new MySqlBridgeObserver();
         disruptor.handleEventsWith(kafkaBridgeObserver,mySqlBridgeObserver);
-        producer=new TlBridgeProducer(disruptor.getRingBuffer());
+        ringBuffer = disruptor.getRingBuffer();
         disruptor.start();
     }
 
     public void send(PublishMessage message){
-        producer.forward(message);
+        long sequence = ringBuffer.next();
+        try {
+            PublishMessage publishMessage = ringBuffer.get(sequence);
+            publishMessage.setMessageId(message.getMessageId());
+            publishMessage.setTopic(message.getTopic());
+            publishMessage.setClientId(message.getClientId());
+            publishMessage.setMessage(message.getMessage());
+            publishMessage.setQos(message.getQos());
+            publishMessage.setRetain(message.isRetain());
+            publishMessage.setDup(message.isDup());
+        }finally {
+            ringBuffer.publish(sequence);
+        }
     }
 
     public void addMysqlInfo(TlMySqlInfo tlMySqlInfo) {
@@ -57,7 +68,4 @@ public class TlBridgeManager {
         kafkaBridgeObserver.add(kafkaInfo);
     }
 
-    public void addHandler(EventHandler<PublishMessage> handler) {
-        disruptor.handleEventsWith(handler);
-    }
 }

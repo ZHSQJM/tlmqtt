@@ -1,5 +1,5 @@
 # tlmqtt
-`tlmqtt是一款基于Java开发的轻量级高并发MQTT Broker，采用Netty和Project Reactor实现异步通信，完整支持MQTT 3.1.1协议，包括QoS消息分级、主题通配符、消息持久化等核心功能。项目         提供认证（文件/数据库/HTTP）、数据桥接（Kafka/MySQL）和存储（内存/Redis）等可扩展组件，支持MQTT和WebSocket双协议接入。具备生产级特性如SSL加密、会话恢复及高并发处理能力，适用于物联网和实时通信场景。开发者可自定义认证逻辑和存储方案`
+`tlmqtt是一款基于Java开发的轻量级高并发MQTT Broker，采用Netty和Project Reactor实现异步通信，完整支持MQTT 3.1.1协议，包括QoS消息分级、主题通配符、消息持久化等核心功能。项目提供认证（文件/数据库/HTTP）、数据桥接（Kafka/MySQL）和存储（内存/Redis）等可扩展组件，支持MQTT和WebSocket双协议接入。具备生产级特性如SSL加密、会话恢复及高并发处理能力，适用于物联网和实时通信场景。开发者可自定义认证逻辑和存储方案`
 ## 功能
 - MQTT3.1.1协议自主解析
 - 完整的qos 0,1,2的消息支持
@@ -163,6 +163,6 @@ bootstrap.setSessionService(redisSessionService).setPublishService(redisPublishS
 #### 8. 遗嘱消息
 在客户端非正常断开后 发送遗嘱消息
 # 感谢项目
-	- [https://github.com/Wizzercn/MqttWk](https://github.com/Wizzercn/MqttWk)
-	- [https://github.com/quickmsg/smqttx](https://github.com/quickmsg/smqttx)
+	- <https://github.com/Wizzercn/MqttWk>
+	- <https://github.com/quickmsg/smqttx>
 `tlmqtt致力于为物联网开发者提供轻量、高效的 MQTT 消息服务，如果您觉得还不错请在右上角点一下 star大家的支持是开源最大动力`

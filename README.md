@@ -163,6 +163,7 @@ bootstrap.setSessionService(redisSessionService).setPublishService(redisPublishS
 #### 8. 遗嘱消息
 在客户端非正常断开后 发送遗嘱消息
 # 感谢项目
-	- [https://github.com/Wizzercn/MqttWk](https://github.com/Wizzercn/MqttWk)
-	- [https://github.com/quickmsg/smqttx](https://github.com/quickmsg/smqttx)
+- [https://github.com/Wizzercn/MqttWk](https://github.com/Wizzercn/MqttWk)
+- [https://github.com/quickmsg/smqttx](https://github.com/quickmsg/smqttx)
+	
 `tlmqtt致力于为物联网开发者提供轻量、高效的 MQTT 消息服务，如果您觉得还不错请在右上角点一下 star大家的支持是开源最大动力`

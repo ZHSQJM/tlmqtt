@@ -20,9 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlHeartBeatEventHandler extends SimpleChannelInboundHandler<TlMqttHeartBeatReq> {
-
-
+public class TlHeartBeatHandler extends SimpleChannelInboundHandler<TlMqttHeartBeatReq> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TlMqttHeartBeatReq msg) throws Exception {

@@ -3,7 +3,6 @@ package com.tlmqtt.core.handler;
 import com.tlmqtt.auth.AuthenticationManager;
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.MqttConnectReturnCode;
-import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.model.TlMqttSession;
@@ -17,7 +16,7 @@ import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
 import com.tlmqtt.core.manager.ChannelManager;
 import com.tlmqtt.core.manager.RetryManager;
 import com.tlmqtt.core.manager.TlStoreManager;
-import com.tlmqtt.core.retry.TlRetryMessage;
+import com.tlmqtt.core.retry.TlRetryTask;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -41,7 +40,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlConnectEventHandler extends SimpleChannelInboundHandler<TlMqttConnectReq> {
+public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectReq>{
 
     private final TlStoreManager storeManager;
 
@@ -55,11 +54,17 @@ public class TlConnectEventHandler extends SimpleChannelInboundHandler<TlMqttCon
     protected void channelRead0(ChannelHandlerContext ctx, TlMqttConnectReq req) throws Exception {
         Channel channel = ctx.channel();
         log.debug("Handling 【CONNECT】 event from client:【{}】", req.getPayload().getClientId());
+        if(channel.hasAttr(AttributeKey.valueOf(Constant.CLIENT_ID))){
+            log.warn("Client:【{}】 has already connected", req.getPayload().getClientId());
+            sendConnack(channel, req.getVariableHead().getCleanSession(),MqttConnectReturnCode.CONNECTION_REFUSED_PROTOCOL_ERROR);
+            channel.close();
+            return;
+        }
         if (!preCheck(req, channel)) {
             return;
         }
         if (!authenticate(req)) {
-            log.debug("Authentication failed for client:【{}】", req.getPayload().getClientId());
+            log.error("Authentication failed for client:【{}】", req.getPayload().getClientId());
             sendConnack(channel, req.getVariableHead().getCleanSession(),
                 MqttConnectReturnCode.CONNECTION_REFUSED_BAD_USER_NAME_OR_PASSWORD);
             return;
@@ -94,7 +99,7 @@ public class TlConnectEventHandler extends SimpleChannelInboundHandler<TlMqttCon
         }
 
         if (variableHead.getReserved() != 0) {
-            log.warn("Invalid reserved bits from client:【{}】", req.getPayload().getClientId());
+            log.error("Invalid reserved bits from client:【{}】", req.getPayload().getClientId());
             return false;
         }
 
@@ -117,7 +122,7 @@ public class TlConnectEventHandler extends SimpleChannelInboundHandler<TlMqttCon
     /**
      * 会话处理
      *
-     * @param req 连接信息
+     * @param req 连接信息b
      * @param ctx 通道
      * @return Mono<Void>
      * @author hszhou
@@ -265,14 +270,19 @@ public class TlConnectEventHandler extends SimpleChannelInboundHandler<TlMqttCon
      * @author hszhou
      * @datetime: 2025-06-09 15:10:48
      **/
-    private void registerClient(TlMqttConnectReq req, Channel channel) {
+    private  void registerClient(TlMqttConnectReq req, Channel channel) {
         String clientId = req.getPayload().getClientId();
+
+        // 先设置channel属性
         channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).set(clientId);
         InetSocketAddress socketAddress = (InetSocketAddress) channel.remoteAddress();
         channel.attr(AttributeKey.valueOf(Constant.IP)).set(socketAddress.getAddress().getHostAddress());
         channel.attr(AttributeKey.valueOf(Constant.USERNAME)).set(req.getPayload().getUsername());
         channel.attr(AttributeKey.valueOf(Constant.DISCONNECT)).set(false);
+
+        // 注册到ChannelManager（会处理旧连接）
         channelManager.put(clientId, channel);
+
     }
 
     /**
@@ -286,16 +296,19 @@ public class TlConnectEventHandler extends SimpleChannelInboundHandler<TlMqttCon
 
         Flux.merge(storeManager.getPublishService().findAll(clientId)
             .doOnNext(msg -> log.debug("Resending PUBLISH message 【{}】", msg.getMessageId())).flatMap(msg -> {
+                Long messageId = msg.getMessageId();
                 TlMqttPublishReq req = TlMqttPublishReq.build(msg.getTopic(), MqttQoS.valueOf(msg.getQos()),
                     msg.getMessage(), msg.getMessageId(), msg.isDup());
                 channel.writeAndFlush(req);
-                retryManager.retry(new TlRetryMessage(msg.getMessageId(), req), clientId,  MqttMessageType.PUBLISH);
+                TlRetryTask task = new TlRetryTask(messageId, msg, channel);
+                retryManager.schedulePublishRetry(messageId, task);
                 return Mono.empty();
             }), storeManager.getPubrelService().findAll(clientId)
             .doOnNext(msg -> log.debug("Resending PUBREL message 【{}】", msg.getMessageId())).flatMap(msg -> {
                 TlMqttPubRelReq req = TlMqttPubRelReq.build(msg.getMessageId(), true);
                 channel.writeAndFlush(req);
-                retryManager.retry(new TlRetryMessage(msg.getMessageId(), req), clientId,MqttMessageType.PUBREL);
+                TlRetryTask tlRetryTask = new TlRetryTask( msg.getMessageId(), msg, channel);
+                retryManager.schedulePubrelRetry(msg.getMessageId(), tlRetryTask);
                 return Mono.empty();
             })
 

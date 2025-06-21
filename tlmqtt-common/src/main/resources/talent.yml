@@ -1,6 +1,7 @@
 session:
   timeout: 5 #session会话超时时间 如果过了这个时间还没连接 那么就不保持会话
-  delay: 5 #ack消息确定 30s后没有收到确定就重发
+  delay: 5 #ack消息确定 5s后没有收到确定就重发
+  maxRetry: 3 #qos1和qos2的消息重试次数
 port:
   mqtt: 1883 # mqtt的默认端口
   sslMqtt: 8883 # mqtt的ssl断开
@@ -17,5 +18,18 @@ auth:
       password: 12345
     - username: zhouhs
       password: 12345
-
+# 通道设置
+channel:
+  writeLimit: 104857600 # 全局出站带宽限制：100MB/s
+  readLimit: 52428800 #  全局入站带宽限制：50MB/s
+  checkInterval: 1000  #统计周期：1秒
+  maxTime: 20971520 # `最大突发流量：20MB
+  lowWaterMark: 65536 # 默认 32768
+  highWaterMark: 131072 #  默认 65536
+#业务线程池队列配置
+business:
+  core: 16
+  max: 32
+  queue: 10000
+  keepAlive: 60
 

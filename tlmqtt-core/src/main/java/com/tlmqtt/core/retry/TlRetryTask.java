@@ -5,10 +5,11 @@ import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import io.netty.util.TimerTask;
 import lombok.Data;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
@@ -21,42 +22,69 @@ import java.util.concurrent.TimeUnit;
 public class TlRetryTask implements TimerTask {
 
     /**
+     * 消息ID
+     */
+    private final Long messageId;
+
+    /**
      * 消息
      */
-    private final TlRetryMessage message;
+    private final Object message;
     /**
      * 客户端通道
      */
     private final Channel channel;
-    /**
-     * 间隔时间
-     */
-    private final int duration;
 
-    @Setter
-    private  Timeout timeout;
+    private final AtomicInteger retryCount = new AtomicInteger(0);
 
-    public TlRetryTask(TlRetryMessage message, Channel channel, int duration){
-        this.message = message;
-        this.channel =channel;
-        this.duration = duration;
-    }
+    private volatile Timeout timeout;
+
+    private volatile boolean cancelled = false;
+
+    private int maxRetry;
+
+    private int duration;
+
+
     @Override
     public void run(Timeout timeout) throws Exception {
-        log.info("Resend messageId 【{}】-【{}】",message.getMessageId(),message.getMessage().getClass());
-        channel.writeAndFlush(message.getMessage());
-        try {
-            Thread.sleep(1000);
-        }catch (Exception e){
-            e.printStackTrace();
+
+        if(cancelled  || channel == null || !channel.isActive()){
+            return;
         }
-        Timer timer = timeout.timer();
-        this.timeout = timer.newTimeout(this, duration, TimeUnit.SECONDS);
+        if(retryCount.incrementAndGet()>maxRetry){
+            cancel();
+            return;
+        }
+        try {
+            // 异步发送避免阻塞定时器线程
+            channel.eventLoop().execute(() -> {
+                if (!cancelled && channel.isActive()) {
+                    channel.writeAndFlush(message).addListener(future -> {
+                        if (future.isSuccess()) {
+                            reschedule(timeout.timer());
+                        }
+                    });
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            log.warn("Event loop overloaded, delaying retry: {}", messageId);
+            reschedule(timeout.timer());
+        }
+
+    }
+
+
+    private void reschedule(Timer timer){
+        if(!cancelled){
+            this.timeout = timer.newTimeout(this,duration, TimeUnit.SECONDS);
+        }
     }
 
     public void cancel(){
-        if(this.timeout != null){
-            this.timeout.cancel();
+        cancelled = true;
+        if(timeout !=null && !timeout.isCancelled()){
+            timeout.cancel();
         }
     }
 }

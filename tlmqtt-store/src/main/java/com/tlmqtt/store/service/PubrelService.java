@@ -21,7 +21,7 @@ public interface PubrelService {
      * @param req       具体的消息
      * @return 是否保存成功
      */
-    Mono<Boolean> save(String clientId, Long messageId, PubrelMessage req);
+    Mono<PubrelMessage> save(String clientId, Long messageId, PubrelMessage req);
 
     /**
      * 清除订阅者的某个rel的消息

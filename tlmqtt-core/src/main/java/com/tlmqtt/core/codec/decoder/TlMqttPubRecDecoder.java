@@ -5,17 +5,20 @@ import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.request.TlMqttPubRecReq;
 import com.tlmqtt.common.model.variable.TlMqttPubRecVariableHead;
 import io.netty.buffer.ByteBuf;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @Author: hszhou
  * @Date: 2024/11/30 15:12
  * @Description: Qos2的消息的消息回复
  */
+@Slf4j
 public class TlMqttPubRecDecoder extends AbstractTlMqttDecoder{
 
 
     @Override
     public TlMqttPubRecReq build(ByteBuf buf, int type,int remainingLength) {
+
         TlMqttFixedHead fixedHead = decodeFixedHeader(remainingLength);
         TlMqttPubRecVariableHead variableHead = decodeVariableHeader(buf);
         return new TlMqttPubRecReq(fixedHead, variableHead);

@@ -51,8 +51,7 @@ public class DefaultSubscriptionServiceImpl implements SubscriptionService {
 
     @Override
     public Flux<TlSubClient> find(String topic) {
-        return Flux.defer(() -> Flux.fromIterable(trie.search(topic)))
-            .subscribeOn(Schedulers.boundedElastic());
+        return Flux.defer(() -> Flux.fromIterable(trie.search(topic)));
     }
 
     @Override

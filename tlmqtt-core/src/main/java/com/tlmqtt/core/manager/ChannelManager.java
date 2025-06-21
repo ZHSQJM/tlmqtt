@@ -26,8 +26,11 @@ public class ChannelManager {
      * @param: channel
      * @return: void
      **/
-    public void put(String clientId, Channel channel){
-        CLIENT_MAP.putIfAbsent(clientId,  channel);
+    public void put(String clientId, Channel newChannel){
+        Channel oldChannel = CLIENT_MAP.put(clientId, newChannel);
+        if(oldChannel !=null && oldChannel != newChannel && oldChannel.isActive()){
+            oldChannel.close();
+        }
     }
 
     /**

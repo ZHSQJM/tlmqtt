@@ -18,7 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlDisconnectEventHandler extends SimpleChannelInboundHandler<TlMqttDisconnectReq> {
+public class TlDisconnectHandler extends SimpleChannelInboundHandler<TlMqttDisconnectReq> {
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TlMqttDisconnectReq msg) throws Exception {

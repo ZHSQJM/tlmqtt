@@ -1,9 +1,6 @@
 package com.tlmqtt.core.manager;
 
-import com.tlmqtt.common.enums.MqttMessageType;
-import com.tlmqtt.core.retry.TlRetryMessage;
 import com.tlmqtt.core.retry.TlRetryTask;
-import io.netty.channel.Channel;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import lombok.Setter;
@@ -20,47 +17,96 @@ import java.util.concurrent.*;
 @Slf4j
 public class RetryManager extends HashedWheelTimer {
 
-    private final ChannelManager channelManager;
 
     private int delay;
 
-    public ConcurrentHashMap<String, TlRetryTask> map = new ConcurrentHashMap<>();
+    private int maxRetry;
 
-    public RetryManager(ChannelManager channelManager, int delay) {
-        this.channelManager = channelManager;
+    private static final int MAP_SEGMENTS = 32;
+    private final ConcurrentMap<Long, TlRetryTask>[] pubSegments;
+    private final ConcurrentMap<Long, TlRetryTask>[] pubrelSegments;
+
+
+    public RetryManager(int  delay,int maxRetry) {
         this.delay = delay;
-    }
-
-    public void retry(TlRetryMessage req, String clientId, MqttMessageType type) {
-
-        Long messageId = req.getMessageId();
-        log.debug(" retry messageId:【{}】，类型是【{}】", messageId,type);
-        Channel channel = channelManager.getChannel(clientId);
-        if (channel != null && channel.isActive()) {
-            TlRetryTask retryTask = new TlRetryTask(req, channel, delay);
-            Timeout timeout = this.newTimeout(retryTask, delay, TimeUnit.SECONDS);
-            retryTask.setTimeout(timeout);
-            map.put(messageId.toString(), retryTask);
-            //通知
-        } else {
-            map.remove(messageId.toString());
+        this.maxRetry = maxRetry;
+        // 初始化分段Map
+        pubSegments = new ConcurrentHashMap[MAP_SEGMENTS];
+        pubrelSegments = new ConcurrentHashMap[MAP_SEGMENTS];
+        for (int i = 0; i < MAP_SEGMENTS; i++) {
+            pubSegments[i] = new ConcurrentHashMap<>();
+            pubrelSegments[i] = new ConcurrentHashMap<>();
         }
-        log.debug("保存完毕【{}】",type);
     }
 
     /**
-     * 取消发送
-     *
-     * @param messageId 消息ID
+     * 获取消息应该存放到哪个map里面
      * @author hszhou
-     * @datetime: 2025-06-07 08:56:56
+     * @datetime: 2025-06-20 13:43:11
+     * @param messageId 消息id
+     * @return int
      **/
-    public void cancel(Long messageId) {
-        String msgId = messageId.toString();
-        TlRetryTask tlRetryTask = map.get(msgId);
-        log.debug("cancel task 【{}】，【{}】",messageId,tlRetryTask.getMessage().getMessage().getClass());
-        tlRetryTask.cancel();
-        map.remove(msgId);
+    private int segmentIndex(Long messageId) {
+        return (int) (messageId % MAP_SEGMENTS);
     }
 
+
+    /**
+     * 定时任务发送publish消息
+     * @author hszhou
+     * @datetime: 2025-06-20 13:44:11
+     * @param messageId 消息id
+     * @param task  任务
+     **/
+    public void schedulePublishRetry(Long messageId,TlRetryTask task){
+            int segmentIndex = segmentIndex(messageId);
+            TlRetryTask retryTask = pubSegments[segmentIndex].putIfAbsent(messageId, task);
+            // 如果retryTask返回的是null 则说明messageID的key不在map中 正常返回
+            // 如果返回的不是null 怎么说明放入失败了 已经有一个任务了 那么就将这个任务取消 重新放入新的任务
+            if(retryTask == null){
+                startRetryTask(task);
+            }else{
+                retryTask.cancel();
+                pubSegments[segmentIndex].put(messageId, task);
+                startRetryTask(task);
+            }
+    }
+
+
+    public void schedulePubrelRetry(Long messageId,TlRetryTask task){
+
+            int segmentIndex = segmentIndex(messageId);
+            TlRetryTask retryTask = pubrelSegments[segmentIndex].putIfAbsent(messageId, task);
+            if(retryTask == null){
+                startRetryTask(task);
+            }else{
+                retryTask.cancel();
+                pubrelSegments[segmentIndex].put(messageId, task);
+                startRetryTask(task);
+            }
+    }
+
+    public void startRetryTask(TlRetryTask retryTask){
+        retryTask.setDuration(delay);
+        retryTask.setMaxRetry(maxRetry);
+        Timeout timeout = this.newTimeout(retryTask, delay, TimeUnit.SECONDS);
+        retryTask.setTimeout(timeout);
+    }
+
+    public void cancelPublishRetry(Long messageId){
+            int segmentIndex = segmentIndex(messageId);
+            TlRetryTask retryTask = pubSegments[segmentIndex].remove(messageId);
+            if(retryTask!=null){
+                retryTask.cancel();
+            }
+    }
+
+
+    public void cancelPubrelRetry(Long messageId){
+            int segmentIndex = segmentIndex(messageId);
+            TlRetryTask retryTask = pubrelSegments[segmentIndex].remove(messageId);
+            if(retryTask!=null){
+                retryTask.cancel();
+            }
+    }
 }

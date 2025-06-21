@@ -25,17 +25,16 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlPubRelEventHandler extends SimpleChannelInboundHandler<TlMqttPubRelReq> {
+public class TlPubRelHandler extends SimpleChannelInboundHandler<TlMqttPubRelReq> {
 
     private final TlMessageService messageService;
 
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TlMqttPubRelReq req) throws Exception {
-
         Channel channel = ctx.channel();
         String clientId = channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).get().toString();
-        log.debug("【broker】4. Handling 【PUBREL】 event from client:【{}】",clientId);
+        log.debug("Handling 【PUBREL】 event from client:【{}】",clientId);
         //根据这个消息获取到对应的
         TlMqttPubRelVariableHead variableHead = req.getVariableHead();
         Long messageId = variableHead.getMessageId();
@@ -61,7 +60,6 @@ public class TlPubRelEventHandler extends SimpleChannelInboundHandler<TlMqttPubR
      * @param ctx 通道
      */
     private void sendComp(Long messageId, ChannelHandlerContext ctx) {
-        log.debug("broker send comp message 【{}】 to client", messageId);
         TlMqttPubCompReq res = TlMqttPubCompReq.build(messageId);
         ctx.channel().writeAndFlush(res);
     }

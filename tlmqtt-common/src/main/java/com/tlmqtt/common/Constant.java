@@ -17,7 +17,6 @@ public class Constant {
      */
     public static final String DISCONNECT = "disconnect_flag";
 
-
     /**
      * 保存在通道中的消息KEY 用于在接收pubrel的时候获取对应的消息
      */
@@ -33,8 +32,6 @@ public class Constant {
 
     public static final String IP ="ip";
 
-    //public static final String SESSION = "session" ;
-    
     public static final String TOPIC_SPLITTER = "#";
     public static final String TOPIC_WILDCARD = "\\+";
     public static final String TOPIC_SPLITTER_SPLITTER = "\\/";

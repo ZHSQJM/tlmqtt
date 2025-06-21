@@ -14,4 +14,6 @@ public class TlSessionProperties {
 
     private int delay;
 
+    private int maxRetry;
+
 }

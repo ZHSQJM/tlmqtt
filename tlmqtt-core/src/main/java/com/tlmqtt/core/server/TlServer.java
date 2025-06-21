@@ -6,6 +6,7 @@ import com.tlmqtt.bridge.TlBridgeManager;
 import com.tlmqtt.common.config.*;
 import com.tlmqtt.common.model.entity.TlUser;
 import com.tlmqtt.core.codec.MqttWebSocketCodec;
+
 import com.tlmqtt.core.manager.TlStoreManager;
 import com.tlmqtt.core.manager.ChannelManager;
 import com.tlmqtt.core.codec.TlMqttMessageCodec;
@@ -17,9 +18,8 @@ import com.tlmqtt.core.message.TlMessageService;
 import com.tlmqtt.store.service.*;
 import com.tlmqtt.store.service.impl.*;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelPipeline;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -31,6 +31,7 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.handler.traffic.GlobalTrafficShapingHandler;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -39,6 +40,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @Author hszhou
@@ -90,27 +95,26 @@ public class TlServer {
 
     private final TlMqttUnSubAckEncoder unSubAckEncoder;
 
-    private final TlHeartbeatEventTriggered heartbeatEventTriggered;
 
-    private final TlConnectEventHandler connectEventHandler;
+    private final TlConnectHandler connectEventHandler;
 
-    private final TlDisconnectEventHandler disconnectEventHandler;
+    private final TlDisconnectHandler disconnectEventHandler;
 
-    private final TlHeartBeatEventHandler heartBeatEventHandler;
+    private final TlHeartBeatHandler heartBeatEventHandler;
 
-    private final TlPubAckEventHandler pubAckEventHandler;
+    private final TlPubAckHandler pubAckEventHandler;
 
-    private final TlPubCompEventHandler pubCompEventHandler;
+    private final TlPubCompHandler pubCompEventHandler;
 
-    private final TlPublishEventHandler publishEventHandler;
+    private final TlPublishHandler publishEventHandler;
 
-    private final TlPubRecEventHandler pubRecEventHandler;
+    private final TlPubRecHandler pubRecEventHandler;
 
-    private final TlPubRelEventHandler pubRelEventHandler;
+    private final TlPubRelHandler pubRelEventHandler;
 
-    private final TlSubscribeEventHandler subscribeEventHandler;
+    private final TlSubscribeHandler subscribeEventHandler;
 
-    private final TlUnSubscribeEventHandler unSubscribeEventHandler;
+    private final TlUnSubscribeHandler unSubscribeEventHandler;
 
     private final TlExceptionHandler exceptionHandler;
 
@@ -125,12 +129,23 @@ public class TlServer {
 
     private SslContext sslContext;
 
+    private final GlobalTrafficShapingHandler globalTrafficShapingHandler;
+
+    private final WriteBufferWaterMark writeBufferWaterMark;
+
+
+    private final ExecutorService executorService;
+
     @Setter
     private boolean ssl;
     @Setter
     private String certPath;
 
     private String privatePath;
+
+    private ShutDownGracefully shutDownGracefully;
+
+
 
 
     public TlServer() {
@@ -161,10 +176,28 @@ public class TlServer {
         TlMqttProperties mqttProperties = mqttConfiguration.getMqttProperties();
         TlSessionProperties session = mqttProperties.getSession();
         int delay = session.getDelay();
+        int maxRetry = session.getMaxRetry();
+
         TlAuthProperties auth = mqttProperties.getAuth();
         boolean enabled = auth.isEnabled();
         List<TlUser> user = auth.getUser();
 
+        ChannelProperties channelProperties = mqttProperties.getChannel();
+        // 创建全局流量整形处理器
+        globalTrafficShapingHandler= new GlobalTrafficShapingHandler(workerGroup, channelProperties.getWriteLimit(),
+            channelProperties.getReadLimit(), channelProperties.getCheckInterval(), channelProperties.getMaxTime());
+        //控制单个channel的高低水位线
+        writeBufferWaterMark = new WriteBufferWaterMark(channelProperties.getLowWaterMark(), channelProperties.getHighWaterMark());
+
+        BusinessProperties businessProperties = mqttProperties.getBusiness();
+        executorService =  new ThreadPoolExecutor(
+            businessProperties==null? Runtime.getRuntime().availableProcessors() * 2: businessProperties.getCore(),
+            businessProperties==null? Runtime.getRuntime().availableProcessors() * 2: businessProperties.getMax(),
+            businessProperties==null? 60L: businessProperties.getKeepAlive(),
+            TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(businessProperties==null?10000:businessProperties.getQueue()),
+            new ThreadPoolExecutor.CallerRunsPolicy()
+        );
         PublishService publishService = new DefaultPublishServiceImpl();
         PubrelService pubrelService = new DefaultPubrelServiceImpl();
         RetainService retainService = new DefaultRetainServiceImpl();
@@ -172,26 +205,26 @@ public class TlServer {
         SubscriptionService subscriptionService = new DefaultSubscriptionServiceImpl(sessionService);
         ChannelManager channelManager = new ChannelManager();
         AclManager aclManager = new AclManager();
-        retryManager = new RetryManager(channelManager, delay);
+        retryManager = new RetryManager(delay,maxRetry);
         storeManager = new TlStoreManager(sessionService, subscriptionService, publishService, pubrelService, retainService);
-        TlMessageService messageService = new TlMessageService(storeManager, channelManager,retryManager);
+        TlMessageService messageService = new TlMessageService(storeManager, channelManager,retryManager,executorService);
         bridgeManager = new TlBridgeManager();
         authenticationManager = new AuthenticationManager(enabled);
         authenticationManager.addFixUsers(user);
 
-        heartbeatEventTriggered = new TlHeartbeatEventTriggered();
         exceptionHandler = new TlExceptionHandler(storeManager,channelManager,messageService);
-        connectEventHandler = new TlConnectEventHandler(storeManager,channelManager, authenticationManager,retryManager);
-        disconnectEventHandler = new TlDisconnectEventHandler();
-        heartBeatEventHandler = new TlHeartBeatEventHandler();
-        pubAckEventHandler = new TlPubAckEventHandler(storeManager, retryManager);
-        pubCompEventHandler = new TlPubCompEventHandler(storeManager, retryManager);
-        publishEventHandler = new TlPublishEventHandler(storeManager, aclManager, bridgeManager, messageService);
-        pubRecEventHandler = new TlPubRecEventHandler(storeManager, retryManager);
-        pubRelEventHandler = new TlPubRelEventHandler(messageService);
-        subscribeEventHandler = new TlSubscribeEventHandler(storeManager, aclManager);
-        unSubscribeEventHandler = new TlUnSubscribeEventHandler(storeManager);
+        connectEventHandler = new TlConnectHandler(storeManager,channelManager, authenticationManager,retryManager);
+        disconnectEventHandler = new TlDisconnectHandler();
+        heartBeatEventHandler = new TlHeartBeatHandler();
+        pubAckEventHandler = new TlPubAckHandler(storeManager, retryManager);
+        pubCompEventHandler = new TlPubCompHandler(storeManager, retryManager);
+        publishEventHandler = new TlPublishHandler(storeManager, aclManager, bridgeManager, messageService);
+        pubRecEventHandler = new TlPubRecHandler(storeManager, retryManager,executorService);
+        pubRelEventHandler = new TlPubRelHandler(messageService);
+        subscribeEventHandler = new TlSubscribeHandler(storeManager, aclManager);
+        unSubscribeEventHandler = new TlUnSubscribeHandler(storeManager);
 
+        this.shutDownGracefully = new ShutDownGracefully(null, bossGroup, workerGroup, executorService);
     }
 
     public void setPrivatePath(String privatePath) {
@@ -209,33 +242,45 @@ public class TlServer {
 
         ServerBootstrap bootstrap = new ServerBootstrap();
         initSsl();
-        bootstrap.group(bossGroup, workerGroup).channel(NioServerSocketChannel.class)
+        bootstrap
+            .group(bossGroup, workerGroup)
+            .channel(NioServerSocketChannel.class)
+            .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK, writeBufferWaterMark)
+            .childOption(ChannelOption.TCP_NODELAY, true)
+            .childOption(ChannelOption.SO_KEEPALIVE, true)
+            .childOption(ChannelOption.SO_REUSEADDR, true)
+            .option(ChannelOption.SO_REUSEADDR, true)
+            .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+            .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
             .childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel ch) throws Exception {
                     ChannelPipeline pipeline = ch.pipeline();
+                    pipeline.addLast(globalTrafficShapingHandler);
                     if (ssl) {
-                        pipeline.addFirst("ssl", sslContext.newHandler(ch.alloc()));
+                        pipeline.addFirst(sslContext.newHandler(ch.alloc()));
                     }
                     pipeline.addLast(new TlMqttMessageCodec(connectDecoder, disConnectDecoder, heartBeatDecoder, pubAckDecoder,pubCompDecoder, publishDecoder, pubRecDecoder, pubRelDecoder, subscribeDecoder, unSubscribeDecoder))
                             .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder, pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder)
-                            .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler,
-                                pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
-                            .addLast(heartbeatEventTriggered,exceptionHandler);
+                            .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler, pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
+                            .addLast(exceptionHandler);
                 }
             });
         try {
             ChannelFuture channelFuture = bootstrap.bind(port).sync();
             log.info("mqtt server start success on port【{}】", port);
-            channelFuture.channel().closeFuture().sync();
+
+            Channel channel = channelFuture.channel();
+            //注册关闭线程池的方法
+            shutDownGracefully.registerShutdownHook(channel);
+
+            channel.closeFuture().sync();
+
         }
         catch (Exception e) {
             log.error("mqtt server start error", e);
         }
-        finally {
-            bossGroup.shutdownGracefully();
-            workerGroup.shutdownGracefully();
-        }
+
     }
 
     public void startWebsocket(int port) {
@@ -253,9 +298,8 @@ public class TlServer {
                     addPipeline(pipeline);
                     pipeline.addLast(new TlMqttMessageCodec(connectDecoder, disConnectDecoder, heartBeatDecoder, pubAckDecoder,pubCompDecoder, publishDecoder, pubRecDecoder, pubRelDecoder, subscribeDecoder, unSubscribeDecoder))
                         .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder, pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder)
-                        .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler,
-                            pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
-                        .addLast(heartbeatEventTriggered,exceptionHandler);
+                          .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler, pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
+                        .addLast(exceptionHandler);
                 }
             });
         try {
@@ -288,7 +332,7 @@ public class TlServer {
         pipeline.addLast("compressor ", new HttpContentCompressor());
         pipeline.addLast("protocol", new WebSocketServerProtocolHandler("/mqtt", "mqtt,mqttv3.1,mqttv3.1.1", true, 65536));
         pipeline.addLast("mqttWebSocket", new MqttWebSocketCodec());
-    };
+    }
 
     /**
      * 构建证书
@@ -320,5 +364,6 @@ public class TlServer {
             throw new IllegalArgumentException("构建sslContext异常", e);
         }
     }
+
 
 }

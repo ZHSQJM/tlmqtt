@@ -30,7 +30,7 @@ import java.util.List;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlSubscribeEventHandler extends SimpleChannelInboundHandler<TlMqttSubscribeReq> {
+public class TlSubscribeHandler extends SimpleChannelInboundHandler<TlMqttSubscribeReq> {
 
     private final TlStoreManager storeManager;
 

@@ -5,6 +5,7 @@ import com.tlmqtt.store.service.PublishService;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,6 +36,7 @@ public class DefaultPublishServiceImpl implements PublishService {
                     v.computeIfAbsent(String.valueOf(messageId), key -> req);
                     return v;
                 })).thenReturn(req);
+            //.subscribeOn(Schedulers.boundedElastic());
 
     }
 

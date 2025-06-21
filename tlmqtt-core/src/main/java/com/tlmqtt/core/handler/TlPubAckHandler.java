@@ -12,6 +12,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * @Author: hszhou
@@ -21,14 +22,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlPubAckEventHandler extends SimpleChannelInboundHandler<TlMqttPubAckReq> {
+public class TlPubAckHandler extends SimpleChannelInboundHandler<TlMqttPubAckReq> {
 
     private final TlStoreManager storeManager;
 
     private final RetryManager retryManager;
-
-
-
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TlMqttPubAckReq req) throws Exception {
@@ -38,7 +36,10 @@ public class TlPubAckEventHandler extends SimpleChannelInboundHandler<TlMqttPubA
         log.debug("Handling 【PubAck】 event from client:【{}】", clientId);
         TlMqttPubAckVariableHead variableHead = req.getVariableHead();
         Long messageId = variableHead.getMessageId();
-        storeManager.getPublishService().clear(clientId, messageId)
-            .subscribe(e -> retryManager.cancel(messageId));
+        retryManager.cancelPublishRetry(messageId);
+        storeManager.getPublishService()
+                    .clear(clientId, messageId)
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe();
     }
 }

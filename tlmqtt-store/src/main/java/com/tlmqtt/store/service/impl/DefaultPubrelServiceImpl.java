@@ -4,6 +4,7 @@ import com.tlmqtt.common.model.entity.PubrelMessage;
 import com.tlmqtt.store.service.PubrelService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -17,7 +18,7 @@ public class DefaultPubrelServiceImpl implements PubrelService {
     public static final ConcurrentHashMap<String, ConcurrentHashMap<String, PubrelMessage>> PUBREL_MAP = new ConcurrentHashMap<>();
 
     @Override
-    public Mono<Boolean> save(String clientId, Long messageId, PubrelMessage req) {
+    public Mono<PubrelMessage> save(String clientId, Long messageId, PubrelMessage req) {
 
 
         return Mono.fromSupplier(()->
@@ -27,7 +28,8 @@ public class DefaultPubrelServiceImpl implements PubrelService {
                 }
                 v.computeIfAbsent(String.valueOf(messageId), key -> req);
                 return v;
-            })).thenReturn(true);
+            })).thenReturn(req);
+            //.subscribeOn(Schedulers.boundedElastic());
     }
 
     @Override

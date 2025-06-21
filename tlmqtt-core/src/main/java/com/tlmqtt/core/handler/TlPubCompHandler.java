@@ -12,6 +12,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * @Author: hszhou
@@ -21,30 +22,23 @@ import lombok.extern.slf4j.Slf4j;
 @ChannelHandler.Sharable
 @Slf4j
 @RequiredArgsConstructor
-public class TlPubCompEventHandler extends SimpleChannelInboundHandler<TlMqttPubCompReq> {
+public class TlPubCompHandler extends SimpleChannelInboundHandler<TlMqttPubCompReq> {
 
     private final TlStoreManager storeManager;
 
     private final RetryManager retryManager;
 
-
-
-
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TlMqttPubCompReq req) throws Exception {
-
-
         Channel channel = ctx.channel();
         String clientId = channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).get().toString();
         log.debug("Handling 【PUBCOMP】 event from client:【{}】", clientId);
         TlMqttPubCompVariableHead variableHead = req.getVariableHead();
         Long messageId = variableHead.getMessageId();
-        log.debug("Receive client 【{}】 messageId 【{}】", clientId, messageId);
-        //删除rel消息
-        storeManager.getPubrelService().clear(clientId, messageId).subscribe(e -> {
-            //取消定时器发送rel消息
-            log.debug("【Client】8.  cancel task for pubrel:【{}】", messageId);
-            retryManager.cancel(messageId);
-        });
+        retryManager.cancelPubrelRetry(messageId);
+        storeManager.getPubrelService()
+                    .clear(clientId, messageId)
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .subscribe();
     }
 }

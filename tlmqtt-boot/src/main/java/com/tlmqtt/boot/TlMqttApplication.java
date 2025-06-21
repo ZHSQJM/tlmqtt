@@ -40,11 +40,11 @@ public class TlMqttApplication implements CommandLineRunner {
     public void run(String... args) throws Exception {
         tlBootstrap
             //表示开启mqtt
-            .socket()
+            .socket(18883)
             //表示开启websocket
-            .websocket()
-            .setFixUser(Collections.singletonList(new TlUser("admin","12345")))
-            .setFixUser(Collections.singletonList(new TlUser("mqtt","mqtt")))
+            //.websocket()
+           // .setFixUser(Collections.singletonList(new TlUser("admin","12345")))
+            //.setFixUser(Collections.singletonList(new TlUser("mqtt","mqtt")))
             .start();
     }
 }

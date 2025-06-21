@@ -23,25 +23,21 @@ import java.util.List;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlUnSubscribeEventHandler extends SimpleChannelInboundHandler<TlMqttUnSubscribeReq> {
+public class TlUnSubscribeHandler extends SimpleChannelInboundHandler<TlMqttUnSubscribeReq> {
 
     private final TlStoreManager storeManager;
-
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TlMqttUnSubscribeReq req) throws Exception {
         Channel channel = ctx.channel();
         String clientId = channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).get().toString();
         log.debug("Handling 【UNSUBSCRIBE】 event from client:【{}】", clientId);
-
-
         TlMqttUnSubscribePayload payload = req.getPayload();
         List<TlTopic> topics = payload.getTopics();
         //取消订阅 就移除掉主题对应的客户端 这样发送消息就接收不到
         topics.forEach(topic-> storeManager.getSubscriptionService()
             .unsubscribe(clientId, topic.getName())
             .subscribe(e -> log.debug("Client 【{}】 unsubscribe topic 【{}】", clientId, topic)));
-
         //构建ack消息
         int messageId = req.getVariableHead().getMessageId();
         TlMqttUnSubAck res = TlMqttUnSubAck.of(messageId);

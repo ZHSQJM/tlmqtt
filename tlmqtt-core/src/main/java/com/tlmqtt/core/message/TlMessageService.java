@@ -1,17 +1,20 @@
 package com.tlmqtt.core.message;
 
-import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.core.manager.ChannelManager;
 import com.tlmqtt.core.manager.RetryManager;
 import com.tlmqtt.core.manager.TlStoreManager;
-import com.tlmqtt.core.retry.TlRetryMessage;
+import com.tlmqtt.core.retry.TlRetryTask;
+import io.netty.channel.Channel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -24,9 +27,10 @@ import java.util.concurrent.atomic.AtomicLong;
 public class TlMessageService {
 
 
-    public static final int MAX_ID = 65535;
+    private static final int MAX_ID = 65535;
+    private final AtomicLong counter = new AtomicLong(1);
 
-    private final AtomicLong messageId = new AtomicLong(0);
+
 
     @Getter
     private final TlStoreManager storeManager;
@@ -34,6 +38,8 @@ public class TlMessageService {
     private final ChannelManager channelManager;
     @Getter
     private final RetryManager retryManager;
+
+    private final ExecutorService executorService;
 
     /**
      * @description: 用于转发消息给订阅topic的客户端
@@ -51,27 +57,34 @@ public class TlMessageService {
     }
 
     private void doPublish(String topic, MqttQoS qoS, String content, TlSubClient client) {
-        TlMqttPublishReq message = ofMessage(topic, qoS, content, client);
-        String clientId = client.getClientId();
-        Long messageId = message.getVariableHead().getMessageId();
-        log.debug("【Client】2. Find  client session 【{}】,message is 【{}】",client.getClientId(),message.getVariableHead().getMessageId());
-        MqttQoS mqttQoS = message.getFixedHead().getQos();
-        if (mqttQoS == MqttQoS.EXACTLY_ONCE || mqttQoS == MqttQoS.AT_LEAST_ONCE) {
-            retryManager.retry(new TlRetryMessage(messageId, message), clientId, MqttMessageType.PUBLISH);
-        }
-            storeManager.getSessionService().find(clientId)
-                .flatMap(session -> {
-                    log.debug("Client session [{}] processing message [{}]", clientId, messageId);
-                    return mqttQoS==MqttQoS.AT_MOST_ONCE
-                        ?  Mono.just(message)
-                        : storeManager.savePublishReq(clientId, messageId, message, mqttQoS);
-                })
-                .doOnError(e -> log.error("Publish failed for client [{}]", clientId, e))
-                .subscribe(e -> {
-                    log.debug("Client session [{}] processed message [{}]", clientId, messageId);
-                    channelManager.writeAndFlush(clientId, message);
-                });
 
+        executorService.execute(()->{
+            TlMqttPublishReq message = ofMessage(topic, qoS, content, client);
+            String clientId = client.getClientId();
+            Long messageId = message.getVariableHead().getMessageId();
+            log.debug("【Find  client session 【{}】,message is 【{}】",client.getClientId(),message.getVariableHead().getMessageId());
+            MqttQoS mqttQoS = message.getFixedHead().getQos();
+            storeManager.getSessionService().find(clientId)
+                .flatMap(session -> mqttQoS==MqttQoS.AT_MOST_ONCE
+                    ?  Mono.just(message)
+                    : storeManager.savePublishReq(clientId, messageId, message, mqttQoS))
+                .doOnError(e -> log.error("Publish failed for client [{}]", clientId, e))
+                .publishOn(Schedulers.boundedElastic())
+                .subscribe(e -> {
+                    // I/O操作回到Netty线程
+                    Channel channel = channelManager.getChannel(clientId);
+                    if (channel != null && channel.isActive()) {
+                        channel.eventLoop().execute(() -> {
+                            channel.writeAndFlush(message);
+                            if (mqttQoS == MqttQoS.EXACTLY_ONCE ||
+                                mqttQoS == MqttQoS.AT_LEAST_ONCE) {
+                                TlRetryTask task = new TlRetryTask(messageId, message, channel);
+                                retryManager.schedulePublishRetry(messageId, task);
+                            }
+                        });
+                    }
+                });
+        });
     }
     /**
      * 构建一个新的消息
@@ -91,17 +104,18 @@ public class TlMessageService {
         if (mqttQoS == MqttQoS.AT_MOST_ONCE) {
             return TlMqttPublishReq.build(topic, mqttQoS, false, content, 0L);
         }
-        Long messageId = getMessageId();
+        Long messageId = nextId();
         return TlMqttPublishReq.build(topic, mqttQoS, false, content, messageId);
     }
 
-    public Long getMessageId() {
-        long andIncrement = messageId.getAndIncrement();
-        if (andIncrement > MAX_ID) {
-            messageId.set(0);
-            return messageId.getAndIncrement();
-        }
-        return andIncrement;
-    }
 
+    public Long nextId() {
+        long current;
+        long next;
+        do {
+            current = counter.get();
+            next = current >= MAX_ID ? 1 : current + 1;
+        } while (!counter.compareAndSet(current, next));
+        return current;
+    }
 }

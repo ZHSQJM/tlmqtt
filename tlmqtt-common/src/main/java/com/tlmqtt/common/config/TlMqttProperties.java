@@ -17,4 +17,10 @@ public class TlMqttProperties {
     private TlSslProperties ssl;
 
     private TlSessionProperties session;
+
+    private ChannelProperties channel;
+
+    private BusinessProperties business;
+
+
 }

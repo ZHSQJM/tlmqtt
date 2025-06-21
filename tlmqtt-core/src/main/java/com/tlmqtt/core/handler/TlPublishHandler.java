@@ -30,7 +30,7 @@ import reactor.core.publisher.Mono;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlPublishEventHandler extends SimpleChannelInboundHandler<TlMqttPublishReq> {
+public class TlPublishHandler extends SimpleChannelInboundHandler<TlMqttPublishReq> {
 
     private final TlStoreManager storeManager;
 
@@ -47,7 +47,6 @@ public class TlPublishEventHandler extends SimpleChannelInboundHandler<TlMqttPub
         Channel channel = ctx.channel();
         String clientId = channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).get().toString();
         log.debug("Handling 【PUBLISH】 event from client:【{}】", clientId);
-
         TlMqttFixedHead fixedHead = req.getFixedHead();
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
         TlMqttPublishPayload payload = req.getPayload();
@@ -71,14 +70,13 @@ public class TlPublishEventHandler extends SimpleChannelInboundHandler<TlMqttPub
         PublishMessage publishMessage = PublishMessage.build(messageId, topic, clientId, content, messageQos.value(),
             retain, false);
         bridgeManager.send(publishMessage);
-        log.debug("【broker】2. Receive message qos 【{}】,messageId 【{}】", messageQos.value(), messageId);
         switch (messageQos) {
-            case AT_LEAST_ONCE -> sendAck(messageId, clientId,channel);
+            case AT_LEAST_ONCE -> sendAck(messageId,channel);
             case EXACTLY_ONCE -> {
                 //这里需要保存消息 key是messageId，value是req，在收到rel消息后 需要将这个消息转发到其他订阅的客户端 在rel只能收到messageId，没有其他的信息
                 channel.attr(AttributeKey.valueOf(Constant.PUB_MSG)).set(req);
                 //发送rec消息给发送者
-                sendRec(messageId, clientId,channel);
+                sendRec(messageId,channel);
                 return;
             }
             default -> {}
@@ -122,10 +120,8 @@ public class TlPublishEventHandler extends SimpleChannelInboundHandler<TlMqttPub
      * 构建ack消息发送返回
      * @param channel 消息ID
      * @param messageId channel
-     * @param clientId 客户端ID
      */
-    private void sendAck(Long messageId, String clientId,Channel channel) {
-        log.debug("【broker】3. Send  messageId 【{}】 ack to client 【{}】", messageId, clientId);
+    private void sendAck(Long messageId,Channel channel) {
         TlMqttPubAck res = TlMqttPubAck.build(messageId);
         channel.writeAndFlush(res);
     }
@@ -139,8 +135,7 @@ public class TlPublishEventHandler extends SimpleChannelInboundHandler<TlMqttPub
      * @param: clientId
      * @return: void
      **/
-    private void sendRec(Long messageId, String clientId,Channel channel) {
-        log.debug("【broker】3. Send rec messageId 【{}】 to clientId 【{}】", messageId, clientId);
+    private void sendRec(Long messageId,Channel channel) {
         TlMqttPubRecReq res = TlMqttPubRecReq.build(messageId);
         channel.writeAndFlush(res);
     }

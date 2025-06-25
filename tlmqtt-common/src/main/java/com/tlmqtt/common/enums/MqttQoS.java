@@ -1,9 +1,9 @@
 package com.tlmqtt.common.enums;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 14:44
- * @Description: mqtt的qos等级
+ * mqtt的qos等级
+ *
+ * @author hszhou
  */
 public enum MqttQoS {
 
@@ -26,12 +26,23 @@ public enum MqttQoS {
     }
 
     public static MqttQoS valueOf(int value) {
-        return switch (value) {
-            case 0 -> AT_MOST_ONCE;
-            case 1 -> AT_LEAST_ONCE;
-            case 2 -> EXACTLY_ONCE;
-            case 128 -> FAILURE;
-            default -> throw new IllegalArgumentException("invalid QoS: " + value);
-        };
+        MqttQoS mqttQos;
+        switch (value) {
+            case 0:
+                mqttQos = AT_MOST_ONCE;
+                break;
+            case 1:
+                mqttQos = AT_LEAST_ONCE;
+                break;
+            case 2:
+                mqttQos = EXACTLY_ONCE;
+                break;
+            case 128:
+                mqttQos = FAILURE;
+                break;
+            default:
+                throw new IllegalArgumentException("invalid QoS: " + value);
+        }
+        return mqttQos;
     }
 }

@@ -15,9 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/15 16:16
- * @Description: mtt的解码器
+ * @author hszhou
  */
 @RequiredArgsConstructor
 @Slf4j
@@ -76,19 +74,41 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
             int messageType = type >> Constant.MESSAGE_BIT;
             MqttMessageType messageTypeEnum = MqttMessageType.valueOf(messageType);
             // 8. 根据消息类型，分派给对应的具体解码器构建请求对象
-            AbstractTlMessage req = switch (messageTypeEnum) {
-                case CONNECT -> connectDecoder.build(messageBuf,type, remainingLength);
-                case DISCONNECT -> disConnectDecoder.build(messageBuf,type, remainingLength);
-                case PUBLISH -> publishDecoder.build(messageBuf, type, remainingLength);
-                case PUBACK -> pubAckDecoder.build(messageBuf,type, remainingLength);
-                case PUBREC -> pubRecDecoder.build(messageBuf,type, remainingLength);
-                case PUBREL -> pubRelDecoder.build(messageBuf,type, remainingLength);
-                case PUBCOMP -> pubCompDecoder.build(messageBuf,type, remainingLength);
-                case SUBSCRIBE -> subscribeDecoder.build(messageBuf,type, remainingLength);
-                case UNSUBSCRIBE -> unSubscribeDecoder.build(messageBuf,type, remainingLength);
-                case PINGREQ -> heartBeatDecoder.build(messageBuf,type, remainingLength);
-                default -> throw new IllegalArgumentException("unknown message type: " + messageTypeEnum);
-            };
+            AbstractTlMessage req;
+            switch (messageTypeEnum) {
+                case CONNECT:
+                    req = connectDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                case DISCONNECT:
+                    req = disConnectDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                case PUBLISH:
+                    req = publishDecoder.build(messageBuf, type, remainingLength);
+                    break;
+                case PUBACK:
+                    req = pubAckDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                case PUBREC:
+                    req = pubRecDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                case PUBREL:
+                    req = pubRelDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                case PUBCOMP:
+                    req = pubCompDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                case SUBSCRIBE:
+                    req = subscribeDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                case UNSUBSCRIBE:
+                    req = unSubscribeDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                case PINGREQ:
+                    req = heartBeatDecoder.build(messageBuf,type, remainingLength);
+                    break;
+                default:
+                    throw new IllegalArgumentException("unknown message type: " + messageTypeEnum);
+            }
             // 9. 将解析好的消息对象加入输出列表，传递给后续Handler
             out.add(req);
         }finally {

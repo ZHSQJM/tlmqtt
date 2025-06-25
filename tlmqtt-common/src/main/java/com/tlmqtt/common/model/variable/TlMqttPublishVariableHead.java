@@ -6,9 +6,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 11:13
- * @Description: 发布消息的可变头
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

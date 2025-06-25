@@ -4,9 +4,7 @@ import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/8 18:54
- * @Description: 定时关闭session的cleansession为0的客户端
+ * @author hszhou
  */
 public class TlSessionTask implements TimerTask {
 

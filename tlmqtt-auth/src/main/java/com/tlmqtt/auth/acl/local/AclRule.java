@@ -1,5 +1,6 @@
 package com.tlmqtt.auth.acl.local;
 
+
 import com.tlmqtt.common.enums.Action;
 import com.tlmqtt.common.enums.SubjectType;
 import lombok.Data;
@@ -7,9 +8,7 @@ import lombok.Data;
 import java.util.Set;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/30 14:44
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author  hszhou
  */
 @Data
 public class AclRule {

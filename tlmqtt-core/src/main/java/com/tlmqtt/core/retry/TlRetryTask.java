@@ -13,9 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/7 9:57
- * @Description: 放入hashwheeltimer的任务
+ * @author hszhou
  */
 @Slf4j
 @Data
@@ -75,12 +73,19 @@ public class TlRetryTask implements TimerTask {
     }
 
 
+    /**
+     * 重新安排任务
+     * @param timer 定时器
+     */
     private void reschedule(Timer timer){
         if(!cancelled){
             this.timeout = timer.newTimeout(this,duration, TimeUnit.SECONDS);
         }
     }
 
+    /**
+     * 取消任务
+     */
     public void cancel(){
         cancelled = true;
         if(timeout !=null && !timeout.isCancelled()){

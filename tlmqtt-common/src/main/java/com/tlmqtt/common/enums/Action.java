@@ -1,9 +1,9 @@
 package com.tlmqtt.common.enums;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/3 8:33
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * acl权限动作
+ *
+ * @author hszhou
  */
 public enum Action {
     /**PUB, SUB*/

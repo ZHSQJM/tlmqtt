@@ -7,9 +7,7 @@ import com.tlmqtt.common.model.variable.TlMqttPubRelVariableHead;
 import lombok.*;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/26 15:07
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 @EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor

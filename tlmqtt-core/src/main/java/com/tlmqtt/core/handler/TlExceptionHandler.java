@@ -19,9 +19,7 @@ import reactor.core.publisher.Mono;
 import java.net.SocketException;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/6 8:48
- * @Description: mqtt消息处理器
+ * @author hszhou
  */
 @Slf4j
 @RequiredArgsConstructor

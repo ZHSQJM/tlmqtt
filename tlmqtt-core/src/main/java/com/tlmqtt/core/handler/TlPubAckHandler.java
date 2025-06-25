@@ -15,9 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/5 18:57
- * @Description: ack时间处理器
+ * @author hszhou
  */
 @Slf4j
 @RequiredArgsConstructor

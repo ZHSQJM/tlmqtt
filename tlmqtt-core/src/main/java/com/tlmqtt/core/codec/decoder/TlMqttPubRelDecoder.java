@@ -7,9 +7,7 @@ import com.tlmqtt.common.model.variable.TlMqttPubRelVariableHead;
 import io.netty.buffer.ByteBuf;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:12
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 public class TlMqttPubRelDecoder extends AbstractTlMqttDecoder{
 

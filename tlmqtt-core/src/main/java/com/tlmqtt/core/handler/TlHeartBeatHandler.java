@@ -13,9 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/5 18:57
- * @Description: 心跳处理器
+ * @author hszhou
  */
 @Slf4j
 @RequiredArgsConstructor

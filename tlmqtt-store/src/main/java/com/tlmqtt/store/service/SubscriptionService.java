@@ -5,9 +5,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 15:48
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
+
  */
 public interface SubscriptionService {
 

@@ -5,9 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/20 16:25
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

@@ -4,9 +4,9 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.internal.ObjectUtil;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 14:44
- * @Description: mqtt的版本枚举
+ * mqtt的版本枚举
+ *
+ * @author hszhou
  */
 public enum MqttVersion {
 

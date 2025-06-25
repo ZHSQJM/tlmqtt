@@ -33,9 +33,7 @@ import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/5 18:50
- * @Description: 连接处理器
+ * @author hszhou
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -77,11 +75,9 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
     }
 
     /**
-     * @description: 预检查
-     * @author: hszhou
-     * @datetime: 2025-04-28 16:48:35
-     * @param: req 连接检查
-     * @param: channel
+     * 预检查
+     * @param req 连接检查
+     * @param channel 客户端通道
      * @return: boolean
      */
     private boolean preCheck(TlMqttConnectReq req, Channel channel) {
@@ -110,9 +106,8 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      * 用户名密码校验
      *
      * @param req 连接
-     * @return boolean
-     * @author hszhou
-     * @datetime: 2025-06-09 13:52:04
+     * @return boolean  是否认证成功
+
      **/
     private boolean authenticate(TlMqttConnectReq req) {
         TlMqttConnectPayload payload = req.getPayload();
@@ -124,9 +119,8 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      *
      * @param req 连接信息b
      * @param ctx 通道
-     * @return Mono<Void>
-     * @author hszhou
-     * @datetime: 2025-06-09 13:53:04
+     * @return Mono<Boolean> 创建会话结果
+
      **/
     private Mono<Boolean> handlerSession(TlMqttConnectReq req, ChannelHandlerContext ctx) {
         String clientId = req.getPayload().getClientId();
@@ -141,14 +135,14 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
     }
 
     /**
+     * 会话处理完成
+     *
      * @param session 会话
      * @param req 连接信息
      * @param ctx 通道
      * @param cleanSession 是否清除会话
-     * @return Mono<Boolean>
-     * @description: 会话处理完成
-     * @author: hszhou
-     * @datetime: 2025-06-09 13:54:04
+     * @return Mono<Boolean> 会话处理结果
+
      **/
     private Mono<Boolean> completeSessionHandling(TlMqttSession session, TlMqttConnectReq req,
         ChannelHandlerContext ctx, boolean cleanSession) {
@@ -168,9 +162,7 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      * @param clientId 客户端
      * @param cleanSession 是否保留会话
      * @param username 用户名
-     * @return Mono<TlMqttSession>
-     * @author hszhou
-     * @datetime: 2025-06-09 15:13:47
+     * @return Mono<TlMqttSession> 新会话
      **/
     private Mono<TlMqttSession> createNewSession(String clientId, boolean cleanSession, String username,
         ChannelHandlerContext ctx) {
@@ -184,8 +176,6 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      *
      * @param ctx 通道
      * @param keepAlive 心跳间隔
-     * @author hszhou
-     * @datetime: 2025-06-09 15:13:25
      **/
     private void setupHeartBeat(ChannelHandlerContext ctx, short keepAlive) {
         ctx.pipeline().addLast(new IdleStateHandler(0, 0, keepAlive, TimeUnit.SECONDS));
@@ -195,9 +185,7 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      * 处理遗嘱消息
      *
      * @param req 连接报文
-     * @return Mono<Void>
-     * @author hszhou
-     * @datetime: 2025-06-09 14:09:44
+     * @return Mono<Void> 处理结果
      **/
     private Mono<Void> handleWillMessage(TlMqttConnectReq req) {
         TlMqttConnectVariableHead variableHead = req.getVariableHead();
@@ -215,24 +203,21 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      * @param channel 通道
      * @param cleanSession 是否清除会话
      * @param returnCode 响应码
-     * @author hszhou
-     * @datetime: 2025-06-09 14:10:11
+
      **/
     private void sendConnack(Channel channel, int cleanSession, MqttConnectReturnCode returnCode) {
         channel.writeAndFlush(TlMqttConnack.build(cleanSession, returnCode));
     }
 
     /**
-     * @description: 存储遗嘱消息
-     * @author: hszhou
-     * @datetime: 2025-04-28 16:48:35
-     * @param:
-     * @param: willTopic 遗嘱消息主题
-     * @param: qoS 遗嘱消息qos
-     * @param: isRetain 是否是保留消息
-     * @param: messageContent 遗嘱消息内容
-     * @param: clientId 客户端ID
-     * @return: Mono<Boolean>
+     * 存储遗嘱消息
+     *
+     * @param willTopic 遗嘱消息主题
+     * @param qoS 遗嘱消息qos
+     * @param isRetain 是否是保留消息
+     * @param content 遗嘱消息内容
+     * @param clientId 客户端ID
+     * @return Mono<Boolean> 保存结果
      **/
     private Mono<Boolean> saveWillMessage(String willTopic, MqttQoS qoS, boolean isRetain, String content,
         String clientId) {
@@ -249,9 +234,7 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      *
      * @param protocolVersion 协议版本
      * @param channel 通道
-     * @return boolean
-     * @author hszhou
-     * @datetime: 2025-06-09 15:12:48
+     * @return boolean 是否正确
      **/
     private boolean validateProtocolVersion(Short protocolVersion, Channel channel) {
         if (!(protocolVersion.toString().equals(MqttVersion.MQTT_5.protocolLevel() + "") || protocolVersion.toString()
@@ -267,8 +250,6 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      *
      * @param req connect报文
      * @param channel 通道
-     * @author hszhou
-     * @datetime: 2025-06-09 15:10:48
      **/
     private  void registerClient(TlMqttConnectReq req, Channel channel) {
         String clientId = req.getPayload().getClientId();
@@ -289,8 +270,6 @@ public class TlConnectHandler extends SimpleChannelInboundHandler<TlMqttConnectR
      * 重发消息
      *
      * @param clientId 客户端ID
-     * @author hszhou
-     * @datetime: 2025-06-09 14:12:24
      **/
     private void republish(String clientId, Channel channel) {
 

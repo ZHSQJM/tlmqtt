@@ -5,9 +5,9 @@ import lombok.Data;
 import java.util.HashMap;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/10 18:56
- * @Description: http的认证对象
+ * http的认证对象
+ *
+ * @author  hszhou
  */
 @Data
 public class HttpEntityInfo {

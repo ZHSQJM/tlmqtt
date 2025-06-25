@@ -4,9 +4,7 @@ import com.tlmqtt.common.model.entity.PublishMessage;
 import reactor.core.publisher.Mono;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 15:48
- * @Description: 保留消息接口
+ * @author hszhou
  */
 public interface RetainService {
 

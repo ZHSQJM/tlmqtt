@@ -11,9 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/5 18:57
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 @Slf4j
 @RequiredArgsConstructor

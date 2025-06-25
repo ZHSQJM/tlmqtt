@@ -15,9 +15,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:35
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 @ChannelHandler.Sharable
 @Slf4j

@@ -13,9 +13,9 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * @Author: hszhou
- * @Date: 2025/1/17 17:16
- * @Description: 认证链 只要有任何一个认证通过即可
+ * 认证链 只要有任何一个认证通过即可
+ *
+ * @author  hszhou
  */
 @Slf4j
 public class AuthenticationManager extends AbstractTlAuthentication {
@@ -24,8 +24,12 @@ public class AuthenticationManager extends AbstractTlAuthentication {
 
     private final NoneAuthenticationService headAuthentication;
 
+    /**
+     *
+     * 2025-05-10 16:16:44
+     * @param auth 认证开关
+     **/
     public AuthenticationManager(boolean auth){
-
         headAuthentication = new NoneAuthenticationService(()->auth);
         FixTlAuthentication fixTlAuthentication = new FixTlAuthentication(new ArrayList<>());
         HttpTlAuthentication httpTlAuthentication = new HttpTlAuthentication(new ArrayList<>());
@@ -36,11 +40,23 @@ public class AuthenticationManager extends AbstractTlAuthentication {
     }
 
 
+    /**
+     *
+     * 认证开关
+     * 2025-05-10 16:16:44
+     * @param auth 认证开关
+     **/
     public void setAuth(Boolean auth){
         headAuthentication.setEnabled(auth);
     }
 
 
+    /**
+     *
+     * 添加http认证信息
+     * 2025-05-10 16:16:44
+     * @param supplier 认证信息
+     **/
     public void addHttpEntity(Supplier<List<HttpEntityInfo>> supplier){
         AbstractTlAuthentication authentication = headAuthentication;
         while (authentication.nextAuthentication!=null ){
@@ -53,6 +69,12 @@ public class AuthenticationManager extends AbstractTlAuthentication {
     }
 
 
+    /**
+     *
+     * 添加sql认证信息
+     * 2025-05-10 16:16:44
+     * @param supplier 认证信息
+     **/
     public void addSqlEntity(Supplier<List<SqlEntityInfo>> supplier){
         AbstractTlAuthentication authentication = headAuthentication;
         while (authentication.nextAuthentication!=null ){
@@ -64,6 +86,12 @@ public class AuthenticationManager extends AbstractTlAuthentication {
         }
     }
 
+    /**
+     *
+     * 添加fix认证信息
+     * 2025-05-10 16:16:44
+     * @param users 认证信息
+     **/
     public void addFixUsers(List<TlUser> users){
         AbstractTlAuthentication authentication = headAuthentication;
         while (authentication.nextAuthentication!=null ){
@@ -79,7 +107,7 @@ public class AuthenticationManager extends AbstractTlAuthentication {
     /**
      * 添加过滤器链
      * @author hszhou
-     * @datetime: 2025-05-15 18:27:50
+     * 2025-05-15 18:27:50
      * @param tlAuthentication 认证过滤器
      **/
     public void addAuthentication(AbstractTlAuthentication tlAuthentication){
@@ -92,7 +120,7 @@ public class AuthenticationManager extends AbstractTlAuthentication {
     /**
      *
      * @author 认证
-     * @datetime: 2025-05-10 16:16:44
+     * 2025-05-10 16:16:44
      * @param username 用户名
      * @param password 密码
      * @return boolean
@@ -106,6 +134,7 @@ public class AuthenticationManager extends AbstractTlAuthentication {
     public boolean enabled() {
         return false;
     }
+
 
     @Override
     public void add(Object object) {

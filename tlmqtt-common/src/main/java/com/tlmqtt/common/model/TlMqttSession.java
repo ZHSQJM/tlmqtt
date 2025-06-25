@@ -1,8 +1,7 @@
 package com.tlmqtt.common.model;
 
-import com.tlmqtt.common.enums.MqttQoS;
+
 import com.tlmqtt.common.enums.MqttVersion;
-import io.netty.channel.ChannelHandlerContext;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -11,9 +10,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/28 15:40
- * @Description: mqtt的会话
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

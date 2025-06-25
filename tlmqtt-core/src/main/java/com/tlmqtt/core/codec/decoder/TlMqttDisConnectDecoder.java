@@ -6,9 +6,7 @@ import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import io.netty.buffer.ByteBuf;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:12
- * @Description: 断开连接报文解码器
+ * @author hszhou
  */
 public class TlMqttDisConnectDecoder  extends AbstractTlMqttDecoder{
 

@@ -26,9 +26,9 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.message.BasicNameValuePair;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/10 18:15
- * @Description: 基于http接口的认证 判断依据是statusCode是200
+ * 基于http接口的认证 判断依据是statusCode是200
+ *
+ * @author  hszhou
  */
 @Slf4j
 public class HttpTlAuthentication extends AbstractTlAuthentication {
@@ -63,22 +63,23 @@ public class HttpTlAuthentication extends AbstractTlAuthentication {
             requestParams.put(params.getOrDefault(USERNAME, USERNAME), username);
             requestParams.put(params.getOrDefault(PASSWORD, PASSWORD), password);
             // 根据方法类型分发请求
-            int statusCode = switch (entity.getMethod()) {
-                case HttpGet.METHOD_NAME -> doGet(requestParams, entity.getUrl());
-                case HttpPost.METHOD_NAME -> {
-                    // 获取 Content-Type 头部值
-                    String contentType = entity.getHeaders()
-                        .getOrDefault(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
-                    if (contentType.contains(ContentType.APPLICATION_JSON.getMimeType())) {
-                        yield doPost(requestParams, entity.getUrl());
-                    } else if (contentType.contains(ContentType.APPLICATION_FORM_URLENCODED.getMimeType())) {
-                        yield doPostForm(requestParams, entity.getUrl());
-                    } else {
-                        yield -1;
-                    }
+            int statusCode;
+            String methodName = entity.getMethod();
+            if (HttpGet.METHOD_NAME.equals(methodName)) {
+                statusCode = doGet(requestParams, entity.getUrl());
+            } else if (HttpPost.METHOD_NAME.equals(methodName)) {
+                // 获取 Content-Type 头部值
+                String contentType = entity.getHeaders().getOrDefault(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
+                if (contentType.contains(ContentType.APPLICATION_JSON.getMimeType())) {
+                    statusCode = doPost(requestParams, entity.getUrl());
+                } else if (contentType.contains(ContentType.APPLICATION_FORM_URLENCODED.getMimeType())) {
+                    statusCode = doPostForm(requestParams, entity.getUrl());
+                } else {
+                    statusCode = -1;
                 }
-                default -> -1;
-            };
+            } else {
+                statusCode = -1;
+            }
             if (statusCode == HttpStatus.SC_OK) {
                 return true;
             }

@@ -11,9 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:35
- * @Description: puback的编码
+ * @author hszhou
  */
 @ChannelHandler.Sharable
 public class TlMqttHeaderBeatEncoder extends MessageToByteEncoder<TlMqttHeartBeat> {

@@ -6,11 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 11:13
- * @Description:
- * mqtt的请求可变头
- * 协议名称 协议 连接标识 保持连接
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

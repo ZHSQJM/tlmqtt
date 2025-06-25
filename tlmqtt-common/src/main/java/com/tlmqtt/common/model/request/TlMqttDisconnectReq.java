@@ -2,16 +2,12 @@ package com.tlmqtt.common.model.request;
 
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 11:07
- * @Description: 接收客户端的心跳
+ * @author hszhou
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

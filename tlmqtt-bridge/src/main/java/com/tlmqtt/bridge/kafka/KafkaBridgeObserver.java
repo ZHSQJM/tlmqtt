@@ -12,9 +12,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * @Author: hszhou
- * @Date: 2025/1/21 15:49
- * @Description: kafka桥接数据
+ * @author hszhou
  */
 @Slf4j
 public class KafkaBridgeObserver  implements EventHandler<PublishMessage> {
@@ -23,9 +21,14 @@ public class KafkaBridgeObserver  implements EventHandler<PublishMessage> {
 
     private final List<TlKafkaInfo> list = new ArrayList<>();
 
+    /**
+     * 添加kafka连接信息
+     * @param object kafka对象
+     */
     public void add(Object object) {
 
-        if (object instanceof TlKafkaInfo kafkaInfo) {
+        if (object instanceof TlKafkaInfo ) {
+            TlKafkaInfo kafkaInfo = (TlKafkaInfo) object;
             try {
                 Properties props = new Properties();
                 props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaInfo.getBootstrapServers());

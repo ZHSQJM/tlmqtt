@@ -23,9 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/5 18:55
- * @Description: subscribe事件处理器
+ * @author hszhou
  */
 @Slf4j
 @RequiredArgsConstructor

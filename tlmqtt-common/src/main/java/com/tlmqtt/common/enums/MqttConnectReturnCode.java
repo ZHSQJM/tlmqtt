@@ -1,9 +1,9 @@
 package com.tlmqtt.common.enums;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 15:04
- * @Description: mqtt的连接拒绝原因
+ * mqtt的连接拒绝原因
+ *
+ * @author hszhou
  */
 public enum MqttConnectReturnCode {
 

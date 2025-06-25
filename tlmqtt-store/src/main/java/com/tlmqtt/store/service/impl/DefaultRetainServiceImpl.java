@@ -12,9 +12,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * @Author: hszhou
- * @Date: 2025/1/8 14:17
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 public class DefaultRetainServiceImpl implements RetainService {
 

@@ -7,9 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/20 19:31
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

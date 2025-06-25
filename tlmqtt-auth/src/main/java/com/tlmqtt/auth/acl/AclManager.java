@@ -6,12 +6,9 @@ import com.tlmqtt.common.model.TlMqttSession;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.InputStream;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/2 14:40
- * @Description: 权限控制器
+ * @author  hszhou
  */
 @Slf4j
 public class AclManager {
@@ -34,8 +31,9 @@ public class AclManager {
     /**
      * 校验是否有订阅的权限
      * @author hszhou
-     * @datetime: 2025-06-02 14:58:27
+     * 2025-06-02 14:58:27
      * @param session 会话
+     * @param topic 主题
      * @return boolean
      **/
     public boolean checkSubscribePermission(TlMqttSession session,String topic){
@@ -45,6 +43,16 @@ public class AclManager {
         return localAclValidator.checkSubscribe(request);
     }
 
+    /**
+     * 校验是否有发布权限
+     * @author hszhou
+     * 2025-06-02 14:58:27
+     * @param clientId 客户端id
+     * @param username 用户名
+     * @param ip ip
+     * @param topic 主题
+     * @return boolean
+     **/
     public boolean checkPublishPermission(String clientId,String username,String ip,String topic) {
         TlAclRequest request = TlAclRequest.builder().ip(ip).username(username)
             .client(clientId).action(Action.SUB).topic(topic).build();

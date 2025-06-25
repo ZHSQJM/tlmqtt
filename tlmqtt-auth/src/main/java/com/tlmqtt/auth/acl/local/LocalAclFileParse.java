@@ -4,20 +4,15 @@ import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.Action;
 import com.tlmqtt.common.enums.SubjectType;
 import lombok.extern.slf4j.Slf4j;
-
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/30 14:47
- * @Description: 读取本地acl文件
+ * 读取本地acl文件
+ *
+ * @author  hszhou
  */
 @Slf4j
 public class LocalAclFileParse {
@@ -27,7 +22,7 @@ public class LocalAclFileParse {
     /**
      * 加载配置文件
      * @author hszhou
-     * @datetime: 2025-06-02 15:47:46
+     * : 2025-06-02 15:47:46
      * @param filePath 配置文件路径
      * @return List<AclRule>
      **/
@@ -37,7 +32,6 @@ public class LocalAclFileParse {
         // 文件行号即隐式优先级
         int implicitPriority = 0;
         for (String line : lines) {
-            log.info("获取的规则文件【{}】",line);
             // 解析规则文本
             AclRule rule = parseRule(line);
             rule.setPriority(implicitPriority++);
@@ -107,23 +101,14 @@ public class LocalAclFileParse {
     public static List<String> readLines(String filePath) {
         List<String> lines = new ArrayList<>();
         ClassLoader classLoader = LocalAclFileParse.class.getClassLoader();
-        try (InputStream inputStream = classLoader.getResourceAsStream(filePath);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-
-            List<String> rawLines = reader.lines().toList();
-            for (String line : rawLines) {
-                String trimmed = line.trim();
-                // 仅当 # 出现在行首时才作为注释
-                if (trimmed.startsWith("#")) {
-                    continue; // 跳过注释行
-                }
-                // 保留行中其他位置的 #（如 topic 通配符）
-                if (!trimmed.isEmpty()) {
-                    lines.add(line);
-                }
+        try (InputStream inputStream = classLoader.getResourceAsStream(filePath)) {
+            assert inputStream != null;
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                return reader.lines().filter(e->!e.trim().startsWith("#")&&!e.trim().isEmpty())
+                    .collect(Collectors.toList());
             }
-            return lines;
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             log.error("read acl file fail：{}", e.getMessage());
             return lines;
         }

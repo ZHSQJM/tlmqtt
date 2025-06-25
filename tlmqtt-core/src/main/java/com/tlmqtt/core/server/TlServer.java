@@ -46,9 +46,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * @Author hszhou
- * @Date 2025/5/13 16:34
- * @Description 服务启动抽象类
+ * @author hszhou
  */
 @Slf4j
 public class TlServer {
@@ -143,11 +141,14 @@ public class TlServer {
 
     private String privatePath;
 
-    private ShutDownGracefully shutDownGracefully;
+    private final ShutDownGracefully shutDownGracefully;
 
 
 
 
+    /**
+     * 创建TlServer
+     */
     public TlServer() {
 
         bossGroup = new NioEventLoopGroup();
@@ -227,17 +228,29 @@ public class TlServer {
         this.shutDownGracefully = new ShutDownGracefully(null, bossGroup, workerGroup, executorService);
     }
 
+    /**
+     * 设置证书路径
+     * @param privatePath 私钥地址
+     */
     public void setPrivatePath(String privatePath) {
         this.privatePath = privatePath;
         sslContext = sslContext();
     }
 
+    /**
+     * 创建SSL上下文
+     */
     private void initSsl() {
         if (ssl) {
             sslContext = sslContext();
         }
     }
 
+
+    /**
+     * 启动socket服务
+     * @param port 端口
+     */
     public void startSocket(int port) {
 
         ServerBootstrap bootstrap = new ServerBootstrap();
@@ -283,6 +296,10 @@ public class TlServer {
 
     }
 
+    /**
+     * 启动websocket服务
+     * @param port 端口
+     */
     public void startWebsocket(int port) {
 
         ServerBootstrap bootstrap = new ServerBootstrap();
@@ -318,7 +335,6 @@ public class TlServer {
 
     /**
      * 添加管道
-     *
      * @param pipeline 添加管道
      */
     public  void addPipeline(ChannelPipeline pipeline){

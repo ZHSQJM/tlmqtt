@@ -1,6 +1,5 @@
 package com.tlmqtt.bridge;
-import com.lmax.disruptor.BusySpinWaitStrategy;
-import com.lmax.disruptor.EventHandler;
+
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.YieldingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
@@ -13,16 +12,11 @@ import com.tlmqtt.common.model.entity.PublishMessage;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/12 15:02
- * @Description: 桥接管理器
+ * 桥接管理器
+ *
+ * @author hszhou
  */
 @Slf4j
 public class TlBridgeManager {
@@ -35,6 +29,9 @@ public class TlBridgeManager {
 
     private final   RingBuffer<PublishMessage> ringBuffer;
 
+    /**
+     * 构造函数
+     */
     public TlBridgeManager() {
         disruptor = new Disruptor<>(PublishMessage::new, 16, new DefaultThreadFactory("tl-mqtt-bridge"), ProducerType.MULTI,new YieldingWaitStrategy());
         kafkaBridgeObserver = new KafkaBridgeObserver();
@@ -44,6 +41,10 @@ public class TlBridgeManager {
         disruptor.start();
     }
 
+    /**
+     * 发送消息
+     * @param message 消息
+     */
     public void send(PublishMessage message){
         long sequence = ringBuffer.next();
         try {
@@ -60,10 +61,18 @@ public class TlBridgeManager {
         }
     }
 
+    /**
+     * 添加数据库信息
+     * @param tlMySqlInfo 数据库信息
+     */
     public void addMysqlInfo(TlMySqlInfo tlMySqlInfo) {
         mySqlBridgeObserver.add(tlMySqlInfo);
     }
 
+    /**
+     * 添加kafka信息
+     * @param kafkaInfo kafka信息
+     */
     public void addKafkaInfo(TlKafkaInfo kafkaInfo) {
         kafkaBridgeObserver.add(kafkaInfo);
     }

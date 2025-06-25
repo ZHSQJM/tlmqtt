@@ -10,9 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/8 13:45
- * @Description: 转发消息给客户端
+ * @author hszhou
  */
 @Slf4j
 @Setter
@@ -30,6 +28,14 @@ public class TlStoreManager {
     private RetainService retainService;
 
 
+    /**
+     * 构造函数
+     * @param sessionService session服务
+     * @param subscriptionService 订阅服务
+     * @param publishService 发布服务
+     * @param pubrelService pubrel服务
+     * @param retainService retain服务
+     **/
     public TlStoreManager(SessionService sessionService, SubscriptionService subscriptionService, PublishService publishService,
         PubrelService pubrelService,RetainService retainService) {
         this.sessionService = sessionService;
@@ -42,13 +48,11 @@ public class TlStoreManager {
 
     /**
      * 保存publish消息
-     * @author hszhou
-     * @datetime: 2025-06-10 15:40:02
      * @param clientId 客户端ID
      * @param messageId 消息ID
      * @param message 消息体
      * @param qoS qos
-     * @return Mono<PublishMessage>
+     * @return Mono 保存成功返回消息体
      **/
     public Mono<PublishMessage> savePublishReq(String clientId, Long messageId, TlMqttPublishReq message,MqttQoS qoS) {
         PublishMessage publishMessage = new PublishMessage();
@@ -67,10 +71,9 @@ public class TlStoreManager {
 
     /**
      * 清除客户端所有的信息
-     * @author hszhou
-     * @datetime: 2025-05-26 18:45:57
+
      * @param clientId 客户端
-     * @return Mono<Void>
+     * @return void 清除成功返回void
      **/
     public Mono<Void> clearAll(String clientId) {
       return sessionService.find(clientId).flatMap(

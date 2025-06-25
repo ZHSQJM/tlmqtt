@@ -5,9 +5,9 @@ import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 18:33
- * @Description: 主题类
+ * 主题类
+ *
+ * @author hszhou
  */
 @Data
 @EqualsAndHashCode

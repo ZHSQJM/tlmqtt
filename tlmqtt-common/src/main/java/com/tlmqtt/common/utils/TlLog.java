@@ -5,9 +5,7 @@ import io.netty.buffer.ByteBufUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * @Author: hszhou
- * @Date: 2024/12/2 13:16
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 @Slf4j
 public class TlLog {
@@ -15,7 +13,7 @@ public class TlLog {
     /**
      * 打印完整字节的
      * @author hszhou
-     * @datetime: 2025-05-13 16:25:36
+     * @since  time: 2025-05-13 16:25:36
      * @param prefix 消息前缀
      * @param buf bytebuffer
      **/

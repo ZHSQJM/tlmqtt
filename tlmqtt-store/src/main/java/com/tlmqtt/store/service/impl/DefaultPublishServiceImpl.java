@@ -5,24 +5,28 @@ import com.tlmqtt.store.service.PublishService;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-import static javax.print.attribute.standard.MediaSizeName.C;
 
 /**
- * @Author: hszhou
- * @Date: 2025/4/18 14:46
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 @Slf4j
 public class DefaultPublishServiceImpl implements PublishService {
 
 
+    /**
+     * key:clientId
+     * value:messageId:PublishMessage
+     */
     public static final ConcurrentHashMap<String, ConcurrentHashMap<String, PublishMessage>> PUBLISH_MAP = new ConcurrentHashMap<>();
 
 
+    /**
+     * key:clientId
+     * value:PublishMessage
+     */
     public static final ConcurrentHashMap<String,PublishMessage> WILL_MAP = new ConcurrentHashMap<>();
 
     @Override

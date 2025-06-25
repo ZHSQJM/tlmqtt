@@ -15,9 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.scheduler.Schedulers;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 11:06
- * @Description: comp处理器
+ * @author hszhou
  */
 @ChannelHandler.Sharable
 @Slf4j

@@ -8,9 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 11:12
- * @Description: 订阅响应
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

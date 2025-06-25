@@ -4,20 +4,17 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
-        <groupId>com.talent</groupId>
+        <groupId>io.github.zhsqjm</groupId>
         <artifactId>tl-mqtt</artifactId>
         <version>1.1.0</version>
     </parent>
 
     <artifactId>tlmqtt-bridge</artifactId>
     <version>1.1.0</version>
+    <name>tlmqtt-bridge</name>
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-
-
 
     <dependencies>
         <dependency>
@@ -36,7 +33,7 @@
         </dependency>
 
         <dependency>
-            <groupId>com.talent</groupId>
+            <groupId>io.github.zhsqjm</groupId>
             <artifactId>tlmqtt-common</artifactId>
             <version>1.1.0</version>
         </dependency>

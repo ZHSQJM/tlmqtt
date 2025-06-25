@@ -8,9 +8,9 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 11:08
- * @Description: mqtt的固定头部信息
+ * mqtt的固定头部信息
+ *
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

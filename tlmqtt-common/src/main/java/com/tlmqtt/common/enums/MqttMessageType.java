@@ -1,9 +1,9 @@
 package com.tlmqtt.common.enums;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 14:50
- * @Description: mqtt的消息类型
+ * mqtt的消息类型
+ *
+ * @author hszhou
  */
 public enum MqttMessageType {
 

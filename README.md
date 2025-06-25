@@ -14,6 +14,14 @@
 + 数据转发功能，目前支持kafka，mysql
 
 ## 快速开始
+
+``` 
+  <dependency>
+        <groupId>io.github.zhsqjm</groupId>
+        <artifactId>tlmqtt-core</artifactId>
+        <version>1.1.0</version>
+  </dependency>
+```
 ```plain
 TlBootstrap bootstrap = new TlBootstrap();
 bootstrap

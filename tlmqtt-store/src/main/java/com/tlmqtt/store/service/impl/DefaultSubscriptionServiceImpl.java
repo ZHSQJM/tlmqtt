@@ -7,12 +7,9 @@ import com.tlmqtt.store.service.SubscriptionService;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 /**
- * @Author: hszhou
- * @Date: 2025/1/8 9:24
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 @Slf4j
 public class DefaultSubscriptionServiceImpl implements SubscriptionService {

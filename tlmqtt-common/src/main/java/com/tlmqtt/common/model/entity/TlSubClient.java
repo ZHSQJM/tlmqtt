@@ -6,9 +6,9 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 /**
- * @Author: hszhou
- * @Date: 2024/12/25 13:27
- * @Description: 订阅的主题对应的客户端
+ * 订阅的主题对应的客户端
+ *
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

@@ -10,9 +10,7 @@ import reactor.core.publisher.Mono;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * @Author: hszhou
- * @Date: 2025/1/8 9:11
- * @Description: 默认的session处理实现类 使用本地
+ * @author hszhou
  */
 @Slf4j
 public class DefaultSessionServiceImpl implements SessionService {
@@ -24,8 +22,6 @@ public class DefaultSessionServiceImpl implements SessionService {
 
     @Override
     public Mono<Boolean> save(TlMqttSession session) {
-
-
         return Mono.fromSupplier(() -> CLIENT_SESSIONS.put(session.getClientId(), session)).thenReturn(true);
     }
 

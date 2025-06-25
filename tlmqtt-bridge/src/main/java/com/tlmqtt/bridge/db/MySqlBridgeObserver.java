@@ -13,9 +13,9 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * @Author: hszhou
- * @Date: 2025/2/27 19:30
- * @Description: 数据库桥接数据
+ * 数据库桥接数据
+ *
+ * @author hszhou
  */
 @Slf4j
 public class MySqlBridgeObserver  implements EventHandler<PublishMessage> {
@@ -26,8 +26,13 @@ public class MySqlBridgeObserver  implements EventHandler<PublishMessage> {
 
     private final static String SQL = "INSERT INTO %s ( message_id, topic, client_id, message, qos, retain, dup) VALUES( '%s', '%s', '%s', '%s', '%s', %s,%s)";
 
+    /**
+     * 添加数据库连接信息
+     * @param object TlMySqlInfo
+     */
     public void add(Object object) {
-        if(object instanceof TlMySqlInfo entityInfo){
+        if(object instanceof TlMySqlInfo){
+            TlMySqlInfo entityInfo = (TlMySqlInfo) object;
             HikariConfig config = new HikariConfig();
             String url = String.format("jdbc:mysql://%s:%s/%s", entityInfo.getHost(), entityInfo.getPort(), entityInfo.getDatabase());
             config.setJdbcUrl(url);
@@ -46,6 +51,13 @@ public class MySqlBridgeObserver  implements EventHandler<PublishMessage> {
 
     }
 
+    /**
+     * 数据库桥接数据
+     * @param event PublishMessage
+     * @param sequence long
+     * @param endOfBatch boolean
+     * @throws Exception 异常
+     */
     @Override
     public void onEvent(PublishMessage event, long sequence, boolean endOfBatch) throws Exception {
         for (TlMySqlInfo entityInfo : list) {

@@ -6,9 +6,7 @@ import com.tlmqtt.common.model.request.TlMqttHeartBeatReq;
 import io.netty.buffer.ByteBuf;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:12
- * @Description: 心跳包解码器
+ * @author hszhou
  */
 public class TlMqttHeartBeatDecoder  extends AbstractTlMqttDecoder{
 

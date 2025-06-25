@@ -5,9 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/26 13:29
- * @Description: 发布消息载体
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

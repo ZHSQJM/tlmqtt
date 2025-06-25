@@ -7,9 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 11:07
- * @Description: 接收客户端的心跳
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

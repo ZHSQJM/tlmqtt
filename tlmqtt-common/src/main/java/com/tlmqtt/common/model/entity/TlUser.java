@@ -5,9 +5,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/15 13:33
- * @Description: 本地文件用户信息
+ * 本地文件用户信息
+ *
+ * @author hszhou
  */
 @AllArgsConstructor
 @Data

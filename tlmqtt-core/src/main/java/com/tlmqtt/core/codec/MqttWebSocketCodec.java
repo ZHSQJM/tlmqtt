@@ -8,9 +8,7 @@ import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import java.util.List;
 
 /**
- * @Author: hszhou
- * @Date: 2025/2/25 18:36
- * @Description: websocket  编解码器
+ * @author hszhou
  */
 public class MqttWebSocketCodec extends MessageToMessageCodec<BinaryWebSocketFrame, ByteBuf> {
     @Override

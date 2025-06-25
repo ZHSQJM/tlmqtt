@@ -6,9 +6,9 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/10 18:54
- * @Description: 基于固定的用户名密码认证
+ * 基于固定的用户名密码认证
+ *
+ * @author  hszhou
  */
 @Slf4j
 public class FixTlAuthentication extends AbstractTlAuthentication {
@@ -22,7 +22,7 @@ public class FixTlAuthentication extends AbstractTlAuthentication {
     /**
      * 添加新的用户
      * @author hszhou
-     * @datetime: 2025-05-15 17:52:29
+     * : 2025-05-15 17:52:29
      * @param object 添加的用户
      **/
     @Override

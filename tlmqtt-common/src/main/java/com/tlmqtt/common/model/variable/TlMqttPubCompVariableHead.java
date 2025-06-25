@@ -5,9 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/25 11:13
- * @Description: 发布确认的响应可变头
+ * @author hszhou
  */
 @Data
 @AllArgsConstructor

@@ -13,9 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:12
- * @Description: 订阅消息解码器
+ * @author hszhou
  */
 public class TlMqttSubscribeDecoder extends AbstractTlMqttDecoder {
 

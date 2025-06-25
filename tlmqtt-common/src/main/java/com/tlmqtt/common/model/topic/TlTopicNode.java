@@ -11,9 +11,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * @Author: hszhou
- * @Date: 2025/4/30 14:47
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 
 @Data
@@ -39,9 +37,7 @@ public class TlTopicNode {
 }
 
 /**
- * @description: 节点类型
- * @author: hszhou
- * @datetime: 2025-05-06 11:59:25
+ * @author hszhou
  **/
 enum NodeType {
     /**

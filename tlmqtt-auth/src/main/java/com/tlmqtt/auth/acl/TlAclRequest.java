@@ -1,17 +1,19 @@
 package com.tlmqtt.auth.acl;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.experimental.Accessors;
 import com.tlmqtt.common.enums.Action;
 /**
- * @Author: hszhou
- * @Date: 2025/6/2 13:57
- * @Description: mqtt的权限认证
+ * @author  hszhou
  */
 @Accessors(chain = true)
 @Builder
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class TlAclRequest {
 
     private String username;

@@ -8,9 +8,7 @@ import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:12
- * @Description: Qos2的消息的消息回复
+ * @author hszhou
  */
 @Slf4j
 public class TlMqttPubRecDecoder extends AbstractTlMqttDecoder{

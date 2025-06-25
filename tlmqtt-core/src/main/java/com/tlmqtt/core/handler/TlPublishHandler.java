@@ -23,9 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/5 18:55
- * @Description: publish消息处理器
+ * @author hszhou
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -71,15 +69,16 @@ public class TlPublishHandler extends SimpleChannelInboundHandler<TlMqttPublishR
             retain, false);
         bridgeManager.send(publishMessage);
         switch (messageQos) {
-            case AT_LEAST_ONCE -> sendAck(messageId,channel);
-            case EXACTLY_ONCE -> {
+            case AT_LEAST_ONCE:
+                sendAck(messageId, channel);
+                break;
+            case EXACTLY_ONCE:
                 //这里需要保存消息 key是messageId，value是req，在收到rel消息后 需要将这个消息转发到其他订阅的客户端 在rel只能收到messageId，没有其他的信息
                 channel.attr(AttributeKey.valueOf(Constant.PUB_MSG)).set(req);
                 //发送rec消息给发送者
-                sendRec(messageId,channel);
+                sendRec(messageId, channel);
                 return;
-            }
-            default -> {}
+            default:
         }
         //转发给其他的订阅的客户端
         messageService.publish(topic, messageQos, content);
@@ -88,8 +87,8 @@ public class TlPublishHandler extends SimpleChannelInboundHandler<TlMqttPublishR
 
     /**
      * @description: 在新订阅的时候发送
-     * @author: hszhou
-     * @datetime: 2025-04-29 18:29:08
+     * @author hszhou
+     * 2025-04-29 18:29:08
      * @param:
      * @param: topic 主题
      * @param: content 内容
@@ -128,8 +127,8 @@ public class TlPublishHandler extends SimpleChannelInboundHandler<TlMqttPublishR
 
     /**
      * @description: 发送rec消息给客户端
-     * @author: hszhou
-     * @datetime: 2025-05-08 16:21:42
+     * @author hszhou
+     * 2025-05-08 16:21:42
      * @param: channel
      * @param: messageId
      * @param: clientId

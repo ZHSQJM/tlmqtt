@@ -7,8 +7,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Stack;
 
+
 /**
- * 字典树 存储订阅关系
+ * @author hszhou
  */
 public class TlTopicTrie {
 

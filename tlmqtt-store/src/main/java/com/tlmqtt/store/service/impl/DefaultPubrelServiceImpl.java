@@ -4,14 +4,11 @@ import com.tlmqtt.common.model.entity.PubrelMessage;
 import com.tlmqtt.store.service.PubrelService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * @Author: hszhou
- * @Date: 2025/4/18 14:46
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 public class DefaultPubrelServiceImpl implements PubrelService {
 
@@ -29,7 +26,6 @@ public class DefaultPubrelServiceImpl implements PubrelService {
                 v.computeIfAbsent(String.valueOf(messageId), key -> req);
                 return v;
             })).thenReturn(req);
-            //.subscribeOn(Schedulers.boundedElastic());
     }
 
     @Override

@@ -6,9 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 15:47
- * @Description: 通道管理类
+ * @author hszhou
  */
 @Slf4j
 public class ChannelManager {
@@ -19,12 +17,9 @@ public class ChannelManager {
     public final static ConcurrentHashMap<String, Channel> CLIENT_MAP = new ConcurrentHashMap<>(16);
 
     /**
-     * @description: 客户端连接时 保存客户端与通道之间的映射关系以及通道保存起来
-     * @author: hszhou
-     * @datetime: 2025-05-08 13:43:56
-     * @param: clientId
-     * @param: channel
-     * @return: void
+     * 客户端连接时 保存客户端与通道之间的映射关系以及通道保存起来
+     * @param clientId 客户端ID
+     * @param newChannel 通道
      **/
     public void put(String clientId, Channel newChannel){
         Channel oldChannel = CLIENT_MAP.put(clientId, newChannel);
@@ -34,37 +29,26 @@ public class ChannelManager {
     }
 
     /**
-     * @description: 根据客户端id获取通道
-     * @author: hszhou
-     * @datetime: 2025-05-08 13:44:35
-     * @param:
-     * @param: clientId
-     * @return: Channel
+     * 根据客户端id获取通道
+     * @param clientId 客户端ID
+     * @return  Channel 通道
      **/
     public Channel getChannel(String clientId){
         return CLIENT_MAP.get(clientId);
     }
 
     /**
-     * @description: 移除客户端与通道之间的映射关系以及通道
-     * @author: hszhou
-     * @datetime: 2025-05-08 13:44:54
-     * @param:
-     * @param: clientId
-     * @return: void
+     * 移除客户端与通道之间的映射关系以及通道
+     * @param clientId 客户端ID
      **/
     public void remove(String clientId){
         CLIENT_MAP.remove(clientId);
     }
 
     /**
-     * @description: 向通道中发送数据
-     * @author: hszhou
-     * @datetime: 2025-05-08 13:45:07
-     * @param:
-     * @param: clientId
-     * @param: msg
-     * @return: void
+     * 向通道中发送数据
+     * @param clientId 客户端ID
+     * @param msg 具体消息
      **/
     public void writeAndFlush(String clientId,Object msg){
         Channel channel = getChannel(clientId);

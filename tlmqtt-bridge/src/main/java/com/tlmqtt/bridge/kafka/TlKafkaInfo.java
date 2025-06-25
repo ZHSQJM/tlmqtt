@@ -5,9 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/12 14:51
- * @Description: kafka的发送者配置
+ * @author hszhou
  */
 
 @Data

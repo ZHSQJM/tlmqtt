@@ -10,9 +10,7 @@ import io.netty.buffer.ByteBuf;
 
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:12
- * @Description: 收到发送者的消息解码器
+ * @author hszhou
  */
 public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
 

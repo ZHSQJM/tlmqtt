@@ -5,9 +5,9 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/15 13:31
- * @Description: 加载配置文件
+ * 加载配置文件
+ *
+ * @author hszhou
  */
 @Data
 public class MqttConfiguration {

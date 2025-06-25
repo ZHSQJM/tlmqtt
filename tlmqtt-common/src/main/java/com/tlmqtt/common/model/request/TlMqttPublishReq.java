@@ -8,9 +8,7 @@ import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import lombok.*;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/26 13:23
- * @Description: 发布消息
+ * @author hszhou
  */
 @EqualsAndHashCode(callSuper = true)
 @Data

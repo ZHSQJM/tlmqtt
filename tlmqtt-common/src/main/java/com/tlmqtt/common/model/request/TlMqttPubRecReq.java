@@ -3,16 +3,12 @@ package com.tlmqtt.common.model.request;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.variable.TlMqttPubRecVariableHead;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/26 15:07
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
+@EqualsAndHashCode(callSuper = true)
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

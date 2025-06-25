@@ -13,9 +13,9 @@ import java.util.List;
 import java.util.function.Supplier;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/10 18:35
- * @Description: 基于数据的用户名密码认证
+ * 基于数据的用户名密码认证
+ *
+ * @author  hszhou
  */
 @Slf4j
 public class SqlTlAuthentication extends AbstractTlAuthentication {

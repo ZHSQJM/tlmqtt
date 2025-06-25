@@ -8,9 +8,7 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:12
- * @Description: 订阅编码器
+ * @author hszhou
  */
 @ChannelHandler.Sharable
 public class TlMqttSubAckEncoder extends MessageToByteEncoder<TlMqttSubAck> {

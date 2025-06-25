@@ -19,9 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.concurrent.ExecutorService;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/5 18:57
- * @Description: rec消息处理器
+ * @author hszhou
  */
 @Slf4j
 @RequiredArgsConstructor

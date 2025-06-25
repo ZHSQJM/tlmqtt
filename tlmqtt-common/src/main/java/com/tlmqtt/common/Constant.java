@@ -1,9 +1,7 @@
 package com.tlmqtt.common;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 15:44
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
  */
 public class Constant {
 

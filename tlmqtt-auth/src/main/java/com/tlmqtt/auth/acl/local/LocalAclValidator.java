@@ -3,15 +3,14 @@ package com.tlmqtt.auth.acl.local;
 import com.tlmqtt.auth.acl.TlAclRequest;
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.Action;
+import com.tlmqtt.common.enums.SubjectType;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/30 15:23
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author  hszhou
  */
 @Slf4j
 public class LocalAclValidator {
@@ -43,7 +42,7 @@ public class LocalAclValidator {
      * @param request 请求
      * @return boolean
      * @author hszhou
-     * @datetime: 2025-06-02 15:54:44
+     * : 2025-06-02 15:54:44
      **/
     public boolean checkSubscribe(TlAclRequest request) {
         for (AclRule rule : subRules) {
@@ -68,12 +67,15 @@ public class LocalAclValidator {
     }
 
     private boolean matchesSubscribeRule(TlAclRequest request, AclRule rule) {
-        return switch (rule.getSubjectType()) {
-            case USER ->( rule.getSubjects().contains(request.getUsername()) || rule.getSubjects().contains("*")) && matchTopic(request.getTopic().trim(), rule);
-            case CLIENT -> (rule.getSubjects().contains(request.getClient())|| rule.getSubjects().contains("*")) && matchTopic(request.getTopic().trim(), rule);
-            case IP -> (rule.getSubjects().contains(request.getIp())|| rule.getSubjects().contains("*")) && matchTopic(request.getTopic().trim(), rule);
-
-        };
+        // 替换switch表达式为传统的if-else结构
+        if (rule.getSubjectType() == SubjectType.USER) {
+            return (rule.getSubjects().contains(request.getUsername()) || rule.getSubjects().contains("*")) && matchTopic(request.getTopic().trim(), rule);
+        } else if (rule.getSubjectType() == SubjectType.CLIENT) {
+            return (rule.getSubjects().contains(request.getClient()) || rule.getSubjects().contains("*")) && matchTopic(request.getTopic().trim(), rule);
+        } else if (rule.getSubjectType() == SubjectType.IP) {
+            return (rule.getSubjects().contains(request.getIp()) || rule.getSubjects().contains("*")) && matchTopic(request.getTopic().trim(), rule);
+        }
+        return false;
     }
 
     /**
@@ -83,7 +85,7 @@ public class LocalAclValidator {
      * @param rule acl 的默认规则
      * @return boolean
      * @author hszhou
-     * @datetime: 2025-06-03 09:57:25
+     * : 2025-06-03 09:57:25
      **/
     public boolean matchTopic(String topic, AclRule rule) {
         Set<String> topics = rule.getTopics();
@@ -97,7 +99,7 @@ public class LocalAclValidator {
      * @param aclTopic acl主题
      * @return boolean
      * @author hszhou
-     * @datetime: 2025-06-03 10:06:01
+     * : 2025-06-03 10:06:01
      **/
     private boolean matchTopic(String topic, String aclTopic) {
         if (aclTopic.equals(Constant.ASTERISK) || aclTopic.equals(Constant.TOPIC_SPLITTER)) {

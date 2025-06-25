@@ -9,9 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.concurrent.*;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/14 15:49
- * @Description: 重试
+ * @author hszhou
  */
 @Setter
 @Slf4j
@@ -27,6 +25,11 @@ public class RetryManager extends HashedWheelTimer {
     private final ConcurrentMap<Long, TlRetryTask>[] pubrelSegments;
 
 
+    /**
+     * 构造函数
+     * @param delay  延迟时间
+     * @param maxRetry 最大重试次数
+     **/
     public RetryManager(int  delay,int maxRetry) {
         this.delay = delay;
         this.maxRetry = maxRetry;
@@ -41,8 +44,6 @@ public class RetryManager extends HashedWheelTimer {
 
     /**
      * 获取消息应该存放到哪个map里面
-     * @author hszhou
-     * @datetime: 2025-06-20 13:43:11
      * @param messageId 消息id
      * @return int
      **/
@@ -53,8 +54,6 @@ public class RetryManager extends HashedWheelTimer {
 
     /**
      * 定时任务发送publish消息
-     * @author hszhou
-     * @datetime: 2025-06-20 13:44:11
      * @param messageId 消息id
      * @param task  任务
      **/
@@ -73,6 +72,11 @@ public class RetryManager extends HashedWheelTimer {
     }
 
 
+    /**
+     * 定时任务发送pubrel消息
+     * @param messageId 消息id
+     * @param task  任务
+     **/
     public void schedulePubrelRetry(Long messageId,TlRetryTask task){
 
             int segmentIndex = segmentIndex(messageId);
@@ -86,6 +90,10 @@ public class RetryManager extends HashedWheelTimer {
             }
     }
 
+    /**
+     * 启动定时任务
+     * @param retryTask  任务
+     **/
     public void startRetryTask(TlRetryTask retryTask){
         retryTask.setDuration(delay);
         retryTask.setMaxRetry(maxRetry);
@@ -93,6 +101,10 @@ public class RetryManager extends HashedWheelTimer {
         retryTask.setTimeout(timeout);
     }
 
+    /**
+     * 取消定时任务
+     * @param messageId 消息id
+     **/
     public void cancelPublishRetry(Long messageId){
             int segmentIndex = segmentIndex(messageId);
             TlRetryTask retryTask = pubSegments[segmentIndex].remove(messageId);
@@ -101,7 +113,10 @@ public class RetryManager extends HashedWheelTimer {
             }
     }
 
-
+    /**
+     * 取消定时任务
+     * @param messageId 消息id
+     **/
     public void cancelPubrelRetry(Long messageId){
             int segmentIndex = segmentIndex(messageId);
             TlRetryTask retryTask = pubrelSegments[segmentIndex].remove(messageId);

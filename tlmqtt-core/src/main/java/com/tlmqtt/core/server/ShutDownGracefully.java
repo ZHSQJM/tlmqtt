@@ -10,9 +10,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/21 10:48
- * @Description: 必须描述类做什么事情, 实现什么功能
+ * @author hszhou
+
  */
 @Slf4j
 public class ShutDownGracefully {
@@ -37,6 +36,13 @@ public class ShutDownGracefully {
 
 
 
+    /**
+     * 构造函数
+     * @param serverChannel 服务端通道
+     * @param bossGroup boss线程组
+     * @param workerGroup work线程组
+     * @param executorService 业务线程池
+     */
     public ShutDownGracefully(Channel serverChannel,NioEventLoopGroup bossGroup, NioEventLoopGroup workerGroup,ExecutorService executorService){
         this.serverChannel =serverChannel;
         this.bossGroup = bossGroup;
@@ -45,11 +51,11 @@ public class ShutDownGracefully {
     }
 
 
+
     /**
-     * 注册JVM关闭钩子
-     * @author hszhou
-     * @datetime: 2025-06-21 10:45:54
-     **/
+     * 注册关闭钩子
+     * @param channel 服务端通道
+     */
     public void registerShutdownHook(Channel channel) {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             this.serverChannel =channel;

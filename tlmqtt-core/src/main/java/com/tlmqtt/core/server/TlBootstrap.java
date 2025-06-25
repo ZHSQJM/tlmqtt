@@ -21,9 +21,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * @Author: hszhou
- * @Date: 2025/5/16 15:00
- * @Description: 启动辅助类
+ * @author hszhou
  */
 @Slf4j
 public class TlBootstrap {
@@ -39,6 +37,9 @@ public class TlBootstrap {
 
     private int webSocketPort;
 
+    /**
+     * 创建TlBootstrap
+     **/
     public TlBootstrap() {
 
         MqttConfiguration mqttConfiguration = new MqttConfiguration();
@@ -65,8 +66,6 @@ public class TlBootstrap {
 
     /**
      * 是否开启认证
-     * @author hszhou
-     * @datetime: 2025-05-21 13:19:40
      * @param auth 是否开启认证
      * @return TlBootstrap
      **/
@@ -78,8 +77,6 @@ public class TlBootstrap {
 
     /**
      * 设置http的接口认证
-     * @author hszhou
-     * @datetime: 2025-05-21 13:20:12
      * @param httpEntityInfos http请求认证
      * @return TlBootstrap
      **/
@@ -90,8 +87,6 @@ public class TlBootstrap {
 
     /**
      * 添加sql认证
-     * @author hszhou
-     * @datetime: 2025-05-21 13:20:41
      * @param sqlEntityInfos sql认证
      * @return TlBootstrap
      **/
@@ -102,8 +97,6 @@ public class TlBootstrap {
 
     /**
      * 添加固定用户认证
-     * @author hszhou
-     * @datetime: 2025-05-21 13:21:01
      * @param fixUsers 固定用户
      * @return TlBootstrap
      **/
@@ -115,8 +108,6 @@ public class TlBootstrap {
 
     /**
      * 设置publish的消息存储
-     * @author hszhou
-     * @datetime: 2025-05-21 13:21:35
      * @param publishService publishService的实现类
      * @return TlBootstrap
      **/
@@ -128,8 +119,6 @@ public class TlBootstrap {
 
     /**
      * 设置pubrelService的存储
-     * @author hszhou
-     * @datetime: 2025-05-21 13:22:13
      * @param pubrelService pubrelService的实现类
      * @return TlBootstrap
      **/
@@ -140,8 +129,6 @@ public class TlBootstrap {
 
     /**
      *
-     * @author hszhou
-     * @datetime: 2025-05-21 13:22:54
      * @param retainService retainService的实现类
      * @return TlBootstrap
      **/
@@ -150,64 +137,124 @@ public class TlBootstrap {
         return this;
     }
 
+    /**
+     * 设置sessionService的存储
+     * @param sessionService sessionService的实现类
+     * @return TlBootstrap
+     **/
     public TlBootstrap setSessionService(SessionService sessionService) {
         tlServer.getStoreManager().setSessionService(sessionService);
         tlServer.getStoreManager().setSubscriptionService(new DefaultSubscriptionServiceImpl(sessionService));
       return this;
     }
 
+    /**
+     * 设置重试的延迟时间
+     * @param delay 重试的延迟时间
+     * @return TlBootstrap
+     **/
     public TlBootstrap setDelay(int delay){
         tlServer.getRetryManager().setDelay(delay);
         return this;
     }
 
+    /**
+     * 添加ssl
+     * @param b 是否开启ssl
+     * @return TlBootstrap
+     **/
     public TlBootstrap setSsl(boolean b) {
         tlServer.setSsl(b);
         return this;
     }
 
+    /**
+     * 添加ssl证书
+     * @param certPath 证书路径
+     * @return TlBootstrap
+     **/
     public TlBootstrap setCertPath(String certPath ) {
         tlServer.setCertPath(certPath);
         return this;
     }
 
+    /**
+     * 添加ssl证书
+     * @param privatePath 私钥路径
+     * @return TlBootstrap
+     **/
     public TlBootstrap setPrivatePath(String privatePath) {
         tlServer.setCertPath(privatePath);
         return this;
     }
 
+    /**
+     * 添加认证实体
+     * @param object 认证实体
+     * @return TlBootstrap
+     **/
     public TlBootstrap addAuthEntity(Object object) {
         tlServer.getAuthenticationManager().add(object);
         return this;
     }
 
 
+    /**
+     * 添加桥接信息
+     * @param kafkaInfo kafka信息
+     * @return TlBootstrap
+     **/
     public TlBootstrap addBridgeKafka(TlKafkaInfo kafkaInfo) {
         tlServer.getBridgeManager().addKafkaInfo(kafkaInfo);
         return this;
     }
+    /**
+     * 添加桥接信息
+     * @param tlMySqlInfo mysql信息
+     * @return TlBootstrap
+     **/
     public TlBootstrap addBridgeMysql(TlMySqlInfo tlMySqlInfo) {
         tlServer.getBridgeManager().addMysqlInfo(tlMySqlInfo);
         return this;
     }
 
+    /**
+     * 添加认证信息
+     * @param authentication 认证信息
+     * @return TlBootstrap
+     **/
     public TlBootstrap addAuthentication(AbstractTlAuthentication authentication) {
         tlServer.getAuthenticationManager().addAuthentication(authentication);
         return this;
     }
 
+    /**
+     * 获取存储管理器
+     * @return TlStoreManager
+     **/
     public TlStoreManager getStoreManager(){
         return tlServer.getStoreManager();
     }
 
+    /**
+     * 获取桥接管理器
+     * @return TlBridgeManager
+     **/
     public TlBridgeManager getBridgeManager(){
         return tlServer.getBridgeManager();
     }
 
+    /**
+     * 获取认证管理器
+     * @return AuthenticationManager
+     **/
     public AuthenticationManager getAuthenticationManager(){
        return tlServer.getAuthenticationManager();
     }
 
+    /**
+     * 启动服务
+     **/
     public void start(){
 
         if (!enableSocket && !enableWebsocket) {
@@ -222,6 +269,10 @@ public class TlBootstrap {
     }
 
 
+    /**
+     * 添加socket服务
+     * @return TlBootstrap
+     **/
     public TlBootstrap socket() {
 
         if(this.enableSocket){
@@ -230,12 +281,21 @@ public class TlBootstrap {
         this.enableSocket = true;
         return this;
     }
+    /**
+     * 添加socket服务
+     * @param port 端口
+     * @return TlBootstrap
+     **/
     public TlBootstrap socket(int port) {
 
         this.port = port;
-        socket();
-        return this;
+        return socket();
     }
+
+    /**
+     * 添加websocket服务
+     * @return TlBootstrap
+     **/
     public TlBootstrap websocket() {
         if(this.enableWebsocket){
             throw new IllegalStateException("The webSocket is already configured");
@@ -243,10 +303,14 @@ public class TlBootstrap {
         this.enableWebsocket = true;
         return this;
     }
+    /**
+     * 添加websocket服务
+     * @param port 端口
+     * @return TlBootstrap
+     **/
     public TlBootstrap websocket(int port) {
         this.webSocketPort = port;
-        websocket();
-        return this;
+        return  websocket();
     }
 
 

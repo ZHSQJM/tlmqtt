@@ -7,9 +7,7 @@ import com.tlmqtt.common.model.variable.TlMqttPubAckVariableHead;
 import io.netty.buffer.ByteBuf;
 
 /**
- * @Author: hszhou
- * @Date: 2024/11/30 15:12
- * @Description: 接收到qos1的消息确定解码器
+ * @author hszhou
  */
 public class TlMqttPubAckDecoder extends AbstractTlMqttDecoder {
 

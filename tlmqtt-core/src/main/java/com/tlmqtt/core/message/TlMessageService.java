@@ -18,9 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * @Author: hszhou
- * @Date: 2025/6/10 15:33
- * @Description: 用于消息的转发等等
+ * @author hszhou
  */
 @RequiredArgsConstructor
 @Slf4j
@@ -42,11 +40,11 @@ public class TlMessageService {
     private final ExecutorService executorService;
 
     /**
-     * @description: 用于转发消息给订阅topic的客户端
-     * @author: hszhou
-     * @datetime: 2025-05-08 13:48:43
-     * @param: topic
-     * @param: req
+     * 用于转发消息给订阅topic的客户端
+     *
+     * @param topic 主题
+     * @param qoS  消息
+     * @param content 内容
      **/
     public void publish(String topic, MqttQoS qoS, String content) {
         //找到所有的客户端
@@ -56,6 +54,14 @@ public class TlMessageService {
         });
     }
 
+    /**
+     * 发送消息
+     *
+     * @param topic 主题
+     * @param qoS qos
+     * @param content 内容
+     * @param client 客户端
+     **/
     private void doPublish(String topic, MqttQoS qoS, String content, TlSubClient client) {
 
         executorService.execute(()->{
@@ -94,8 +100,6 @@ public class TlMessageService {
      * @param content 内容
      * @param client 客户端
      * @return TlMqttPublishReq
-     * @author hszhou
-     * @datetime: 2025-05-16 09:52:45
      **/
     public TlMqttPublishReq ofMessage(String topic, MqttQoS qoS, String content, TlSubClient client) {
         int subQos = client.getQos();
@@ -109,6 +113,11 @@ public class TlMessageService {
     }
 
 
+    /**
+     * 生成消息id
+     *
+     * @return Long
+     **/
     public Long nextId() {
         long current;
         long next;

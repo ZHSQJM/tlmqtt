@@ -1,8 +1,10 @@
 package com.tlmqtt.common.model.variable;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.tlmqtt.common.model.entity.UserProperty;
+import lombok.*;
+import lombok.experimental.Accessors;
+
+import java.util.List;
 
 /**
  * @author hszhou
@@ -10,12 +12,22 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
+@Accessors(chain = true)
+@Builder
 public class TlMqttPubCompVariableHead {
 
     private Long messageId;
 
-    public static TlMqttPubCompVariableHead build(Long messageId) {
-        return new TlMqttPubCompVariableHead(messageId);
-    }
+    /**mqtt5.0 协议有的*/
+    private byte reasonCode;
+
+    private String reasonString;
+
+    private List<UserProperty> userPropertyList;
+
+    /**属性长度*/
+    private int propertiesLength;
+
 
 }

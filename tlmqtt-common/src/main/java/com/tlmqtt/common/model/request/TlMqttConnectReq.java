@@ -5,6 +5,8 @@ import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttConnectPayload;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
 import lombok.*;
+import lombok.experimental.Accessors;
+import lombok.experimental.SuperBuilder;
 
 /**
  *
@@ -12,12 +14,11 @@ import lombok.*;
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 @ToString
+@Accessors
+@SuperBuilder
 public class TlMqttConnectReq  extends AbstractTlMessage {
 
-    private TlMqttFixedHead fixedHead;
     /**可变头*/
     private TlMqttConnectVariableHead variableHead;
 

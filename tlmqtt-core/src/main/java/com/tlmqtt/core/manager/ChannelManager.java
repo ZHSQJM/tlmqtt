@@ -1,5 +1,6 @@
 package com.tlmqtt.core.manager;
 
+import com.tlmqtt.common.model.request.AbstractTlMessage;
 import io.netty.channel.Channel;
 import lombok.extern.slf4j.Slf4j;
 
@@ -45,15 +46,4 @@ public class ChannelManager {
         CLIENT_MAP.remove(clientId);
     }
 
-    /**
-     * 向通道中发送数据
-     * @param clientId 客户端ID
-     * @param msg 具体消息
-     **/
-    public void writeAndFlush(String clientId,Object msg){
-        Channel channel = getChannel(clientId);
-        if(channel!=null && channel.isActive()){
-            channel.writeAndFlush(msg);
-        }
-    }
 }

@@ -1,6 +1,6 @@
 package com.tlmqtt.store.service;
 
-import com.tlmqtt.common.model.entity.PublishMessage;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import reactor.core.publisher.Mono;
 
 /**
@@ -15,7 +15,7 @@ public interface RetainService {
      * @param req   消息
      * @return 下线哦
      */
-    Mono<Boolean> save(String topic, PublishMessage req);
+    Mono<Boolean> save(String topic, TlMqttPublishReq req);
 
     /**
      * 找到主题topic的保留消息
@@ -23,7 +23,7 @@ public interface RetainService {
      * @param topic 主题
      * @return 保留消息
      */
-    Mono<PublishMessage> find(String topic);
+    Mono<TlMqttPublishReq> find(String topic);
 
     /**
      * 清除主题topic的保留消息

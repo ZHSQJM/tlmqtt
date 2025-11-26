@@ -4,7 +4,7 @@ import com.tlmqtt.auth.AuthenticationManager;
 import com.tlmqtt.auth.acl.AclManager;
 import com.tlmqtt.bridge.TlBridgeManager;
 import com.tlmqtt.common.config.*;
-import com.tlmqtt.common.model.entity.TlUser;
+import com.tlmqtt.common.model.entity.TlAuthUser;
 import com.tlmqtt.core.codec.MqttWebSocketCodec;
 
 import com.tlmqtt.core.manager.TlStoreManager;
@@ -14,7 +14,7 @@ import com.tlmqtt.core.codec.decoder.*;
 import com.tlmqtt.core.codec.encoder.*;
 import com.tlmqtt.core.handler.*;
 import com.tlmqtt.core.manager.RetryManager;
-import com.tlmqtt.core.message.TlMessageService;
+import com.tlmqtt.core.manager.MessageManager;
 import com.tlmqtt.store.service.*;
 import com.tlmqtt.store.service.impl.*;
 import io.netty.bootstrap.ServerBootstrap;
@@ -37,8 +37,8 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -75,9 +75,9 @@ public class TlServer {
 
     private final TlMqttUnSubscribeDecoder unSubscribeDecoder;
 
-    private final TlMqttConnackEncoder connackEncoder;
+    private final TlMqttConnAckEncoder connackEncoder;
 
-    private final TlMqttHeaderBeatEncoder headerBeatEncoder;
+    private final TlMqttHeaderBeatAckEncoder headerBeatEncoder;
 
     private final TlMqttPubAckEncoder pubAckEncoder;
 
@@ -144,8 +144,6 @@ public class TlServer {
     private final ShutDownGracefully shutDownGracefully;
 
 
-
-
     /**
      * 创建TlServer
      */
@@ -164,8 +162,8 @@ public class TlServer {
         pubRecDecoder = new TlMqttPubRecDecoder();
         subscribeDecoder = new TlMqttSubscribeDecoder();
         unSubscribeDecoder = new TlMqttUnSubscribeDecoder();
-        connackEncoder = new TlMqttConnackEncoder();
-        headerBeatEncoder = new TlMqttHeaderBeatEncoder();
+        connackEncoder = new TlMqttConnAckEncoder();
+        headerBeatEncoder = new TlMqttHeaderBeatAckEncoder();
         pubAckEncoder = new TlMqttPubAckEncoder();
         pubCompEncoder = new TlMqttPubCompEncoder();
         publishEncoder = new TlMqttPublishEncoder();
@@ -181,7 +179,7 @@ public class TlServer {
 
         TlAuthProperties auth = mqttProperties.getAuth();
         boolean enabled = auth.isEnabled();
-        List<TlUser> user = auth.getUser();
+        List<TlAuthUser> user = auth.getUser();
 
         ChannelProperties channelProperties = mqttProperties.getChannel();
         // 创建全局流量整形处理器
@@ -208,23 +206,22 @@ public class TlServer {
         AclManager aclManager = new AclManager();
         retryManager = new RetryManager(delay,maxRetry);
         storeManager = new TlStoreManager(sessionService, subscriptionService, publishService, pubrelService, retainService);
-        TlMessageService messageService = new TlMessageService(storeManager, channelManager,retryManager,executorService);
+        MessageManager messageManager = new MessageManager(storeManager, channelManager,retryManager,executorService);
         bridgeManager = new TlBridgeManager();
         authenticationManager = new AuthenticationManager(enabled);
         authenticationManager.addFixUsers(user);
 
-        exceptionHandler = new TlExceptionHandler(storeManager,channelManager,messageService);
-        connectEventHandler = new TlConnectHandler(storeManager,channelManager, authenticationManager,retryManager);
+        exceptionHandler = new TlExceptionHandler(storeManager,channelManager,messageManager);
+        connectEventHandler = new TlConnectHandler(storeManager,channelManager, authenticationManager,retryManager,messageManager);
         disconnectEventHandler = new TlDisconnectHandler();
         heartBeatEventHandler = new TlHeartBeatHandler();
-        pubAckEventHandler = new TlPubAckHandler(storeManager, retryManager);
-        pubCompEventHandler = new TlPubCompHandler(storeManager, retryManager);
-        publishEventHandler = new TlPublishHandler(storeManager, aclManager, bridgeManager, messageService);
+        pubAckEventHandler = new TlPubAckHandler(storeManager, retryManager,messageManager);
+        pubCompEventHandler = new TlPubCompHandler(storeManager, retryManager,messageManager);
+        publishEventHandler = new TlPublishHandler(storeManager, aclManager, bridgeManager, messageManager);
         pubRecEventHandler = new TlPubRecHandler(storeManager, retryManager,executorService);
-        pubRelEventHandler = new TlPubRelHandler(messageService);
-        subscribeEventHandler = new TlSubscribeHandler(storeManager, aclManager);
+        pubRelEventHandler = new TlPubRelHandler(messageManager);
+        subscribeEventHandler = new TlSubscribeHandler(storeManager, aclManager,messageManager);
         unSubscribeEventHandler = new TlUnSubscribeHandler(storeManager);
-
         this.shutDownGracefully = new ShutDownGracefully(null, bossGroup, workerGroup, executorService);
     }
 
@@ -314,9 +311,9 @@ public class TlServer {
                     }
                     addPipeline(pipeline);
                     pipeline.addLast(new TlMqttMessageCodec(connectDecoder, disConnectDecoder, heartBeatDecoder, pubAckDecoder,pubCompDecoder, publishDecoder, pubRecDecoder, pubRelDecoder, subscribeDecoder, unSubscribeDecoder))
-                        .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder, pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder)
-                          .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler, pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
-                        .addLast(exceptionHandler);
+                            .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder, pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder)
+                            .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler, pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
+                            .addLast(exceptionHandler);
                 }
             });
         try {
@@ -367,8 +364,8 @@ public class TlServer {
 
         File keyResource = new File(privatePath);
 
-        try (InputStream certStream = new FileInputStream(certResource);
-            InputStream keyStream = new FileInputStream(keyResource)) {
+        try (InputStream certStream = Files.newInputStream(certResource.toPath());
+            InputStream keyStream = Files.newInputStream(keyResource.toPath())) {
 
             // 使用 SslContextBuilder 创建 SslContext，并传递 InputStream
             return SslContextBuilder.forServer(certStream, keyStream)

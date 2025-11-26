@@ -4,18 +4,20 @@ import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.variable.TlMqttPubAckVariableHead;
 import lombok.*;
+import lombok.experimental.Accessors;
+import lombok.experimental.SuperBuilder;
 
 /**
  * @author hszhou
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 @ToString
+@Accessors
+@SuperBuilder
 public class TlMqttPubAckReq extends AbstractTlMessage {
 
-    private TlMqttFixedHead fixedHead;
+
     private TlMqttPubAckVariableHead variableHead;
 
     @Override

@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Data
 @NoArgsConstructor
-public class TlUser {
+public class TlAuthUser {
 
     /****
      * 用户名

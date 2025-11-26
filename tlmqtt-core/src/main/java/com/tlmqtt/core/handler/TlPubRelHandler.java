@@ -1,14 +1,14 @@
 package com.tlmqtt.core.handler;
 
 import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.enums.MqttQoS;
-import com.tlmqtt.common.model.fix.TlMqttFixedHead;
-import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
+import com.tlmqtt.common.enums.MqttVersion;
+import com.tlmqtt.common.enums.PubReasonCode;
+import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.TlMqttPubCompReq;
 import com.tlmqtt.common.model.request.TlMqttPubRelReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.variable.TlMqttPubRelVariableHead;
-import com.tlmqtt.core.message.TlMessageService;
+import com.tlmqtt.core.manager.MessageManager;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -23,15 +23,17 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlPubRelHandler extends SimpleChannelInboundHandler<TlMqttPubRelReq> {
+public class TlPubRelHandler extends AbstractTlHandler<TlMqttPubRelReq> {
 
-    private final TlMessageService messageService;
+    private final MessageManager messageManager;
+
+
 
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, TlMqttPubRelReq req) throws Exception {
-        Channel channel = ctx.channel();
-        String clientId = channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).get().toString();
+    public void handle(ChannelHandlerContext ctx, TlMqttPubRelReq req, TlMqttSession session) {
+        String clientId = session.getClientId();
+        MqttVersion mqttVersion = session.getMqttVersion();
         log.debug("Handling 【PUBREL】 event from client:【{}】",clientId);
         //根据这个消息获取到对应的
         TlMqttPubRelVariableHead variableHead = req.getVariableHead();
@@ -39,17 +41,10 @@ public class TlPubRelHandler extends SimpleChannelInboundHandler<TlMqttPubRelReq
         TlMqttPublishReq publishReq = (TlMqttPublishReq) ctx.channel().attr(AttributeKey.valueOf(Constant.PUB_MSG))
             .getAndSet(null);
         //向客户端发送comp消息
-        sendComp(messageId, ctx);
+        sendComp(messageId, ctx,mqttVersion);
         //转发消息给其他客户端
-        TlMqttFixedHead fixedHead = publishReq.getFixedHead();
-        TlMqttPublishPayload payload = publishReq.getPayload();
-        MqttQoS messageQos = fixedHead.getQos();
-        String topic = publishReq.getVariableHead().getTopic();
-        String content = payload.getContent().toString();
-        messageService.publish(topic, messageQos, content);
-
+        messageManager.publish(publishReq, clientId,mqttVersion);
     }
-
 
     /**
      * 发送comp消息给客户端 表示broker已经收到了消息
@@ -57,8 +52,8 @@ public class TlPubRelHandler extends SimpleChannelInboundHandler<TlMqttPubRelReq
      * @param messageId 消息ID
      * @param ctx 通道
      */
-    private void sendComp(Long messageId, ChannelHandlerContext ctx) {
-        TlMqttPubCompReq res = TlMqttPubCompReq.build(messageId);
+    private void sendComp(Long messageId, ChannelHandlerContext ctx, MqttVersion mqttVersion) {
+        TlMqttPubCompReq res = TlMqttPubCompReq.build(messageId, PubReasonCode.SUCCESS.getCode(), null,null,mqttVersion);
         ctx.channel().writeAndFlush(res);
     }
 

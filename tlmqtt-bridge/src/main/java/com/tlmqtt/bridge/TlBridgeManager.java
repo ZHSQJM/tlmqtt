@@ -8,7 +8,7 @@ import com.tlmqtt.bridge.db.MySqlBridgeObserver;
 import com.tlmqtt.bridge.db.TlMySqlInfo;
 import com.tlmqtt.bridge.kafka.KafkaBridgeObserver;
 import com.tlmqtt.bridge.kafka.TlKafkaInfo;
-import com.tlmqtt.common.model.entity.PublishMessage;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,41 +21,44 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class TlBridgeManager {
 
-    public final Disruptor<PublishMessage> disruptor;
+    public final Disruptor<TlMqttPublishReq> disruptor;
 
     private final KafkaBridgeObserver kafkaBridgeObserver;
 
     private final MySqlBridgeObserver mySqlBridgeObserver;
 
-    private final   RingBuffer<PublishMessage> ringBuffer;
+    private final   RingBuffer<TlMqttPublishReq> ringBuffer;
 
     /**
      * 构造函数
      */
     public TlBridgeManager() {
-        disruptor = new Disruptor<>(PublishMessage::new, 16, new DefaultThreadFactory("tl-mqtt-bridge"), ProducerType.MULTI,new YieldingWaitStrategy());
+        //todo
+        disruptor =null;
+        ringBuffer = null;
+       // disruptor = new Disruptor<>(TlMqttPublishReq.builder().build(), 16, new DefaultThreadFactory("tl-mqtt-bridge"), ProducerType.MULTI,new YieldingWaitStrategy());
         kafkaBridgeObserver = new KafkaBridgeObserver();
         mySqlBridgeObserver = new MySqlBridgeObserver();
-        disruptor.handleEventsWith(kafkaBridgeObserver,mySqlBridgeObserver);
-        ringBuffer = disruptor.getRingBuffer();
-        disruptor.start();
+      //  disruptor.handleEventsWith(kafkaBridgeObserver,mySqlBridgeObserver);
+      //  ringBuffer = disruptor.getRingBuffer();
+      //  disruptor.start();
     }
 
     /**
      * 发送消息
      * @param message 消息
      */
-    public void send(PublishMessage message){
+    public void send(TlMqttPublishReq message){
         long sequence = ringBuffer.next();
         try {
-            PublishMessage publishMessage = ringBuffer.get(sequence);
-            publishMessage.setMessageId(message.getMessageId());
-            publishMessage.setTopic(message.getTopic());
-            publishMessage.setClientId(message.getClientId());
-            publishMessage.setMessage(message.getMessage());
-            publishMessage.setQos(message.getQos());
-            publishMessage.setRetain(message.isRetain());
-            publishMessage.setDup(message.isDup());
+            TlMqttPublishReq publishMessage = ringBuffer.get(sequence);
+//            publishMessage.setMessageId(message.getMessageId());
+//            publishMessage.setTopic(message.getTopic());
+//            publishMessage.setClientId(message.getClientId());
+//            publishMessage.setMessage(message.getMessage());
+//            publishMessage.setQos(message.getQos());
+//            publishMessage.setRetain(message.isRetain());
+//            publishMessage.setDup(message.isDup());
         }finally {
             ringBuffer.publish(sequence);
         }

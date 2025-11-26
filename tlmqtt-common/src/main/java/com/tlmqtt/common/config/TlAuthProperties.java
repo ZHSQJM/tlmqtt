@@ -1,6 +1,6 @@
 package com.tlmqtt.common.config;
 
-import com.tlmqtt.common.model.entity.TlUser;
+import com.tlmqtt.common.model.entity.TlAuthUser;
 import lombok.Data;
 
 import java.util.ArrayList;
@@ -16,7 +16,7 @@ public class TlAuthProperties {
 
     private boolean enabled;
 
-    private List<TlUser> user = new ArrayList<>();
+    private List<TlAuthUser> user = new ArrayList<>();
 
 
 }

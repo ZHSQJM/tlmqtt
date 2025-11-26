@@ -1,8 +1,7 @@
 package com.tlmqtt.common.model.variable;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+import lombok.experimental.Accessors;
 
 /**
  * @author hszhou
@@ -10,12 +9,11 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
+@Accessors(chain = true)
+@Builder
 public class TlMqttUnSubAckVariableHead {
 
     private int messageId;
-
-    public static TlMqttUnSubAckVariableHead build(int messageId){
-        return new TlMqttUnSubAckVariableHead(messageId);
-    }
 
 }

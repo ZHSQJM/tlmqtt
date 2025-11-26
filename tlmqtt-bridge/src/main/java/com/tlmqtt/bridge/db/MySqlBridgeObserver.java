@@ -1,7 +1,9 @@
 package com.tlmqtt.bridge.db;
 
 import com.lmax.disruptor.EventHandler;
-import com.tlmqtt.common.model.entity.PublishMessage;
+import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
+import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author hszhou
  */
 @Slf4j
-public class MySqlBridgeObserver  implements EventHandler<PublishMessage> {
+public class MySqlBridgeObserver  implements EventHandler<TlMqttPublishReq> {
 
     private final List<TlMySqlInfo> list = new ArrayList<>();
 
@@ -59,17 +61,19 @@ public class MySqlBridgeObserver  implements EventHandler<PublishMessage> {
      * @throws Exception 异常
      */
     @Override
-    public void onEvent(PublishMessage event, long sequence, boolean endOfBatch) throws Exception {
+    public void onEvent(TlMqttPublishReq event, long sequence, boolean endOfBatch) throws Exception {
         for (TlMySqlInfo entityInfo : list) {
             Connection connection = connectPool.get(entityInfo.getHost() + entityInfo.getPort()+entityInfo.getTable());
             if(connection!=null){
-                String sql = String.format(SQL, entityInfo.getTable(), event.getMessageId(), event.getTopic(), event.getClientId(),event.getMessage(), event.getQos(), event.isRetain(), event.isDup());
-                try{
-                    PreparedStatement preparedStatement = connection.prepareStatement(sql);
-                    preparedStatement.execute();
-                }catch (Exception e){
-                    log.error("数据库执行失败",e);
-                }
+                TlMqttPublishPayload payload = event.getPayload();
+                TlMqttPublishVariableHead variableHead = event.getVariableHead();
+//                String sql = String.format(SQL, entityInfo.getTable(), variableHead.getMessageId(), variableHead.getTopic(), event.getClientId(),payload.getContent(), event.getQos(), event.isRetain(), event.isDup());
+//                try{
+//                    PreparedStatement preparedStatement = connection.prepareStatement(sql);
+//                    preparedStatement.execute();
+//                }catch (Exception e){
+//                    log.error("数据库执行失败",e);
+//                }
             }
 
         }

@@ -1,21 +1,23 @@
 package com.tlmqtt.core.handler;
 
 import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.enums.MqttQoS;
-import com.tlmqtt.common.model.entity.PublishMessage;
+import com.tlmqtt.common.enums.MqttVersion;
+import com.tlmqtt.common.exception.TlMalformedPacketException;
+import com.tlmqtt.common.exception.TlProtocolErrorException;
+import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
+import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import com.tlmqtt.core.manager.TlStoreManager;
 import com.tlmqtt.core.manager.ChannelManager;
-import com.tlmqtt.core.message.TlMessageService;
+import com.tlmqtt.core.manager.MessageManager;
+import com.tlmqtt.core.task.TlWillTask;
 import io.netty.channel.*;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
 import java.net.SocketException;
 
 /**
@@ -31,71 +33,106 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
     private final ChannelManager channelManager;
 
-    private final TlMessageService messageService;
-
-
-
-
+    private final MessageManager messageManager;
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
+
+        //log.info("进入inactive的模块");
         Channel channel = ctx.channel();
-        Object clientId = channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).get();
-        if (clientId == null) {
+        Object obj = channel.attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
+        if (obj == null) {
             return;
         }
-        //检查当前channel是否仍然是channelManager中注册的channel
-        Channel currentChannel = channelManager.getChannel(clientId.toString());
+        TlMqttSession session = (TlMqttSession) obj;
+        String clientId = session.getClientId();
+        //检查channel管理器中的通道是否是当前通道 如果不是 那么就不需要做任何事情  这种情况是重复clientId的发生 将上一个通道关闭即可
+        Channel currentChannel = channelManager.getChannel(clientId);
         if (currentChannel != channel) {
             log.info("Channel for client:【{}】 has been replaced, skip cleanup", clientId);
             return;
         }
-        handleSessionCleanup(clientId.toString()).then(handleWillMessage(clientId.toString())).doFinally(signal -> channel.close())
-            .subscribe(null, e -> log.error("Channel inactive processing error", e));
+        MqttVersion mqttVersion = session.getMqttVersion();
+        handleWillMessage(clientId,mqttVersion)
+            .then(handleSessionCleanup(session))
+            .doFinally(signalType -> channel.close())
+            .subscribe();
     }
 
-    private Mono<Void> handleSessionCleanup(String clientId) {
-        return storeManager.getSessionService().find(clientId).flatMap(session -> {
-            channelManager.remove(clientId);
-            return session.getCleanSession() ? storeManager.clearAll(clientId) : Mono.empty();
-        }).onErrorResume(e -> {
-            log.error("Session cleanup error ", e);
+    private Mono<Void> handleSessionCleanup(TlMqttSession session) {
+        String clientId = session.getClientId();
+        channelManager.remove(clientId);
+        boolean cleanSession = session.isCleanSession();
+        //CleanStart=true：丢弃任何现有会话，建立全新会话（类似 MQTT 3.1.1 的 CleanSession=true）。
+        if(cleanSession){
+            return storeManager.clearAll(clientId);
+        }
+
+        MqttVersion mqttVersion = session.getMqttVersion();
+        //定义会话在断开连接后的保留时间（单位：秒）。
+        //Session Expiry Interval=0（默认值）：会话在断开时立即删除
+        //Session Expiry Interval>0：会话保留指定时间，客户端在此期间重连可恢复订阅和未接收的 QoS 1/2 消息。
+        //Session Expiry Interval=0xFFFFFFFF（无限）：会话永久保留（类似 MQTT 3.1.1 的 CleanSession=false 但无时间限制）135。
+        if (mqttVersion == MqttVersion.MQTT_5) {
+            int sessionExpiryInterval = session.getSessionExpiryInterval();
+            if(sessionExpiryInterval==0){
+                return storeManager.clearAll(clientId);
+            }
+           return storeManager.scheduleRemoveSession(session);
+        }else{
             return Mono.empty();
-        });
+        }
     }
 
-    private Mono<Boolean> handleWillMessage(String clientId) {
+    /**
+     * 处理遗嘱消息
+     * 1. 服务端检测到了一个I/O错误或者网络故障。
+     * 2. 客户端在保持连接（Keep Alive）的时间内未能通讯。
+     * 3. 客户端没有先发送原因码为 0x00 （正常断连）的 DISCONNECT 报文直接关闭了网络连接。
+     * 4. 服务器没有先发送原因码为 0x00 （正常断连）的 DISCONNECT 报文直接关闭了网络连接。
+     * @param clientId 客户端的ID
+     * @return 是否发送遗嘱消息成功
+     *
+     * todo 当连接断开后，尽管会话还会保持，无论遗嘱消息是否发生，该条遗嘱消息不应该存在了
+     */
+    private Mono<Boolean> handleWillMessage(String clientId,MqttVersion version) {
+
         if (isNormalDisconnect(clientId)) {
-            return storeManager.getPublishService().clearWill(clientId);
+            return storeManager.getPublishService()
+                               .clearWill(clientId);
         }
-        return storeManager.getPublishService().findWill(clientId).flatMap(willMsg -> {
-            TlMqttPublishReq willRequest = buildWillPublishReq(willMsg);
-            return publishToSubscribers(willMsg.getTopic(), willRequest).then(
-                storeManager.getPublishService().clearWill(clientId));
-        }).onErrorResume(e -> {
-            log.error("Will message processing error", e);
-            return Mono.just(false);
-        });
+
+        TlMqttPublishReq block = storeManager.getPublishService().findWill(clientId).block();
+        log.info("[{}]",block);
+        return storeManager.getPublishService()
+            .findWill(clientId)
+            .doOnNext(req->log.info("获取遗嘱消息【{}】",req))
+            .flatMap(req->{
+                log.info("获取到遗嘱消息【{}】",req);
+                TlMqttPublishVariableHead variableHead = req.getVariableHead();
+                Integer willDelayInterval = variableHead.getWillDelayInterval();
+                if(willDelayInterval==null){
+                    log.error("WillDelayInterval为空");
+                   return publishToSubscribers(req,clientId,version);
+                }
+                log.info("WillDelayInterval【{}】",willDelayInterval);
+                return messageManager.scheduleSendWillMessage(clientId,req,willDelayInterval)
+                    .then(Mono.empty());
+            });
     }
 
-    private Flux<Void> publishToSubscribers(String topic, TlMqttPublishReq message) {
-        return storeManager.getSubscriptionService().find(topic).flatMap(subscription -> {
-            channelManager.writeAndFlush(subscription.getClientId(), message);
-            return Flux.empty();
-        });
+    private Mono<Boolean> publishToSubscribers(TlMqttPublishReq req,String clientId,MqttVersion version) {
+        messageManager.publish(req,clientId,version);
+        return Mono.empty();
     }
 
-    private TlMqttPublishReq buildWillPublishReq(PublishMessage willMsg) {
-        String topic = willMsg.getTopic();
-        MqttQoS qos = MqttQoS.valueOf(willMsg.getQos());
-        TlMqttPublishReq req = TlMqttPublishReq.build(topic, qos, false, willMsg.getMessage());
-        if (qos != MqttQoS.AT_MOST_ONCE) {
-            Long messageId = messageService.nextId();
-            req.getVariableHead().setMessageId(messageId);
-        }
-        return req;
-    }
 
+
+    /**
+     * 判定是否是正常判断
+     * @param clientId 客户端ID
+     * @return 是否正常断开
+     */
     private boolean isNormalDisconnect(String clientId) {
         Channel channel = channelManager.getChannel(clientId);
         if (channel == null) {
@@ -108,9 +145,22 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        log.info("异常");
         ReferenceCountUtil.release(cause);
-        log.error("Exception", cause);
-        if (cause instanceof SocketException) {
+        cause.printStackTrace();
+        if (cause instanceof TlProtocolErrorException){
+            log.info("协议错误");
+
+        }else if(cause instanceof TlMalformedPacketException){
+
+            log.error("无效报文");
+        }
+        else if (cause instanceof SocketException) {
+            log.error("1关闭连接");
+            ctx.close();
+        }
+        else {
+            log.error("2关闭连接");
             ctx.close();
         }
     }

@@ -1,9 +1,10 @@
 package com.tlmqtt.common.model.variable;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import com.tlmqtt.common.model.entity.UserProperty;
+import lombok.*;
+import lombok.experimental.Accessors;
+
+import java.util.List;
 
 /**
  * @author hszhou
@@ -12,26 +13,28 @@ import lombok.ToString;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
+@Accessors(chain = true)
+@Builder
 public class TlMqttConnectVariableHead {
 
     /**协议名称长度*/
-    private Integer protocolNameLength;
+    private int protocolNameLength;
     /**协议名称*/
     private String protocolName;
     /**协议版本*/
-    private Short protocolVersion;
+    private short protocolVersion;
     //下面是一个字节的连接标识
     /**
      * 如果usernameFlag 设置为0  那么用户名不必须要出现在载荷中
      * 如果usernameFlag设置为1 那么用户名必须出现在在载荷中
      * */
-    private Boolean usernameFlag;
+    private boolean usernameFlag;
     /**
      * 吐过passwordFlag 设置为0  那么密码不必要出现在载荷中
      * 吐过passwordFlag 设置为1 那么密码必须出现在载荷中
      * 如果usernameFlag 设置为0 那么passwordFlag必须设置为0
      * */
-    private Boolean passwordFlag;
+    private boolean passwordFlag;
     /**
      * 表示will message咋发布之后是否需要保留
      * 如果will flag设置我0 那么这个will retain 特必须是0
@@ -77,7 +80,35 @@ public class TlMqttConnectVariableHead {
      * 客户端可以再任何时间发送了PINGREQ后，在一个合理的时间都没有收到PINGRES包，客户端应该关闭和服务端的网络连接
      * Keep Alive的值为0 就关闭了维持的机制，这意味着在这种情况下，服务端不会断开静默的客户端
      */
-    private Short keepAlive;
+    private short keepAlive;
+
+    /**
+     * 会话超时
+     * 默认为0
+     * 0 表示服务端不处理会话超时
+     * 否则服务端必须处理会话超时
+     * */
+    private int sessionExpiryInterval;
+
+    /**
+     * 接收最大值
+     * 默认值为65535
+     * */
+    private Short receiveMaximum ;
+
+    private Integer maximumPacketSize;
+
+    /**
+     * 主题别名最大值
+     * 默认值为65535
+     * */
+    private short topicMaxAlias;
+
+    private boolean requestResponseInformation;
+
+    private boolean requestProblemInformation;
+
+    private List<UserProperty> userProperty;
 
 
 }

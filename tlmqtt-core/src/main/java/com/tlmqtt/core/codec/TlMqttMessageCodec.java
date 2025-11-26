@@ -9,6 +9,7 @@ import com.tlmqtt.core.codec.decoder.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
+import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -68,7 +69,7 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
         }
         // 6. 数据完整：读取载荷部分到临时ByteBuf // 使用slice避免复制
         ByteBuf messageBuf = in.readSlice(remainingLength).retain();
-        TlLog.logger("mqtt 16 radix",messageBuf);
+      //  TlLog.logger("mqtt 16 radix",messageBuf);
         try {
             // 7. 提取消息类型 (右移4位取高4位)
             int messageType = type >> Constant.MESSAGE_BIT;
@@ -77,34 +78,34 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
             AbstractTlMessage req;
             switch (messageTypeEnum) {
                 case CONNECT:
-                    req = connectDecoder.build(messageBuf,type, remainingLength);
+                    req = connectDecoder.decode(messageBuf,type, remainingLength, ctx,messageTypeEnum);
                     break;
                 case DISCONNECT:
-                    req = disConnectDecoder.build(messageBuf,type, remainingLength);
+                    req = disConnectDecoder.decode(messageBuf,type, remainingLength,ctx,messageTypeEnum);
                     break;
                 case PUBLISH:
-                    req = publishDecoder.build(messageBuf, type, remainingLength);
+                    req = publishDecoder.decode(messageBuf, type, remainingLength,ctx,messageTypeEnum);
                     break;
                 case PUBACK:
-                    req = pubAckDecoder.build(messageBuf,type, remainingLength);
+                    req = pubAckDecoder.decode(messageBuf,type, remainingLength,ctx,messageTypeEnum);
                     break;
                 case PUBREC:
-                    req = pubRecDecoder.build(messageBuf,type, remainingLength);
+                    req = pubRecDecoder.decode(messageBuf,type, remainingLength,ctx,messageTypeEnum);
                     break;
                 case PUBREL:
-                    req = pubRelDecoder.build(messageBuf,type, remainingLength);
+                    req = pubRelDecoder.decode(messageBuf,type, remainingLength,ctx,messageTypeEnum);
                     break;
                 case PUBCOMP:
-                    req = pubCompDecoder.build(messageBuf,type, remainingLength);
+                    req = pubCompDecoder.decode(messageBuf,type, remainingLength,ctx,messageTypeEnum);
                     break;
                 case SUBSCRIBE:
-                    req = subscribeDecoder.build(messageBuf,type, remainingLength);
+                    req = subscribeDecoder.decode(messageBuf,type, remainingLength,ctx,messageTypeEnum);
                     break;
                 case UNSUBSCRIBE:
-                    req = unSubscribeDecoder.build(messageBuf,type, remainingLength);
+                    req = unSubscribeDecoder.decode(messageBuf,type, remainingLength,ctx,messageTypeEnum);
                     break;
                 case PINGREQ:
-                    req = heartBeatDecoder.build(messageBuf,type, remainingLength);
+                    req = heartBeatDecoder.decode(messageBuf,type, remainingLength,ctx,messageTypeEnum);
                     break;
                 default:
                     throw new IllegalArgumentException("unknown message type: " + messageTypeEnum);

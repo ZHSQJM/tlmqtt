@@ -1,13 +1,19 @@
 package com.tlmqtt.core.manager;
 
-import com.tlmqtt.common.enums.MqttQoS;
-import com.tlmqtt.common.model.entity.PublishMessage;
+import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
+import com.tlmqtt.core.task.TlSessionTask;
 import com.tlmqtt.store.service.*;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timeout;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
+
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author hszhou
@@ -15,7 +21,9 @@ import reactor.core.publisher.Mono;
 @Slf4j
 @Setter
 @Getter
-public class TlStoreManager {
+public class TlStoreManager extends HashedWheelTimer {
+
+    private final ConcurrentMap<String, TlSessionTask> sessionTaskMap = new ConcurrentHashMap<>();
 
     private SessionService sessionService;
 
@@ -50,21 +58,11 @@ public class TlStoreManager {
      * 保存publish消息
      * @param clientId 客户端ID
      * @param messageId 消息ID
-     * @param message 消息体
-     * @param qoS qos
      * @return Mono 保存成功返回消息体
      **/
-    public Mono<PublishMessage> savePublishReq(String clientId, Long messageId, TlMqttPublishReq message,MqttQoS qoS) {
-        PublishMessage publishMessage = new PublishMessage();
-        publishMessage.setClientId(clientId);
-        publishMessage.setTopic(message.getVariableHead().getTopic());
-        publishMessage.setQos(qoS.value());
-        publishMessage.setMessageId(message.getVariableHead().getMessageId());
-        publishMessage.setMessage(message.getPayload().getContent().toString());
-        publishMessage.setDup(true);
-        publishMessage.setRetain(false);
+    public Mono<TlMqttPublishReq> savePublishReq(String clientId, Long messageId, TlMqttPublishReq publishReq) {
         log.debug("save publish messageId is【{}】", messageId);
-        return publishService.save(clientId, messageId, publishMessage);
+        return publishService.save(clientId, messageId, publishReq);
     }
 
 
@@ -76,11 +74,45 @@ public class TlStoreManager {
      * @return void 清除成功返回void
      **/
     public Mono<Void> clearAll(String clientId) {
-      return sessionService.find(clientId).flatMap(
-            e -> Mono.when(
-                subscriptionService.clear(clientId),
-                publishService.clearAll(clientId),
-                pubrelService.clearAll(clientId),
-                publishService.clearWill(clientId)));
+
+        //log.info("清除会话");
+       return Mono.when(
+            sessionService.clear(clientId),
+            subscriptionService.clear(clientId),
+            publishService.clearAll(clientId),
+            publishService.clearWill(clientId),
+            pubrelService.clearAll(clientId));
     }
+
+
+    /**
+     * 定时删除会话
+     *
+     * @param session 客户端id
+     */
+    public Mono<Void> scheduleRemoveSession(TlMqttSession session){
+
+        TlSessionTask sessionTask = new TlSessionTask(session.getClientId(),this);
+        Timeout timeout = this.newTimeout(sessionTask, session.getSessionExpiryInterval(), TimeUnit.SECONDS);
+        sessionTask.setTimeout(timeout);
+        sessionTaskMap.put(session.getClientId(),sessionTask);
+        return Mono.empty();
+    }
+
+
+    /**
+     * 取消定时删除会话
+     *
+     * @param clientId 客户端id
+     */
+    public void cancelRemoveSession(String clientId){
+        TlSessionTask sessionTask = sessionTaskMap.get(clientId);
+        if(sessionTask!=null){
+            log.info("取消定时任务");
+            sessionTask.cancel();
+        }
+        sessionTaskMap.remove(clientId);
+    }
+
+
 }

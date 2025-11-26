@@ -5,7 +5,7 @@ import com.tlmqtt.auth.http.HttpEntityInfo;
 import com.tlmqtt.auth.http.HttpTlAuthentication;
 import com.tlmqtt.auth.sql.SqlEntityInfo;
 import com.tlmqtt.auth.sql.SqlTlAuthentication;
-import com.tlmqtt.common.model.entity.TlUser;
+import com.tlmqtt.common.model.entity.TlAuthUser;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -92,7 +92,7 @@ public class AuthenticationManager extends AbstractTlAuthentication {
      * 2025-05-10 16:16:44
      * @param users 认证信息
      **/
-    public void addFixUsers(List<TlUser> users){
+    public void addFixUsers(List<TlAuthUser> users){
         AbstractTlAuthentication authentication = headAuthentication;
         while (authentication.nextAuthentication!=null ){
             authentication = authentication.nextAuthentication;

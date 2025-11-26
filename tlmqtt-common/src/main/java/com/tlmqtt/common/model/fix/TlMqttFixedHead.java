@@ -2,10 +2,8 @@ package com.tlmqtt.common.model.fix;
 
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
+import lombok.experimental.Accessors;
 
 /**
  * mqtt的固定头部信息
@@ -15,7 +13,9 @@ import lombok.ToString;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@ToString
+//@ToString
+@Builder
+@Accessors(chain = true)
 public class TlMqttFixedHead {
 
 
@@ -29,8 +29,6 @@ public class TlMqttFixedHead {
     private boolean retain;
     /**消息长度*/
     private int length;
-
-
 
     public static TlMqttFixedHead build(MqttMessageType messageType,MqttQoS qos,boolean retain){
         TlMqttFixedHead fixedHead = new TlMqttFixedHead();
@@ -51,6 +49,11 @@ public class TlMqttFixedHead {
         return fixedHead;
     }
 
+    /**
+     * 构建固定头部信息
+     * @param messageType 消息类型
+     * @return 固定头部信息
+     */
     public static TlMqttFixedHead build(MqttMessageType messageType){
         TlMqttFixedHead fixedHead = new TlMqttFixedHead();
         fixedHead.setDup(false);

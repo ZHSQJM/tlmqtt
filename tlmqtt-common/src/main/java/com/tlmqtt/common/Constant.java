@@ -6,6 +6,10 @@ package com.tlmqtt.common;
 public class Constant {
 
     /**
+     * 协议名称
+     */
+    public static final String PROTOCOL_NAME = "MQTT";
+    /**
      * 保存在通道中客户端的KEY
      */
     public static final String CLIENT_ID = "client_id";
@@ -37,4 +41,8 @@ public class Constant {
     public static final String ASTERISK = "*";
     public static final String COMMA = "\\,";
     public static final String VERTICAL_LINE ="\\|";
+
+    public static final String MQTT_SESSION = "session";
+
+
 }

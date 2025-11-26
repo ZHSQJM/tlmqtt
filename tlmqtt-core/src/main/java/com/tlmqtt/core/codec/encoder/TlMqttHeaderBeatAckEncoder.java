@@ -1,23 +1,22 @@
 package com.tlmqtt.core.codec.encoder;
 
 
+import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
-import com.tlmqtt.common.model.response.TlMqttHeartBeat;
+import com.tlmqtt.common.model.response.TlMqttHeartBeatAck;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * @author hszhou
  */
 @ChannelHandler.Sharable
-public class TlMqttHeaderBeatEncoder extends MessageToByteEncoder<TlMqttHeartBeat> {
+public class TlMqttHeaderBeatAckEncoder extends AbstractTlMqttEncoder<TlMqttHeartBeatAck> {
 
     @Override
-    protected void encode(ChannelHandlerContext ctx, TlMqttHeartBeat res, ByteBuf out) throws Exception {
+    protected void encode(ChannelHandlerContext ctx, TlMqttHeartBeatAck res, ByteBuf out, MqttMessageType mqttMessageType){
         TlMqttFixedHead fixedHead = res.getFixedHead();
         int messageType = fixedHead.getMessageType().value() << 4;
         out.writeByte(messageType);

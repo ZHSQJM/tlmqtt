@@ -1,8 +1,10 @@
 package com.tlmqtt.common.model.variable;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.tlmqtt.common.model.entity.UserProperty;
+import lombok.*;
+import lombok.experimental.Accessors;
+
+import java.util.List;
 
 /**
  * @author hszhou
@@ -10,11 +12,21 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@ToString
+@Accessors(chain = true)
+@Builder
 public class TlMqttSubscribeVariableHead {
 
     private int messageId;
 
-    public static TlMqttSubscribeVariableHead build(int messageId){
-      return new TlMqttSubscribeVariableHead(messageId);
-    }
+    /**
+     * 订阅标识符
+     */
+    private int subscriptionIdentifier;
+
+    /**
+     * 用户属性
+     */
+    private List<UserProperty> userPropertyList;
+
 }

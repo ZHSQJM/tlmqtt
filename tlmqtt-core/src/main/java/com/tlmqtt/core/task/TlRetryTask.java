@@ -1,4 +1,4 @@
-package com.tlmqtt.core.retry;
+package com.tlmqtt.core.task;
 
 import io.netty.channel.Channel;
 import io.netty.util.Timeout;
@@ -23,7 +23,6 @@ public class TlRetryTask implements TimerTask {
      * 消息ID
      */
     private final Long messageId;
-
     /**
      * 消息
      */

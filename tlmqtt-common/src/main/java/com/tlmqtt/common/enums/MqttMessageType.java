@@ -27,7 +27,7 @@ public enum MqttMessageType {
     private static final MqttMessageType[] VALUES;
     private final int value;
 
-    private MqttMessageType(int value) {
+    MqttMessageType(int value) {
         this.value = value;
     }
 
@@ -46,16 +46,11 @@ public enum MqttMessageType {
     static {
         MqttMessageType[] values = values();
         VALUES = new MqttMessageType[values.length + 1];
-        MqttMessageType[] var1 = values;
-        int var2 = values.length;
-
-        for(int var3 = 0; var3 < var2; ++var3) {
-            MqttMessageType mqttMessageType = var1[var3];
+        for (MqttMessageType mqttMessageType : values) {
             int value = mqttMessageType.value;
             if (VALUES[value] != null) {
                 throw new AssertionError("value already in use: " + value);
             }
-
             VALUES[value] = mqttMessageType;
         }
 

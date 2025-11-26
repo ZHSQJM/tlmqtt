@@ -1,18 +1,15 @@
 package com.tlmqtt.core.handler;
 
-import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.model.entity.PubrelMessage;
+import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.TlMqttPubRecReq;
 import com.tlmqtt.common.model.request.TlMqttPubRelReq;
 import com.tlmqtt.common.model.variable.TlMqttPubRecVariableHead;
 import com.tlmqtt.core.manager.RetryManager;
 import com.tlmqtt.core.manager.TlStoreManager;
-import com.tlmqtt.core.retry.TlRetryTask;
-import io.netty.channel.Channel;
+import com.tlmqtt.core.task.TlRetryTask;
+
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,7 +21,7 @@ import java.util.concurrent.ExecutorService;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlPubRecHandler extends SimpleChannelInboundHandler<TlMqttPubRecReq> {
+public class TlPubRecHandler extends AbstractTlHandler<TlMqttPubRecReq> {
 
     private final TlStoreManager storeManager;
 
@@ -34,8 +31,13 @@ public class TlPubRecHandler extends SimpleChannelInboundHandler<TlMqttPubRecReq
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, TlMqttPubRecReq req) throws Exception {
 
-        Channel channel = ctx.channel();
-        String clientId = channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).get().toString();
+
+    }
+
+    @Override
+    public void handle(ChannelHandlerContext ctx, TlMqttPubRecReq req, TlMqttSession session) {
+
+        String clientId = session.getClientId();
         log.debug("Handling 【PUBREC】 event from client:【{}】", clientId);
 
         TlMqttPubRecVariableHead vh = req.getVariableHead();
@@ -43,23 +45,19 @@ public class TlPubRecHandler extends SimpleChannelInboundHandler<TlMqttPubRecReq
         retryManager.cancelPublishRetry(messageId);
         executorService.execute(()-> storeManager.getPublishService()
             .clear(clientId, messageId)
-            .flatMap(e -> {
-                PubrelMessage pubrelMessage = PubrelMessage.builder()
-                    .messageId(messageId)
-                    .clientId(clientId)
-                    .build();
-                return storeManager.getPubrelService().save(clientId, messageId, pubrelMessage);
+            .flatMap(publishReq -> {
+                TlMqttPubRelReq res = TlMqttPubRelReq.build(messageId);
+                return storeManager.getPubrelService().save(clientId, messageId, res);
             })
-            .subscribe(e -> {
+            .subscribe(relReq -> {
                 // 发送操作回到Netty线程
-                channel.eventLoop().execute(() -> {
-                    TlMqttPubRelReq res = TlMqttPubRelReq.build(messageId);
-                    channel.writeAndFlush(res);
+                ctx.channel().eventLoop().execute(() -> {
 
-                    TlRetryTask tlRetryTask = new TlRetryTask(messageId, res, channel);
+                    ctx.channel().writeAndFlush(relReq);
+
+                    TlRetryTask tlRetryTask = new TlRetryTask(messageId, relReq, ctx.channel());
                     retryManager.schedulePubrelRetry(messageId, tlRetryTask);
                 });
             }));
-
     }
 }

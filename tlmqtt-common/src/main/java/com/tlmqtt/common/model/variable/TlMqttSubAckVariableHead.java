@@ -1,16 +1,26 @@
 package com.tlmqtt.common.model.variable;
 
+import com.tlmqtt.common.model.entity.UserProperty;
+import lombok.*;
+import lombok.experimental.Accessors;
+
+import java.util.List;
+
 /**
  * @author hszhou
  */
-public class TlMqttSubAckVariableHead extends TlMqttSubscribeVariableHead {
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@ToString
+@Accessors(chain = true)
+@Builder
+public class TlMqttSubAckVariableHead  {
 
+    private int messageId;
 
-    public TlMqttSubAckVariableHead(int messageId) {
-        super(messageId);
-    }
+    private String reasonString;
 
-    public static TlMqttSubAckVariableHead of(int messageId){
-        return new TlMqttSubAckVariableHead(messageId);
-    }
+    private List<UserProperty> userPropertyList;
+
 }

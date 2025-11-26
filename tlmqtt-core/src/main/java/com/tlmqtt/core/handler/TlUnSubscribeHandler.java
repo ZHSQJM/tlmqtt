@@ -1,6 +1,7 @@
 package com.tlmqtt.core.handler;
 
 import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlTopic;
 import com.tlmqtt.common.model.payload.TlMqttUnSubscribePayload;
 import com.tlmqtt.common.model.request.TlMqttUnSubscribeReq;
@@ -21,14 +22,15 @@ import java.util.List;
 @Slf4j
 @RequiredArgsConstructor
 @ChannelHandler.Sharable
-public class TlUnSubscribeHandler extends SimpleChannelInboundHandler<TlMqttUnSubscribeReq> {
+public class TlUnSubscribeHandler extends AbstractTlHandler<TlMqttUnSubscribeReq> {
 
     private final TlStoreManager storeManager;
 
+
+
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, TlMqttUnSubscribeReq req) throws Exception {
-        Channel channel = ctx.channel();
-        String clientId = channel.attr(AttributeKey.valueOf(Constant.CLIENT_ID)).get().toString();
+    public void handle(ChannelHandlerContext ctx, TlMqttUnSubscribeReq req, TlMqttSession session) {
+        String clientId = session.getClientId();
         log.debug("Handling 【UNSUBSCRIBE】 event from client:【{}】", clientId);
         TlMqttUnSubscribePayload payload = req.getPayload();
         List<TlTopic> topics = payload.getTopics();
@@ -38,7 +40,7 @@ public class TlUnSubscribeHandler extends SimpleChannelInboundHandler<TlMqttUnSu
             .subscribe(e -> log.debug("Client 【{}】 unsubscribe topic 【{}】", clientId, topic)));
         //构建ack消息
         int messageId = req.getVariableHead().getMessageId();
-        TlMqttUnSubAck res = TlMqttUnSubAck.of(messageId);
+        TlMqttUnSubAck res = TlMqttUnSubAck.build(messageId);
         ctx.channel().writeAndFlush(res);
     }
 }

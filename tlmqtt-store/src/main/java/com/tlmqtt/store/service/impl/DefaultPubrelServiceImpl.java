@@ -1,6 +1,7 @@
 package com.tlmqtt.store.service.impl;
 
-import com.tlmqtt.common.model.entity.PubrelMessage;
+import com.tlmqtt.common.model.request.TlMqttPubRelReq;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.store.service.PubrelService;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -12,10 +13,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class DefaultPubrelServiceImpl implements PubrelService {
 
-    public static final ConcurrentHashMap<String, ConcurrentHashMap<String, PubrelMessage>> PUBREL_MAP = new ConcurrentHashMap<>();
+    public static final ConcurrentHashMap<String, ConcurrentHashMap<String, TlMqttPubRelReq>> PUBREL_MAP = new ConcurrentHashMap<>();
 
     @Override
-    public Mono<PubrelMessage> save(String clientId, Long messageId, PubrelMessage req) {
+    public Mono<TlMqttPubRelReq> save(String clientId, Long messageId, TlMqttPubRelReq req) {
 
 
         return Mono.fromSupplier(()->
@@ -29,7 +30,7 @@ public class DefaultPubrelServiceImpl implements PubrelService {
     }
 
     @Override
-    public Mono<PubrelMessage> clear(String clientId, Long messageId) {
+    public Mono<TlMqttPubRelReq> clear(String clientId, Long messageId) {
         return Mono.fromSupplier(()->  PUBREL_MAP.getOrDefault(clientId, new ConcurrentHashMap<>(16))
                 .remove(String.valueOf(messageId)));
     }
@@ -40,13 +41,13 @@ public class DefaultPubrelServiceImpl implements PubrelService {
     }
 
     @Override
-    public Mono<PubrelMessage> find(String clientId, Long messageId) {
+    public Mono<TlMqttPubRelReq> find(String clientId, Long messageId) {
 
         return Mono.fromSupplier(()->PUBREL_MAP.getOrDefault(clientId, new ConcurrentHashMap<>(16)).get(String.valueOf(messageId)));
     }
 
     @Override
-    public Flux<PubrelMessage> findAll(String clientId) {
+    public Flux<TlMqttPubRelReq> findAll(String clientId) {
         return Flux.fromIterable(  PUBREL_MAP.getOrDefault(clientId, new ConcurrentHashMap<>(16)).values());
     }
 }

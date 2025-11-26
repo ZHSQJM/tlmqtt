@@ -11,7 +11,7 @@ import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.config.TlMqttProperties;
 import com.tlmqtt.common.config.TlPortProperties;
 import com.tlmqtt.common.config.TlSslProperties;
-import com.tlmqtt.common.model.entity.TlUser;
+import com.tlmqtt.common.model.entity.TlAuthUser;
 import com.tlmqtt.core.manager.TlStoreManager;
 import com.tlmqtt.store.service.*;
 import com.tlmqtt.store.service.impl.DefaultSubscriptionServiceImpl;
@@ -100,7 +100,7 @@ public class TlBootstrap {
      * @param fixUsers 固定用户
      * @return TlBootstrap
      **/
-    public TlBootstrap setFixUser(List<TlUser> fixUsers) {
+    public TlBootstrap setFixUser(List<TlAuthUser> fixUsers) {
         tlServer.getAuthenticationManager().addFixUsers(fixUsers);
         return this;
     }
@@ -174,6 +174,7 @@ public class TlBootstrap {
      * @return TlBootstrap
      **/
     public TlBootstrap setCertPath(String certPath ) {
+        assert tlServer != null;
         tlServer.setCertPath(certPath);
         return this;
     }

@@ -3,17 +3,19 @@ package com.tlmqtt.common.model.request;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import lombok.*;
+import lombok.experimental.Accessors;
+import lombok.experimental.SuperBuilder;
 
 /**
  * @author hszhou
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 @ToString
+@Accessors
+@SuperBuilder
 public class TlMqttHeartBeatReq extends AbstractTlMessage {
-    private TlMqttFixedHead fixedHead;
+
 
     @Override
     public MqttMessageType getMessageType() {

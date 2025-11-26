@@ -2,8 +2,11 @@ package com.tlmqtt.store.service;
 
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlSubClient;
+import io.netty.util.Timeout;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author hszhou
@@ -54,11 +57,14 @@ public interface SessionService {
     Mono<Boolean> removeTopic(TlSubClient subClient);
 
     /**
-     * 返回所有的客户端雷彪
+     * 返回所有的客户端列表
      *
      * @return TlMqttSession 客户端列表
      */
     Flux<TlMqttSession> findAll();
+
+
+
 
 
 

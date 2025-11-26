@@ -1,6 +1,7 @@
 package com.tlmqtt.auth.sql;
 
 import com.tlmqtt.auth.AbstractTlAuthentication;
+import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.exception.TlAuthenticationException;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -59,7 +60,7 @@ public class SqlTlAuthentication extends AbstractTlAuthentication {
                     }
                 }
             } catch (Exception e) {
-                throw new TlAuthenticationException();
+                throw new TlAuthenticationException(MqttVersion.MQTT_3_1_1);
             }
         }
 

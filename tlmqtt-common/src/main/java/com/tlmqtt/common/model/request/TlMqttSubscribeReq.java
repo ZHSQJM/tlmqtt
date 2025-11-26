@@ -5,18 +5,18 @@ import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttSubscribePayload;
 import com.tlmqtt.common.model.variable.TlMqttSubscribeVariableHead;
 import lombok.*;
+import lombok.experimental.Accessors;
+import lombok.experimental.SuperBuilder;
 
 /**
  * @author hszhou
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 @ToString
+@Accessors
+@SuperBuilder
 public class TlMqttSubscribeReq  extends AbstractTlMessage  {
-
-    private TlMqttFixedHead fixedHead;
 
     /**可变头*/
     private TlMqttSubscribeVariableHead variableHead;

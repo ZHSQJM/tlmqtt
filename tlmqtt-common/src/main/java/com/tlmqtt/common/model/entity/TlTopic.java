@@ -19,6 +19,12 @@ public class TlTopic {
 
     private int qos;
 
+    /**值为1 表示不能转发给自己*/
+    private boolean noLocal;
+
+    private boolean retainAsPublished;
+
+    private int retainHandling;
 
 }
 

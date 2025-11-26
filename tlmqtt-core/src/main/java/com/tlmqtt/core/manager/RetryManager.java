@@ -1,6 +1,6 @@
 package com.tlmqtt.core.manager;
 
-import com.tlmqtt.core.retry.TlRetryTask;
+import com.tlmqtt.core.task.TlRetryTask;
 import io.netty.util.HashedWheelTimer;
 import io.netty.util.Timeout;
 import lombok.Setter;
@@ -30,7 +30,7 @@ public class RetryManager extends HashedWheelTimer {
      * @param delay  延迟时间
      * @param maxRetry 最大重试次数
      **/
-    public RetryManager(int  delay,int maxRetry) {
+    public RetryManager(int delay,int maxRetry) {
         this.delay = delay;
         this.maxRetry = maxRetry;
         // 初始化分段Map

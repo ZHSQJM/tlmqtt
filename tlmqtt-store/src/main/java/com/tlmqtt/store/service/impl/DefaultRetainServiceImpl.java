@@ -1,13 +1,10 @@
 package com.tlmqtt.store.service.impl;
 
-import com.tlmqtt.common.model.entity.PublishMessage;
-import com.tlmqtt.common.model.entity.TlSubClient;
-import com.tlmqtt.common.model.topic.TlTopicTrie;
+
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.store.service.RetainService;
-import com.tlmqtt.store.service.SubscriptionService;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -19,10 +16,10 @@ public class DefaultRetainServiceImpl implements RetainService {
 
 
 
-    public static final ConcurrentHashMap<String, PublishMessage> RETAIN_MAP = new ConcurrentHashMap<>();
+    public static final ConcurrentHashMap<String, TlMqttPublishReq> RETAIN_MAP = new ConcurrentHashMap<>();
 
     @Override
-    public Mono<Boolean> save(String topic, PublishMessage req) {
+    public Mono<Boolean> save(String topic, TlMqttPublishReq req) {
         return Mono.fromSupplier(() -> { RETAIN_MAP.put(topic, req);
             return true;
         });
@@ -30,7 +27,7 @@ public class DefaultRetainServiceImpl implements RetainService {
 
 
     @Override
-    public Mono<PublishMessage> find(String topic) {
+    public Mono<TlMqttPublishReq> find(String topic) {
         return Mono.fromSupplier(() -> RETAIN_MAP.entrySet().stream()
             .filter(entry -> matchesMqttTopic(topic, entry.getKey()))
             .findFirst()

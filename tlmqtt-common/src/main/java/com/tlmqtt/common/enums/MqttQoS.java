@@ -17,7 +17,7 @@ public enum MqttQoS {
 
     private final int value;
 
-    private MqttQoS(int value) {
+    MqttQoS(int value) {
         this.value = value;
     }
 

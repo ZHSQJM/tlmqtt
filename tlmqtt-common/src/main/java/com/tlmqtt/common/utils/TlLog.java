@@ -18,8 +18,12 @@ public class TlLog {
      * @param buf bytebuffer
      **/
     public static void logger(String prefix, ByteBuf buf){
-        String sb = ByteBufUtil.hexDump(buf);
-        log.debug("【{}】 16 【{}】", prefix, sb);
+       String sb = ByteBufUtil.hexDump(buf);
+        log.debug("【{}】 ===【{}】", prefix, sb);
     }
 
-}
+    }
+
+
+    // Received packet: {"cmd":"publish","retain":false,"qos":1,"dup":false,"length":19,"topic":"testtopic/1","payload":{"type":"Buffer","data":[49]},"messageId":1,"properties":{"payloadFormatIndicator":false}}
+//                      {"cmd":"publish","retain":false,"qos":1,"dup":false,"length":19,"topic":"testtopic/1","payload":{"type":"Buffer","data":[49]},"messageId":2,"properties":{"payloadFormatIndicator":true}}

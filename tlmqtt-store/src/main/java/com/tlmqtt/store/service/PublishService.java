@@ -1,6 +1,6 @@
 package com.tlmqtt.store.service;
 
-import com.tlmqtt.common.model.entity.PublishMessage;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -19,7 +19,7 @@ public interface PublishService {
      * @param req       消息
      * @return 是否保存成功
      */
-    Mono<PublishMessage> save(String clientId, Long messageId, PublishMessage req);
+    Mono<TlMqttPublishReq> save(String clientId, Long messageId, TlMqttPublishReq req);
 
     /**
      * 清除某个客户端的某个消息
@@ -29,7 +29,7 @@ public interface PublishService {
      * @param messageId 消息ID
      * @return 是否清除成功
      */
-    Mono<PublishMessage> clear(String clientId, Long messageId);
+    Mono<TlMqttPublishReq> clear(String clientId, Long messageId);
 
     /**
      * 清除订阅者的所有消息 当订阅者断开连接的时候 需要清除所有消息
@@ -46,7 +46,7 @@ public interface PublishService {
      * @param messageId 消息ID
      * @return 具体的消息
      */
-    Mono<PublishMessage> find(String clientId, Long messageId);
+    Mono<TlMqttPublishReq> find(String clientId, Long messageId);
 
     /**
      * 查找某个订阅者的所有消息
@@ -54,7 +54,7 @@ public interface PublishService {
      * @param clientId 订阅者的客户端ID
      * @return 所有的消息
      */
-    Flux<PublishMessage> findAll(String clientId);
+    Flux<TlMqttPublishReq> findAll(String clientId);
 
 
     /**
@@ -63,7 +63,7 @@ public interface PublishService {
      * @param req 消息体
      * @return 是否保存成功
      */
-    Mono<Boolean> saveWill(String clientId, PublishMessage req);
+    Mono<Boolean> saveWill(String clientId, TlMqttPublishReq req);
 
 
     /**
@@ -71,7 +71,7 @@ public interface PublishService {
      * @param clientId 客户端ID
      * @return 消息体
      */
-    Mono<PublishMessage> findWill(String clientId);
+    Mono<TlMqttPublishReq> findWill(String clientId);
 
 
     /**

@@ -1,7 +1,7 @@
 package com.tlmqtt.bridge.kafka;
 
 import com.lmax.disruptor.EventHandler;
-import com.tlmqtt.common.model.entity.PublishMessage;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author hszhou
  */
 @Slf4j
-public class KafkaBridgeObserver  implements EventHandler<PublishMessage> {
+public class KafkaBridgeObserver  implements EventHandler<TlMqttPublishReq> {
 
     private final ConcurrentHashMap<String, Producer<String, String>> producerPool = new ConcurrentHashMap<>();
 
@@ -53,7 +53,7 @@ public class KafkaBridgeObserver  implements EventHandler<PublishMessage> {
     }
 
     @Override
-    public void onEvent(PublishMessage event, long sequence, boolean endOfBatch) throws Exception {
+    public void onEvent(TlMqttPublishReq event, long sequence, boolean endOfBatch) throws Exception {
         for (TlKafkaInfo entityInfo : list) {
             Producer<String, String> producer = producerPool.get(entityInfo.getBootstrapServers());
             // 3. 构造消息记录

@@ -3,17 +3,20 @@ package com.tlmqtt.store.service.impl;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.store.service.SessionService;
+import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timeout;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author hszhou
  */
 @Slf4j
-public class DefaultSessionServiceImpl implements SessionService {
+public class DefaultSessionServiceImpl   implements SessionService {
 
     /**
      * 对应的是客户端的ID后面是客户端对应的session
@@ -29,14 +32,20 @@ public class DefaultSessionServiceImpl implements SessionService {
     public Mono<TlMqttSession> find(String clientId) {
         return Mono.justOrEmpty(CLIENT_SESSIONS.get(clientId))
             .doOnError(e -> log.error("session: save clientId【{}】 failed",clientId, e))
-            .doOnSuccess(e->log.debug("session: save clientId 【{}】 session status【{}】",clientId,e));
+            .doOnSuccess(e->{
+
+                }
+             //   log.debug("session: save clientId 【{}】 session status【{}】",clientId,e)
+            );
     }
 
     @Override
     public Mono<Boolean> clear(String clientId) {
         return Mono.fromSupplier(() -> CLIENT_SESSIONS.remove(clientId) != null).defaultIfEmpty(false)
             .doOnError(e -> log.error("session: save clientId【{}】 failed",clientId, e))
-            .doOnSuccess(e->log.debug("session: save clientId 【{}】 session status【{}】",clientId,e));
+            .doOnSuccess(e->
+                {});
+                //log.debug("session: save clientId 【{}】 session status【{}】",clientId,e));
     }
 
     @Override
@@ -67,4 +76,6 @@ public class DefaultSessionServiceImpl implements SessionService {
     public Flux<TlMqttSession> findAll() {
         return Flux.fromIterable(CLIENT_SESSIONS.values());
     }
+
+
 }

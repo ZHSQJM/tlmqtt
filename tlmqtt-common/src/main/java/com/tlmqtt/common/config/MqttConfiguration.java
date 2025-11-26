@@ -1,6 +1,7 @@
 package com.tlmqtt.common.config;
 
 import lombok.Data;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
@@ -17,13 +18,13 @@ public class MqttConfiguration {
 
 
     public  MqttConfiguration() {
-        Yaml yaml = new Yaml(new Constructor(TlMqttProperties.class));
+        Yaml yaml = new Yaml(new Constructor(TlMqttProperties.class,new LoaderOptions()));
         mqttProperties = yaml.load(this.getClass().getClassLoader().getResourceAsStream("talent.yml"));
     }
 
-    public static void main(String[] args) {
-        MqttConfiguration mqttConfiguration = new MqttConfiguration();
-        TlMqttProperties mqttProperties1 = mqttConfiguration.getMqttProperties();
-        TlAuthProperties authProperties = mqttProperties1.getAuth();
-    }
+//    public static void main(String[] args) {
+//        MqttConfiguration mqttConfiguration = new MqttConfiguration();
+//        TlMqttProperties mqttProperties1 = mqttConfiguration.getMqttProperties();
+//        TlAuthProperties authProperties = mqttProperties1.getAuth();
+//    }
 }

@@ -1,61 +1,34 @@
 package com.tlmqtt.common.enums;
 
-import io.netty.util.CharsetUtil;
-import io.netty.util.internal.ObjectUtil;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 /**
  * mqtt的版本枚举
  *
  * @author hszhou
  */
+@Getter
+@AllArgsConstructor
 public enum MqttVersion {
 
     /**
      * MQTT 3.1.1
      */
-    MQTT_3_1("MQIsdp", (byte)3),
-    MQTT_3_1_1("MQTT", (byte)4),
-    MQTT_5("MQTT", (byte)5);
+    MQTT_3_1((byte)3),
+    MQTT_3_1_1 ((byte)4),
+    MQTT_5((byte)5);
 
-    private final String name;
     private final byte level;
 
-    private MqttVersion(String protocolName, byte protocolLevel) {
-        this.name = (String) ObjectUtil.checkNotNull(protocolName, "protocolName");
-        this.level = protocolLevel;
-    }
 
-    public String protocolName() {
-        return this.name;
-    }
-
-    public byte[] protocolNameBytes() {
-        return this.name.getBytes(CharsetUtil.UTF_8);
-    }
-
-    public byte protocolLevel() {
-        return this.level;
-    }
-
-    public static MqttVersion fromProtocolNameAndLevel(String protocolName, byte protocolLevel) {
-        MqttVersion mv = null;
-        switch (protocolLevel) {
-            case 3:
-                mv = MQTT_3_1;
-                break;
-            case 4:
-                mv = MQTT_3_1_1;
-                break;
-            case 5:
-                mv = MQTT_5;
+    public static MqttVersion valueOf(byte b) {
+        for (MqttVersion mqttVersion : values()) {
+            if (mqttVersion.level == b) {
+                return mqttVersion;
+            }
         }
-
-        if (mv == null) {
-            throw new RuntimeException(protocolName + " is an unknown protocol name");
-        } else if (mv.name.equals(protocolName)) {
-            return mv;
-        } else {
-            throw new RuntimeException(protocolName + " and " + protocolLevel + " don't match");
-        }
+        return null;
     }
+
 }

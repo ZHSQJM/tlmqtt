@@ -45,14 +45,10 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttPublishReq req, TlMqttSession session) {
 
-        //log.info("收到的消息是【{}】-【{}】-【{}】-【{}】",req.hashCode(),req.getFixedHead().hashCode(),req.getVariableHead().hashCode(),req.getPayload().hashCode());
         String clientId = session.getClientId();
 
         Channel channel = ctx.channel();
         MqttVersion mqttVersion = session.getMqttVersion();
-        //log.debug("Handling 【PUBLISH】 event from client:【{}】", clientId);
-        ///log.info("收到客户端【{}】的消息【{}】",clientId,req);
-
         TlMqttFixedHead fixedHead = req.getFixedHead();
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
 
@@ -65,6 +61,9 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
         if (!aclManager.checkPublishPermission(clientId,username,ip, topic)) {
             log.error("Client 【{}】 no permission to publish topic 【{}】", clientId, topic);
             return;
+        }
+        if(req.getPayload().getContent().equals("ab")){
+            ctx.close();
         }
         Long messageId = variableHead.getMessageId();
 
@@ -104,12 +103,12 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
      * @return: Mono<Boolean>
      **/
     private Mono<Boolean> storeRetain(String topic,TlMqttPublishReq req) {
-
         return Mono.defer(() -> {
             Object content = req.getPayload().getContent();
             if ("".equals(content) || null == content) {
                 return storeManager.getRetainService().clear(topic);
             } else {
+                req.setAcceptTime(System.currentTimeMillis()/1000);
                 return storeManager.getRetainService().save(topic, req);
             }
         });

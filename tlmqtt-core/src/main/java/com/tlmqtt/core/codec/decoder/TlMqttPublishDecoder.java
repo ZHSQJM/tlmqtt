@@ -29,10 +29,12 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
         MqttQoS qos = fixedHead.getQos();
         TlMqttPublishVariableHead variableHead = decodeVariableHeader(buf, qos,session);
         TlMqttPublishPayload payload = decodePayload(buf);
-        TlMqttPublishReq req = TlMqttPublishReq.builder().fixedHead(fixedHead).variableHead(variableHead)
-            .payload(payload).build();
-        //log.info("fixedHeade ==[{}],variableHead==[{}],payload==[{}],TlMqttPublishReq=[{}]",fixedHead,variableHead,payload,req);
-        return req;
+        TlMqttPublishReq.TlMqttPublishReqBuilder<?, ?> builder = TlMqttPublishReq.builder().fixedHead(fixedHead)
+            .variableHead(variableHead).payload(payload);
+        if(session.getMqttVersion() == MqttVersion.MQTT_5){
+            builder.acceptTime(getCurrentTime());
+        }
+        return builder.build();
     }
 
     TlMqttFixedHead decodeFixedHeader(int type, int remainingLength) {

@@ -69,4 +69,15 @@ public abstract class  AbstractTlMqttDecoder {
         } while ((encodedByte & 128) != 0);
         return value;
     }
+
+    /**
+     * 获取当前时间。返回的是秒
+     * @author zhouhs
+     * @param: null
+     * @return: null
+     **/
+    public Long getCurrentTime() {
+        return System.currentTimeMillis() / 1000;
+    }
+
 }

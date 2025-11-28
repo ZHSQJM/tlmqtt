@@ -164,10 +164,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
             fillSession(session, variableHead);
         }
 
-        // 如果此次的cleanSession是false 则重新发布所有未确认的消息
-        if (!cleanSession) {
-            republish(clientId, ctx.channel());
-        }
+
         registerClient(ctx.channel(),session);
         ctx.channel().writeAndFlush(connackResponse).addListener(future -> {
             if (future.isSuccess()) {
@@ -177,6 +174,10 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
             }
         });
 
+        // 如果此次的cleanSession是false 则重新发布所有未确认的消息
+        if (!cleanSession) {
+            republish(clientId, ctx.channel(),mqttVersion);
+        }
         messageManager.cancelSendWillMessage(clientId);
         return storeManager.getSessionService().save(session);
     }
@@ -308,17 +309,44 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
      *
      * @param clientId 客户端ID
      **/
-    private void republish(String clientId, Channel channel) {
+    private void republish(String clientId, Channel channel,MqttVersion mqttVersion) {
 
         Flux.merge(storeManager.getPublishService()
                                .findAll(clientId)
                                .flatMap(publishReq -> {
-                                   TlMqttPublishVariableHead variableHead = publishReq.getVariableHead();
-                                   log.debug("Resending PUBLISH message 【{}】", variableHead.getMessageId());
+
+//                                   TlMqttFixedHead fixedHead = publishReq.getFixedHead();
+//                                   TlMqttPublishReq req = messageManager.build(publishReq, fixedHead.getQos(),
+//                                       mqttVersion);
+                                  TlMqttPublishVariableHead variableHead = publishReq.getVariableHead();
+//                                   log.debug("Resending PUBLISH messageIs 【{}】", variableHead.getMessageId());
                                    Long messageId = variableHead.getMessageId();
-                                   channel.writeAndFlush(publishReq);
-                                    TlRetryTask task = new TlRetryTask(messageId, publishReq, channel);
-                                    retryManager.schedulePublishRetry(messageId, task);
+                                   //如果消息是mqtt5的话 需要判断国企时间
+                                   if(publishReq.getMqttVersion() == MqttVersion.MQTT_5){
+                                       log.info("ddd");
+                                       Integer messageExpiryInterval = variableHead.getMessageExpiryInterval();
+
+                                       Long acceptTime = publishReq.getAcceptTime();
+                                       log.info("【{}】-【{}】",messageExpiryInterval,acceptTime);
+                                       if(messageExpiryInterval !=null && acceptTime !=null){
+                                           long now = System.currentTimeMillis() / 1000;
+                                           //表示过期了
+                                           if(now>messageExpiryInterval+acceptTime){
+                                               return Mono.empty();
+                                           }
+                                           int remainding =(int)(messageExpiryInterval-(now-acceptTime));
+                                           log.info("转到5的客户端当前时间。【{}}剩余时间[{}]，国企时间【{}}",now,remainding,messageExpiryInterval);
+                                           variableHead.setMessageExpiryInterval(remainding);
+                                       }
+                                   }
+                                   channel.writeAndFlush(publishReq).addListener(future -> {
+                                        storeManager.getPublishService().save(clientId,messageId,publishReq)
+                                            .subscribe(da->{
+                                               TlRetryTask task = new TlRetryTask(messageId, publishReq, channel);
+                                                retryManager.schedulePublishRetry(messageId, task);
+                                            });
+                                    });
+
                                     return Mono.empty();
                                }),
                    storeManager.getPubrelService().

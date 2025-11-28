@@ -26,11 +26,25 @@ import java.util.List;
 @SuperBuilder
 public class TlMqttPublishReq extends AbstractTlMessage  {
 
+    /**
+     * 可变头
+     */
     private TlMqttPublishVariableHead variableHead;
 
+    /**
+     * 固定头
+     */
     private TlMqttPublishPayload payload;
 
+    /**
+     * MQTT版本
+     */
     private MqttVersion mqttVersion;
+
+    /**
+     * 服务端接收到次消息的时间
+     */
+    private Long acceptTime;
 
 
     public static TlMqttPublishReq build(TlMqttFixedHead fixedHead,

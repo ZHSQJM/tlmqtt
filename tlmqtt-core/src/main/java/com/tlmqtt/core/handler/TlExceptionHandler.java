@@ -101,9 +101,6 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
             return storeManager.getPublishService()
                                .clearWill(clientId);
         }
-
-        TlMqttPublishReq block = storeManager.getPublishService().findWill(clientId).block();
-        log.info("[{}]",block);
         return storeManager.getPublishService()
             .findWill(clientId)
             .doOnNext(req->log.info("获取遗嘱消息【{}】",req))

@@ -32,8 +32,6 @@ public class TlPubAckHandler extends AbstractTlHandler<TlMqttPubAckReq> {
 
     private final MessageManager messageManager;
 
-
-
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttPubAckReq req, TlMqttSession session) {
         String clientId = session.getClientId();

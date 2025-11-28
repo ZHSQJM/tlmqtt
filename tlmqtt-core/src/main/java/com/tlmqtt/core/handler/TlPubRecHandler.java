@@ -28,36 +28,31 @@ public class TlPubRecHandler extends AbstractTlHandler<TlMqttPubRecReq> {
     private final RetryManager retryManager;
 
     private final ExecutorService  executorService;
-    @Override
-    protected void channelRead0(ChannelHandlerContext ctx, TlMqttPubRecReq req) throws Exception {
-
-
-    }
 
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttPubRecReq req, TlMqttSession session) {
 
         String clientId = session.getClientId();
-        log.debug("Handling 【PUBREC】 event from client:【{}】", clientId);
-
         TlMqttPubRecVariableHead vh = req.getVariableHead();
         Long messageId = vh.getMessageId();
+        log.debug("Handling 【PUBREC】 event from client:【{}】,message=[{}]", clientId,messageId);
         retryManager.cancelPublishRetry(messageId);
-        executorService.execute(()-> storeManager.getPublishService()
+        storeManager.getPublishService()
             .clear(clientId, messageId)
             .flatMap(publishReq -> {
+                log.info("找到消息【{}】",publishReq);
                 TlMqttPubRelReq res = TlMqttPubRelReq.build(messageId);
                 return storeManager.getPubrelService().save(clientId, messageId, res);
             })
             .subscribe(relReq -> {
                 // 发送操作回到Netty线程
+                log.info("发送rel消息");
                 ctx.channel().eventLoop().execute(() -> {
-
                     ctx.channel().writeAndFlush(relReq);
-
                     TlRetryTask tlRetryTask = new TlRetryTask(messageId, relReq, ctx.channel());
                     retryManager.schedulePubrelRetry(messageId, tlRetryTask);
+
                 });
-            }));
+            });
     }
 }

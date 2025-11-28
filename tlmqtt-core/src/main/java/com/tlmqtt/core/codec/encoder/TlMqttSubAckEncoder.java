@@ -41,7 +41,6 @@ public class TlMqttSubAckEncoder extends AbstractTlMqttEncoder<TlMqttSubAck> {
         //消息类型
         out.writeByte(type);
         if(mqttVersion == MqttVersion.MQTT_3_1_1){
-            log.info("订阅的是3.1.1");
             //剩余长度
             out.writeByte(Short.BYTES + codes.length);
             out.writeShort(variableHead.getMessageId());

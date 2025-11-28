@@ -131,7 +131,7 @@ public class TlMqttSubscribeDecoder extends AbstractTlMqttDecoder {
                 topic.setNoLocal((subscriptionOptions & 0x04) != 0);
                 topic.setRetainAsPublished((subscriptionOptions & 0x08) != 0);
                 topic.setRetainHandling(retainHandling);
-                log.info("订阅最大maxQos【{}】,noLocal【{}】,retainAsPublished【{}】,retainHanding【{}】",maxQos,topic.isNoLocal(),topic.isRetainAsPublished(),topic.getRetainHandling());
+                //log.info("订阅最大maxQos【{}】,noLocal【{}】,retainAsPublished【{}】,retainHanding【{}】",maxQos,topic.isNoLocal(),topic.isRetainAsPublished(),topic.getRetainHandling());
 
             }else if(session.getMqttVersion()==MqttVersion.MQTT_3_1_1){
                  short qos = buf.readUnsignedByte();

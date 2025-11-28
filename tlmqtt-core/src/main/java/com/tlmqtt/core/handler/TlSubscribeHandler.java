@@ -7,8 +7,10 @@ import com.tlmqtt.common.enums.SubReasonCode;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.common.model.entity.TlTopic;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.request.TlMqttSubscribeReq;
 import com.tlmqtt.common.model.response.TlMqttSubAck;
+import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import com.tlmqtt.common.model.variable.TlMqttSubscribeVariableHead;
 import com.tlmqtt.core.manager.TlStoreManager;
 import com.tlmqtt.core.manager.MessageManager;
@@ -66,8 +68,11 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
             } else if(mqttVersion==MqttVersion.MQTT_5){
                 codes[i] = SubReasonCode.NOT_AUTHORIZED.getCode();
             }
+            log.info("【SUBSCRIBE】 event from client:【{}】--【{}】", clientId, tlTopic.getName());
         }
         TlMqttSubAck res = TlMqttSubAck.build(codes, messageId,null,null);
+
+
         channel.writeAndFlush(res);
 
         session.getTopics().addAll(successTopic.stream().map(TlTopic::getName).collect(Collectors.toSet()));
@@ -79,20 +84,31 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
                 return Mono.empty();
             }).thenMany(Flux.fromIterable(successTopic).flatMap(topic -> {
                 int qos= topic.getQos();
-                TlSubClient client = new TlSubClient(qos, clientId, topic.getName());
+                TlSubClient client = new TlSubClient(qos, clientId, topic.getName(),mqttVersion);
                 //找到主题的保留消息
                 return storeManager.getRetainService().find(topic.getName()).doOnNext(publishReq -> {
                     log.debug("Send retain message 【{}】 to client 【{}】", publishReq.toString(), clientId);
+                    TlMqttPublishVariableHead publishReqVariableHead = publishReq.getVariableHead();
+                    Integer messageExpiryInterval = publishReqVariableHead.getMessageExpiryInterval();
+                    if (MqttVersion.MQTT_5 == mqttVersion && messageExpiryInterval != null) {
+                        long currentTime = System.currentTimeMillis()/1000;
+                        Long acceptTime = publishReq.getAcceptTime();
+                        if (acceptTime + messageExpiryInterval < currentTime) {
+                            log.debug("Retain message 【{}】 is expired", publishReq);
+                            return;
+                        }
+                        long remainingTime = messageExpiryInterval - (currentTime - acceptTime);
+                        publishReqVariableHead.setMessageExpiryInterval((int) remainingTime);
+                    }
                     //这是保留消息的qos等级
                     int retainQos = publishReq.getFixedHead().getQos().value();
                     int realQos = Math.min(qos, retainQos);
                     MqttQoS mqttQoS = MqttQoS.valueOf(realQos);
-                    publishReq.getFixedHead().setQos(mqttQoS);
+                    TlMqttPublishReq publishMessage = messageManager.build(publishReq, mqttQoS,mqttVersion);
                     if(mqttQoS != MqttQoS.AT_MOST_ONCE){
-                        Long id = messageManager.nextId();
-                        publishReq.getVariableHead().setMessageId(id);
+                        storeManager.savePublishReq(clientId, publishMessage.getVariableHead().getMessageId(), publishMessage).subscribe();
                     }
-                    channel.writeAndFlush(publishReq);
+                    channel.writeAndFlush(publishMessage);
                 }).then(storeManager.getSubscriptionService().subscribe(client)
                     .doOnNext(e -> {})
                       //  log.debug("Client 【{}】 subscribe topic 【{}】", clientId, topics))

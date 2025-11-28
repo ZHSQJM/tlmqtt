@@ -1,5 +1,6 @@
 package com.tlmqtt.common.model.entity;
 
+import com.tlmqtt.common.enums.MqttVersion;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -23,4 +24,6 @@ public class TlSubClient {
     private String clientId;
 
     private String topic;
+
+    private MqttVersion mqttVersion;
 }

@@ -65,7 +65,6 @@ public class MessageManager extends HashedWheelTimer {
     private final Map<String,Map<String,String>> aliasMap = new ConcurrentHashMap<>();
 
     public void publish(TlMqttPublishReq req,String clientId,MqttVersion mqttVersion){
-        //log.info("收到的消息是【{}】-【{}】-【{}】-【{}】",req.hashCode(),req.getFixedHead().hashCode(),req.getVariableHead().hashCode(),req.getPayload().hashCode());
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
         String topic = variableHead.getTopic();
         Integer topicAlias = variableHead.getTopicAlias();
@@ -91,7 +90,6 @@ public class MessageManager extends HashedWheelTimer {
     }
 
     private void doPublish(TlMqttPublishReq req, TlSubClient client){
-        log.info("收到的消息是【{}】-【{}】-【{}】-【{}】",req.hashCode(),req.getFixedHead().hashCode(),req.getVariableHead().hashCode(),req.getPayload().hashCode());
         TlMqttFixedHead fixedHead = req.getFixedHead();
         int sendQos =fixedHead.getQos().value();
         int subQos = client.getQos();
@@ -104,15 +102,11 @@ public class MessageManager extends HashedWheelTimer {
                     .flatMap(session -> {
                         // 如果是qos0的消息 直接转发
                         TlMqttPublishReq publishReq = build(req, mqttQoS,session.getMqttVersion());
-                        //log.info("转发到的消息是【{}】-【{}】-【{}】-【{}】",publishReq.hashCode(),publishReq.getFixedHead().hashCode(),publishReq.getVariableHead().hashCode(),publishReq.getPayload().hashCode());
-
-                        //log.info("转发消息给客户端【{}】-【{}】",clientId,publishReq);
+                        log.debug("发送到客户端【{}}的消息id【{}】",clientId,publishReq.getVariableHead().getMessageId());
                         MqttVersion mqttVersion = session.getMqttVersion();
                         if(mqttVersion == MqttVersion.MQTT_5){
                             int length = publishReq.getFixedHead().getLength();
-
                             Integer maximumPacketSize = session.getMaximumPacketSize();
-                            //log.info("客户端【{}】的maximumPacketSize的值为【{}】",clientId,maximumPacketSize);
                             if (maximumPacketSize != null && length > maximumPacketSize) {
                                 log.warn("Client [{}] exceeded maximum packet size, dropping message", clientId);
                                 return Mono.empty();
@@ -141,12 +135,12 @@ public class MessageManager extends HashedWheelTimer {
                         if(mqttQoS == MqttQoS.AT_MOST_ONCE){
                             return Mono.just(publishReq);
                         }
-
                         return storeManager.savePublishReq(clientId, publishReq.getVariableHead().getMessageId(), publishReq);
                     })
                     .doOnError(e -> log.error("Publish failed for client [{}]", clientId, e))
                     .doOnSuccess(publishReq -> {
                         // I/O操作回到Netty线程
+                        log.info("保存到内存在的是【{}】",publishReq.getVariableHead().getMessageId());
                         send(publishReq,clientId);
                     })
                     .subscribe();
@@ -156,20 +150,35 @@ public class MessageManager extends HashedWheelTimer {
 
 
 
-     private TlMqttPublishReq build(TlMqttPublishReq req,MqttQoS mqttQoS,MqttVersion mqttVersion){
+     public TlMqttPublishReq build(TlMqttPublishReq req,MqttQoS mqttQoS,MqttVersion mqttVersion){
          // 创建新的fixedHead副本，避免共享同一个对象导致的问题
          TlMqttFixedHead newFixedHead = TlMqttFixedHead.builder()
                  .messageType(req.getFixedHead().getMessageType())
                  .dup(req.getFixedHead().isDup())
-                 .qos(mqttQoS)  // 使用传入的QoS值
+                 .qos(mqttQoS)
                  .retain(req.getFixedHead().isRetain())
                  .build();
 
+         //从新复制一份variableHead
+          TlMqttPublishVariableHead newVariableHead = TlMqttPublishVariableHead.builder()
+                .topic(req.getVariableHead().getTopic())
+                //  .messageId(req.getVariableHead().getMessageId())
+                  .payloadFormatIndicator(req.getVariableHead().getPayloadFormatIndicator())
+                  .messageExpiryInterval(req.getVariableHead().getMessageExpiryInterval())
+                  .topicAlias(req.getVariableHead().getTopicAlias())
+                  .responseTopic(req.getVariableHead().getResponseTopic())
+                  .correlationData(req.getVariableHead().getCorrelationData())
+                   .userProperties(req.getVariableHead().getUserProperties())
+                    .subscriptionIdentifier(req.getVariableHead().getSubscriptionIdentifier())
+                    .contentType(req.getVariableHead().getContentType())
+                    .propertiesLength(req.getVariableHead().getPropertiesLength())
+              .build();
          TlMqttPublishReq publishReq = TlMqttPublishReq.build(
                  newFixedHead,
-                 req.getVariableHead(),
+             newVariableHead,
                  req.getPayload(),
                  mqttVersion);
+         publishReq.setAcceptTime(req.getAcceptTime());
          
          // 注意：不再需要手动设置QoS，因为已经在newFixedHead中设置了
          // 不再需要手动设置messageId，因为TlMqttPublishReq.build已经处理了（如果需要的话）
@@ -237,8 +246,6 @@ public class MessageManager extends HashedWheelTimer {
         if (req == null) {
             return;
         }
-        //log.info("开始前转发消息到客户端【{}】-【{}】-【{}】-【{}】-【{}】",clientId,req.hashCode(),req.getFixedHead().hashCode(),req.getVariableHead().hashCode(),req.getPayload().hashCode());
-
         Channel channel = channelManager.getChannel(clientId);
         if (channel != null && channel.isActive()) {
             MqttQoS mqttQoS = req.getFixedHead().getQos();
@@ -255,8 +262,7 @@ public class MessageManager extends HashedWheelTimer {
                         TlRetryTask task = new TlRetryTask(messageId, req, channel);
                         retryManager.schedulePublishRetry(messageId, task);
                     }
-                    int length = req.getFixedHead().getLength();
-                    //log.info("Sent message to client [{}],长度是【{}】", clientId,req);
+                    log.info("Sent message to client [{}],消息是【{}】", clientId,req);
                 });
 
             });

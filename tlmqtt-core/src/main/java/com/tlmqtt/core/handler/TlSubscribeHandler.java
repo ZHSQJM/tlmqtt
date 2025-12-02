@@ -68,6 +68,8 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
             } else if(mqttVersion==MqttVersion.MQTT_5){
                 codes[i] = SubReasonCode.NOT_AUTHORIZED.getCode();
             }
+
+
             log.info("【SUBSCRIBE】 event from client:【{}】--【{}】", clientId, tlTopic.getName());
         }
         TlMqttSubAck res = TlMqttSubAck.build(codes, messageId,null,null);
@@ -84,7 +86,21 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
                 return Mono.empty();
             }).thenMany(Flux.fromIterable(successTopic).flatMap(topic -> {
                 int qos= topic.getQos();
-                TlSubClient client = new TlSubClient(qos, clientId, topic.getName(),mqttVersion);
+                int subscriptionIdentifier = variableHead.getSubscriptionIdentifier();
+                int retainHandling = topic.getRetainHandling();
+                TlSubClient client =  TlSubClient.builder()
+                    .qos(qos)
+                    .clientId(clientId)
+                    .topic(topic.getName())
+                    .mqttVersion(mqttVersion)
+                    .subscriptionIdentifier(subscriptionIdentifier)
+                    .isShared(false)
+                    .retainAsPublished(topic.getRetainAsPublished())
+                    .noLocal(topic.getNoLocal())
+                    .build();
+                if(retainHandling == 2){
+                    return Flux.empty();
+                }
                 //找到主题的保留消息
                 return storeManager.getRetainService().find(topic.getName()).doOnNext(publishReq -> {
                     log.debug("Send retain message 【{}】 to client 【{}】", publishReq.toString(), clientId);
@@ -104,7 +120,7 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
                     int retainQos = publishReq.getFixedHead().getQos().value();
                     int realQos = Math.min(qos, retainQos);
                     MqttQoS mqttQoS = MqttQoS.valueOf(realQos);
-                    TlMqttPublishReq publishMessage = messageManager.build(publishReq, mqttQoS,mqttVersion);
+                    TlMqttPublishReq publishMessage = messageManager.build(publishReq, mqttQoS,session,client);
                     if(mqttQoS != MqttQoS.AT_MOST_ONCE){
                         storeManager.savePublishReq(clientId, publishMessage.getVariableHead().getMessageId(), publishMessage).subscribe();
                     }

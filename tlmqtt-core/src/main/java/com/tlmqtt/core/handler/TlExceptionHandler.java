@@ -38,7 +38,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
 
-        //log.info("进入inactive的模块");
+        log.info("进入inactive的模块");
         Channel channel = ctx.channel();
         Object obj = channel.attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
         if (obj == null) {

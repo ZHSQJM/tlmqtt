@@ -1,5 +1,6 @@
 package com.tlmqtt.core.codec.decoder;
 
+import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
@@ -16,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * @author hszhou
@@ -25,6 +27,9 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
 
     @Override
     public TlMqttPublishReq build(ByteBuf buf, int type, int remainingLength, TlMqttSession session ) {
+
+
+
         TlMqttFixedHead fixedHead = decodeFixedHeader(type, remainingLength);
         MqttQoS qos = fixedHead.getQos();
         TlMqttPublishVariableHead variableHead = decodeVariableHeader(buf, qos,session);
@@ -89,6 +94,9 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
                     case TOPIC_ALIAS:
                         // 主题别名
                         int topicAlias = buf.readShort();
+                        if(topicAlias> Constant.TOPIC_ALIAS_MAXIMUM){
+                            throw new RuntimeException("主题别名不能大于200");
+                        }
                         builder.topicAlias(topicAlias);
                         break;
                     case RESPONSE_TOPIC:

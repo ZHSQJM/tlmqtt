@@ -44,5 +44,16 @@ public class Constant {
 
     public static final String MQTT_SESSION = "session";
 
+    /**分组订阅的前缀*/
+    public static final String SHARE_PREFIX_SUBSCRIBE = "$share";
+
+
+    /**会话最长的过期时间*/
+    public static final int SESSION_EXPIRY_INTERVAL = 3600;
+    /**服务器支持的最大别名的长度*/
+    public static final int TOPIC_ALIAS_MAXIMUM = 200;
+
+
+
 
 }

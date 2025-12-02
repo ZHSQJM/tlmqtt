@@ -25,6 +25,7 @@ public class TlMqttPublishEncoder extends AbstractTlMqttEncoder<TlMqttPublishReq
     @Override
     protected void encode(ChannelHandlerContext ctx, TlMqttPublishReq req, ByteBuf out, MqttMessageType mqttMessageType)  {
 
+        log.info("encode publish req[{}]",req);
         TlMqttFixedHead fixedHead = req.getFixedHead();
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
         int type = getFixedHeaderByte(fixedHead);
@@ -42,7 +43,6 @@ public class TlMqttPublishEncoder extends AbstractTlMqttEncoder<TlMqttPublishReq
 
         if(mqttVersion==MqttVersion.MQTT_3_1_1){
             propertiesLength = 0;
-            remindLength-=propertiesLength;
         }
 
         //剩余长度

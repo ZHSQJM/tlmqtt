@@ -3,6 +3,7 @@ package com.tlmqtt.core.manager;
 import cn.hutool.core.util.StrUtil;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
+import com.tlmqtt.common.exception.TlProtocolErrorException;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
@@ -68,7 +69,7 @@ public class MessageManager extends HashedWheelTimer {
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
         String topic = variableHead.getTopic();
         Integer topicAlias = variableHead.getTopicAlias();
-        //如果消息的客户端是5 那么需要判断toipc与topicAlias是否都不为空 如果都不为空 那么就需要保存
+        //如果消息的客户端是5 那么需要判断topic与topicAlias是否都不为空 如果都不为空 那么就需要保存
         if (mqttVersion == MqttVersion.MQTT_5 && topicAlias!=null) {
             if (StrUtil.isNotEmpty(topic)) {
                 aliasMap.computeIfAbsent(clientId, k -> new ConcurrentHashMap<>())
@@ -79,17 +80,25 @@ public class MessageManager extends HashedWheelTimer {
                     topic = clientAliases.get(topicAlias.toString());
                 }
             }
+
         }
         storeManager.getSubscriptionService()
                     .find(topic)
-                    .doOnNext(client -> doPublish(req,client))
+                    .doOnNext(client -> doPublish(req,client,clientId))
                     .doOnError(e -> log.error("Publish failed for topic [{}]", req.getVariableHead().getTopic(), e))
                     .publishOn(Schedulers.boundedElastic())
                     .subscribe();
 
     }
 
-    private void doPublish(TlMqttPublishReq req, TlSubClient client){
+    /**
+     * 转发消息到各个订阅的客户端
+     * @param req 原始消息
+     * @param client 订阅的客户端
+     * @param publishClientId 发布的客户端
+     */
+    private void doPublish(TlMqttPublishReq req, TlSubClient client,String publishClientId){
+
         TlMqttFixedHead fixedHead = req.getFixedHead();
         int sendQos =fixedHead.getQos().value();
         int subQos = client.getQos();
@@ -100,9 +109,13 @@ public class MessageManager extends HashedWheelTimer {
         storeManager.getSessionService()
                     .find(client.getClientId())
                     .flatMap(session -> {
+                        Boolean noLocal = client.getNoLocal();
+                        log.info("client=[{}],noLocal=[{}]",client.getClientId(),noLocal);
+                        if(noLocal && client.getClientId().equals(publishClientId)){
+                            return Mono.empty();
+                        }
                         // 如果是qos0的消息 直接转发
-                        TlMqttPublishReq publishReq = build(req, mqttQoS,session.getMqttVersion());
-                        log.debug("发送到客户端【{}}的消息id【{}】",clientId,publishReq.getVariableHead().getMessageId());
+                        TlMqttPublishReq publishReq = build(req, mqttQoS,session,client);
                         MqttVersion mqttVersion = session.getMqttVersion();
                         if(mqttVersion == MqttVersion.MQTT_5){
                             int length = publishReq.getFixedHead().getLength();
@@ -116,7 +129,6 @@ public class MessageManager extends HashedWheelTimer {
                                 clientId,
                                 k -> session.getReceiveMaximum() != null ? session.getReceiveMaximum() : 65535
                             );
-                            //log.info("客户端【{}】的receiveMaximun的值为【{}】",clientId,receiveMaximum);
                             AtomicInteger inFlightCount = clientInFlightMessages.computeIfAbsent(
                                 clientId,
                                 k -> new AtomicInteger(0)
@@ -131,7 +143,6 @@ public class MessageManager extends HashedWheelTimer {
                             }
                             inFlightCount.incrementAndGet();
                         }
-                        //log.info("发送到客户端【{}】的数据长度是【{}】",clientId,publishReq.getFixedHead().getLength());
                         if(mqttQoS == MqttQoS.AT_MOST_ONCE){
                             return Mono.just(publishReq);
                         }
@@ -140,7 +151,7 @@ public class MessageManager extends HashedWheelTimer {
                     .doOnError(e -> log.error("Publish failed for client [{}]", clientId, e))
                     .doOnSuccess(publishReq -> {
                         // I/O操作回到Netty线程
-                        log.info("保存到内存在的是【{}】",publishReq.getVariableHead().getMessageId());
+                        //log.info("保存到内存在的是【{}】",publishReq.getVariableHead().getMessageId());
                         send(publishReq,clientId);
                     })
                     .subscribe();
@@ -150,46 +161,57 @@ public class MessageManager extends HashedWheelTimer {
 
 
 
-     public TlMqttPublishReq build(TlMqttPublishReq req,MqttQoS mqttQoS,MqttVersion mqttVersion){
+     public TlMqttPublishReq build(TlMqttPublishReq req,MqttQoS mqttQoS,TlMqttSession session,TlSubClient client ){
+         TlMqttPublishVariableHead variableHead = req.getVariableHead();
+         TlMqttFixedHead fixedHead = req.getFixedHead();
+         Integer topicAlias = variableHead.getTopicAlias();
+         Short topicMaxAlias = session.getTopicMaxAlias();
+         if (topicAlias != null && topicMaxAlias != null && topicAlias > topicMaxAlias) {
+             log.warn("Client [{}] exceeded topic alias limit, dropping message", session.getClientId());
+             //todo 服务的转发的消息主题大于客户端能接收到的最大值
+             throw new RuntimeException();
+         }
+         MqttVersion mqttVersion = session.getMqttVersion();
+         Integer subscriptionIdentifier = client.getSubscriptionIdentifier();
+         //是否是保留消息
+         boolean retain = fixedHead.isRetain();
+         if(MqttVersion.MQTT_5==mqttVersion && !client.getRetainAsPublished() ){
+             retain = false;
+         }
          // 创建新的fixedHead副本，避免共享同一个对象导致的问题
          TlMqttFixedHead newFixedHead = TlMqttFixedHead.builder()
                  .messageType(req.getFixedHead().getMessageType())
                  .dup(req.getFixedHead().isDup())
                  .qos(mqttQoS)
-                 .retain(req.getFixedHead().isRetain())
+                 .retain(retain)
                  .build();
 
          //从新复制一份variableHead
           TlMqttPublishVariableHead newVariableHead = TlMqttPublishVariableHead.builder()
                 .topic(req.getVariableHead().getTopic())
-                //  .messageId(req.getVariableHead().getMessageId())
                   .payloadFormatIndicator(req.getVariableHead().getPayloadFormatIndicator())
                   .messageExpiryInterval(req.getVariableHead().getMessageExpiryInterval())
+                 //主体别名
                   .topicAlias(req.getVariableHead().getTopicAlias())
                   .responseTopic(req.getVariableHead().getResponseTopic())
                   .correlationData(req.getVariableHead().getCorrelationData())
                    .userProperties(req.getVariableHead().getUserProperties())
-                    .subscriptionIdentifier(req.getVariableHead().getSubscriptionIdentifier())
+                    .subscriptionIdentifier(subscriptionIdentifier==null?req.getVariableHead().getSubscriptionIdentifier():subscriptionIdentifier)
                     .contentType(req.getVariableHead().getContentType())
                     .propertiesLength(req.getVariableHead().getPropertiesLength())
               .build();
-         TlMqttPublishReq publishReq = TlMqttPublishReq.build(
-                 newFixedHead,
-             newVariableHead,
-                 req.getPayload(),
-                 mqttVersion);
-         publishReq.setAcceptTime(req.getAcceptTime());
-         
-         // 注意：不再需要手动设置QoS，因为已经在newFixedHead中设置了
-         // 不再需要手动设置messageId，因为TlMqttPublishReq.build已经处理了（如果需要的话）
-         
+
          // 如果QoS不是AT_MOST_ONCE，则需要生成新的消息ID
          if (mqttQoS != MqttQoS.AT_MOST_ONCE) {
-             TlMqttPublishVariableHead variableHead = publishReq.getVariableHead();
              Long messageId = nextId();
-             variableHead.setMessageId(messageId);
+             newVariableHead.setMessageId(messageId);
          }
-
+         TlMqttPublishReq publishReq = TlMqttPublishReq.build(
+             newFixedHead,
+             newVariableHead,
+             req.getPayload(),
+             mqttVersion);
+         publishReq.setAcceptTime(req.getAcceptTime());
          return publishReq;
      }
 
@@ -252,7 +274,6 @@ public class MessageManager extends HashedWheelTimer {
             channel.eventLoop().execute(() -> {
                // log.info("开始转发消息到客户端【{}】,【{}】",clientId,req);
                 channel.writeAndFlush(req).addListener(future -> {
-                 //   log.info("转发消息到客户端成功【{}】-【{}】-【{}】-【{}】-【{}】-【{}】",clientId,req.getFixedHead().getLength(),req.hashCode(),req.getFixedHead().hashCode(),req.getVariableHead().hashCode(),req.getPayload().hashCode());
                     if (!future.isSuccess()) {
                         log.error("Failed to send message to client [{}]", clientId, future.cause());
                         return;
@@ -278,7 +299,7 @@ public class MessageManager extends HashedWheelTimer {
      * @param willDelayInterval 延迟消息
      */
     public Mono<Void> scheduleSendWillMessage(String clientId,TlMqttPublishReq req,int willDelayInterval){
-        log.info("定时发送遗嘱消息【{}】",willDelayInterval);
+        log.debug("遗嘱消息延迟【{}】秒发送",willDelayInterval);
         TlWillTask willTask = new TlWillTask(clientId,this,req,willDelayInterval);
         Timeout timeout = this.newTimeout(willTask,willDelayInterval, TimeUnit.SECONDS);
         willTask.setTimeout(timeout);

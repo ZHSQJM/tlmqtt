@@ -1,5 +1,6 @@
 package com.tlmqtt.common.model.response;
 
+import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
@@ -40,13 +41,13 @@ public class TlMqttConnackAck extends AbstractTlMessage {
         TlMqttConnackVariableHead variableHead =TlMqttConnackVariableHead.builder().currentSession(sessionPresent).code(returnCode.byteValue()).build();
         int propertiesLength = 0;
         if(mqttVersion == MqttVersion.MQTT_5){
-            variableHead.setSessionExpiryInterval(3600);
+            variableHead.setSessionExpiryInterval(Constant.SESSION_EXPIRY_INTERVAL);
             variableHead.setReceiveMaximum((short)200);
             variableHead.setMaximumQoS(null);
             variableHead.setRetainAvailable((byte) 1);
             variableHead.setMaximumPacketSize(65535);
             variableHead.setAssignedClientIdentifier(clientId);
-            variableHead.setTopicAliasMaximum((short)200);
+            variableHead.setTopicAliasMaximum((short) Constant.TOPIC_ALIAS_MAXIMUM);
             variableHead.setReasonString(null);
             variableHead.setUserProperties(null);
             variableHead.setWildcardSubscriptionsAvailable(true);

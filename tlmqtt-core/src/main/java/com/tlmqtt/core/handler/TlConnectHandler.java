@@ -315,15 +315,10 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
                                .findAll(clientId)
                                .flatMap(publishReq -> {
 
-//                                   TlMqttFixedHead fixedHead = publishReq.getFixedHead();
-//                                   TlMqttPublishReq req = messageManager.build(publishReq, fixedHead.getQos(),
-//                                       mqttVersion);
                                   TlMqttPublishVariableHead variableHead = publishReq.getVariableHead();
-//                                   log.debug("Resending PUBLISH messageIs 【{}】", variableHead.getMessageId());
                                    Long messageId = variableHead.getMessageId();
                                    //如果消息是mqtt5的话 需要判断国企时间
                                    if(publishReq.getMqttVersion() == MqttVersion.MQTT_5){
-                                       log.info("ddd");
                                        Integer messageExpiryInterval = variableHead.getMessageExpiryInterval();
 
                                        Long acceptTime = publishReq.getAcceptTime();
@@ -332,11 +327,11 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
                                            long now = System.currentTimeMillis() / 1000;
                                            //表示过期了
                                            if(now>messageExpiryInterval+acceptTime){
+                                               storeManager.getPublishService().clear(clientId,messageId).subscribe();
                                                return Mono.empty();
                                            }
-                                           int remainding =(int)(messageExpiryInterval-(now-acceptTime));
-                                           log.info("转到5的客户端当前时间。【{}}剩余时间[{}]，国企时间【{}}",now,remainding,messageExpiryInterval);
-                                           variableHead.setMessageExpiryInterval(remainding);
+                                           int reminding =(int)(messageExpiryInterval-(now-acceptTime));
+                                           variableHead.setMessageExpiryInterval(reminding);
                                        }
                                    }
                                    channel.writeAndFlush(publishReq).addListener(future -> {

@@ -41,7 +41,6 @@ public class TlWillTask  implements TimerTask {
 
     @Override
     public void run(Timeout timeout) throws Exception {
-        log.error("执行发送");
         messageManager.publish(req,clientId, MqttVersion.MQTT_5);
     }
 

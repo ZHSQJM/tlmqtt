@@ -11,8 +11,14 @@ import com.tlmqtt.common.enums.MqttMessageType;
 public class TlProtocolErrorException extends RuntimeException{
 
 
+    /**
+     * 报文错误码
+     */
     private final MqttErrorCode errcode;
 
+    /**
+     * 报文类型
+     */
     private final MqttMessageType mqttMessageType;
 
 

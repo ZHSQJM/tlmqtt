@@ -53,8 +53,8 @@ public class TlBootstrap {
         if (ssl) {
             this.port = portProperties.getSslMqtt();
             this.webSocketPort = portProperties.getSslWebsocket();
-            setCertPath(sslProperties.getCertPath());
-            setPrivatePath(sslProperties.getPrivatePath());
+            TlBootstrap bootstrap = setCertPath(sslProperties.getCertPath());
+            bootstrap.setPrivatePath(sslProperties.getPrivatePath());
         }
         this.enableSocket = false;
         this.enableWebsocket = false;

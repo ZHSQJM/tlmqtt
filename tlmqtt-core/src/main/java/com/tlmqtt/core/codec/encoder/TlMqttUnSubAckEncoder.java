@@ -8,11 +8,13 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author hszhou
  */
 @ChannelHandler.Sharable
+@Slf4j
 public class TlMqttUnSubAckEncoder extends AbstractTlMqttEncoder<TlMqttUnSubAck> {
     @Override
     protected void encode(ChannelHandlerContext ctx, TlMqttUnSubAck req, ByteBuf out, MqttMessageType mqttMessageType) {
@@ -24,6 +26,8 @@ public class TlMqttUnSubAckEncoder extends AbstractTlMqttEncoder<TlMqttUnSubAck>
         //剩余长度
         out.writeByte(Short.BYTES);
         out.writeShort(variableHead.getMessageId());
+
+        log.debug("Send 【UNSUBACK】 message to client:【{}】", variableHead.getMessageId());
 
     }
 }

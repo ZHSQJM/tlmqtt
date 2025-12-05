@@ -111,7 +111,7 @@ public class MessageManager extends HashedWheelTimer {
                     .flatMap(session -> {
                         Boolean noLocal = client.getNoLocal();
                         log.info("client=[{}],noLocal=[{}]",client.getClientId(),noLocal);
-                        if(noLocal && client.getClientId().equals(publishClientId)){
+                        if(null != noLocal && noLocal && client.getClientId().equals(publishClientId)){
                             return Mono.empty();
                         }
                         // 如果是qos0的消息 直接转发

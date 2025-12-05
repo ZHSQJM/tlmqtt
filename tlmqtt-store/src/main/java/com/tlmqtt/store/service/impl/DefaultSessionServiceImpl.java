@@ -44,8 +44,7 @@ public class DefaultSessionServiceImpl   implements SessionService {
         return Mono.fromSupplier(() -> CLIENT_SESSIONS.remove(clientId) != null).defaultIfEmpty(false)
             .doOnError(e -> log.error("session: save clientId【{}】 failed",clientId, e))
             .doOnSuccess(e->
-                {});
-                //log.debug("session: save clientId 【{}】 session status【{}】",clientId,e));
+                log.debug("session: clean clientId 【{}】 session status【{}】",clientId,e));
     }
 
     @Override

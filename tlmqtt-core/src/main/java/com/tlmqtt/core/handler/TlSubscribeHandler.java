@@ -1,12 +1,15 @@
 package com.tlmqtt.core.handler;
 
 import com.tlmqtt.auth.acl.AclManager;
+import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.SubReasonCode;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.common.model.entity.TlTopic;
+import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.request.TlMqttSubscribeReq;
 import com.tlmqtt.common.model.response.TlMqttSubAck;
@@ -57,9 +60,12 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
 
         TlMqttSubscribeVariableHead variableHead = req.getVariableHead();
         int messageId = variableHead.getMessageId();
+
+
         //发送订阅确认
         for (int i = 0; i < topics.size(); i++) {
             TlTopic tlTopic = topics.get(i);
+
             if (aclManager.checkSubscribePermission(session, tlTopic.getName())) {
                 codes[i] = tlTopic.getQos();
                 successTopic.add(tlTopic);
@@ -73,10 +79,7 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
             log.info("【SUBSCRIBE】 event from client:【{}】--【{}】", clientId, tlTopic.getName());
         }
         TlMqttSubAck res = TlMqttSubAck.build(codes, messageId,null,null);
-
-
         channel.writeAndFlush(res);
-
         session.getTopics().addAll(successTopic.stream().map(TlTopic::getName).collect(Collectors.toSet()));
         storeManager.getSessionService()
             .save(session)
@@ -86,8 +89,8 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
                 return Mono.empty();
             }).thenMany(Flux.fromIterable(successTopic).flatMap(topic -> {
                 int qos= topic.getQos();
-                int subscriptionIdentifier = variableHead.getSubscriptionIdentifier();
-                int retainHandling = topic.getRetainHandling();
+                Integer subscriptionIdentifier = variableHead.getSubscriptionIdentifier();
+                Integer retainHandling = topic.getRetainHandling();
                 TlSubClient client =  TlSubClient.builder()
                     .qos(qos)
                     .clientId(clientId)
@@ -98,7 +101,7 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
                     .retainAsPublished(topic.getRetainAsPublished())
                     .noLocal(topic.getNoLocal())
                     .build();
-                if(retainHandling == 2){
+                if(retainHandling != null  && retainHandling== 2){
                     return Flux.empty();
                 }
                 //找到主题的保留消息

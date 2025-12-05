@@ -4,35 +4,40 @@ import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
+import com.tlmqtt.common.exception.TlMalformedPacketException;
 import com.tlmqtt.common.exception.TlProtocolErrorException;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.AbstractTlMessage;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author hszhou
  */
+@Slf4j
 public abstract class  AbstractTlMqttDecoder {
 
 
-    private static final Integer MAXIMUM_PACKET_SIZE = 65535;
+
     public AbstractTlMessage decode(ByteBuf buf,int type, int remainingLength, ChannelHandlerContext ctx,   MqttMessageType messageTypeEnum) {
-        Object o = ctx.channel().attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
-
+        Object  sessionValue = ctx.channel().attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
+        log.info("========================");
         if(messageTypeEnum==MqttMessageType.CONNECT){
+            //todo 在一个网络连接上，客户端只能发送一次CONNECT报文。服务端必须将客户端发送的第二个CONNECT报文当作协议违规处理并断开客户端的连接 [MQTT-3.1.0-2]。有关错误处理的信息请查看4.13节。
+            if(sessionValue != null){
+                throw new TlProtocolErrorException(messageTypeEnum);
+            }
             return build(buf,type, remainingLength,null);
-        }else if(null == o){
-
-            //todo 如果不是连接的话 其他报文里面没有这个session的话
+        }else if(null == sessionValue){
+            //todo 如果sessionValue的值为空 说明ctx之前没有连接过
+            throw new TlMalformedPacketException(messageTypeEnum);
         }
-
-        TlMqttSession session = (TlMqttSession)o ;
-        assert session != null;
+        TlMqttSession session = (TlMqttSession)sessionValue;
         if(session.getMqttVersion() == MqttVersion.MQTT_5){
-            if(buf.readableBytes() > MAXIMUM_PACKET_SIZE){
-               throw new TlProtocolErrorException(MqttErrorCode.PACKET_TOO_LARGE,MqttMessageType.DISCONNECT);
+            if(buf.readableBytes() > Constant.MAXIMUM_PACKET_SIZE){
+               throw new TlProtocolErrorException(MqttMessageType.DISCONNECT);
             }
         }
         return build(buf,type, remainingLength,session);

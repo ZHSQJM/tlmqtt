@@ -13,6 +13,7 @@ import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttConnectPayload;
 import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
 import com.tlmqtt.common.model.request.TlMqttConnectReq;
+import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
@@ -58,32 +59,25 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
 
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttConnectReq req, TlMqttSession session) {
-        Channel channel = ctx.channel();
         log.debug("Handling 【CONNECT】 event from client:【{}】", req.getPayload().getClientId());
         TlMqttConnectVariableHead variableHead = req.getVariableHead();
         short protocolVersion = variableHead.getProtocolVersion();
         MqttVersion mqttVersion = MqttVersion.valueOf((byte) protocolVersion);
-        if(session != null){
-            log.warn("Client:【{}】 has already connected", req.getPayload().getClientId());
-            //在一个网络连接上，客户端只能发送一次CONNECT报文。服务端必须将客户端发送的第二个CONNECT报文当作协议违规处理并断开客户端的连接 [MQTT-3.1.0-2]。有关错误处理的信息请查看4.13节
-            channel.close();
-            return;
-        }
-
         if (!authenticate(req)) {
             log.error("Authentication failed for client:【{}】", req.getPayload().getClientId());
             throw new TlAuthenticationException(mqttVersion);
         }
 
         handlerSession(req, ctx,mqttVersion)
-            .then(handleWillMessage(req))
+            .then(Mono.defer(() -> handleWillMessage(req)))
             .doOnSuccess(e->{
-                //log.info("1保存will消息[{}]",e);
             })
             .subscribe(e->{
-               // log.info("2保存will消息[{}]",e);
-            });
+        }, throwable -> {
+
+        });
     }
+
 
     /**
      * 用户名密码校验
@@ -105,32 +99,75 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
      * @return Mono<Boolean> 创建会话结果
 
      **/
-    private Mono<Boolean> handlerSession(TlMqttConnectReq req, ChannelHandlerContext ctx,  MqttVersion mqttVersion ) {
+    private Mono<Boolean> handlerSession(TlMqttConnectReq req, ChannelHandlerContext ctx,  MqttVersion mqttVersion) {
 
-        String clientId = req.getPayload().getClientId() != null ? req.getPayload().getClientId() :
-            (mqttVersion == MqttVersion.MQTT_5 ? IdUtil.nanoId(16) : null);
+        //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。
+        MqttQoS mqttQoS = MqttQoS.valueOf(req.getVariableHead().getWillQos());
+        if(Constant.MAXIMUM_QOS<mqttQoS.value() && mqttVersion == MqttVersion.MQTT_5){
+            TlMqttConnackAck connackResponse = TlMqttConnackAck.build(0, MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,mqttVersion,null,(short) 0);
+
+            ctx.channel().writeAndFlush(connackResponse);
+            // 直接返回错误Mono，不继续执行后续操作
+            return Mono.error(new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED, true, MqttMessageType.CONNECT, MqttMessageType.CONNACK));
+        }
+        //如果服务端收到一个包含保留标志位1的遗嘱消息的CONNECT报文且服务端不支持保留消息，服务端必须拒绝此连接请求，且应该发送包含原因码为0x9A（不支持保留）的CONNACK报文，随后必须关闭网络连接 [MQTT-3.2.2-13]
+        if(!Constant.RETAIN_AVAILABLE && req.getVariableHead().getWillRetain()==1){
+            TlMqttConnackAck connackResponse = TlMqttConnackAck.build(0, MqttErrorCode.CONNECTION_REFUSED_RETAIN_NOT_SUPPORTED,mqttVersion,null,(short) 0);
+             log.error("发送保留消息不支持");
+             ctx.channel().writeAndFlush(connackResponse);
+             // 直接返回错误Mono，不继续执行后续操作
+             return Mono.error(new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_RETAIN_NOT_SUPPORTED, true, MqttMessageType.CONNECT, MqttMessageType.CONNACK));
+        }
+
+
+        //如果服务端收到一个包含保留标志位1的遗嘱消息的CONNECT报文且服务端不支持保留消息，服务端必须拒绝此连接请求，且应该发送包含原因码为0x9A（不支持保留）的CONNACK报文，随后必须关闭网络连接 [MQTT-3.2.2-13]。
+        String clientId;
+
+        //如果客户端使用长度为0的客户标识符（ClientID），服务端必须回复包含分配客户标识符（Assigned Client Identifier）的CONNACK报文。分配客户标识符必须是没有被服务端的其他会话所使用的新客户标识符 [MQTT-3.2.2-16]。
+        if(mqttVersion == MqttVersion.MQTT_5 && req.getPayload().getClientId() == null) {
+           clientId = IdUtil.nanoId(12);
+        }else{
+            clientId = req.getPayload().getClientId();
+        }
         req.getPayload().setClientId(clientId);
         final String username = req.getPayload().getUsername();
         TlMqttConnectVariableHead variableHead = req.getVariableHead();
         boolean cleanSession = variableHead.getCleanSession() != 0;
         //是否存在会话 默认存在
         AtomicBoolean existSession = new AtomicBoolean(true);
-        //如果cleanSession是1的话 就说明不保存会话 先把之前的会话清除掉 如果cleanSession是0的话 就不清除
-        //查找clientId的会话 如果没有的话 就创建一个新的会话
-        return Mono.defer(() -> cleanSession ? storeManager.clearAll(clientId) : Mono.empty())
-            .then(storeManager.getSessionService().find(clientId))
+
+        // 并且必须关闭原有的网络连接 [MQTT-3.1.4-3]。如果原有客户端存在遗嘱消息（Will Message），遗嘱消息按照 3.1.2.5节所描述的方式发布。
+        return storeManager.getSessionService().find(clientId)
             .doOnNext(session -> {
-                log.info("Existing session found for clientId: {}，【{}】", clientId,session);
-                // 走到这里之前存在会话  然后连接了 那么就将移除会话和发送遗嘱消息的定时任务取消掉
-                storeManager.cancelRemoveSession(clientId);
+                //5.如果客户标识符（ClientID）所代表的客户端已经连接到此服务端，那么向原有的客户端发送一个包含原因码为0x8E（会话被接管）的DISCONNECT报文，
+                if(session != null && mqttVersion == MqttVersion.MQTT_5 && session.getCtx().channel().isActive()){
+                    TlMqttDisconnectReq disconnectReq = TlMqttDisconnectReq.build(
+                        MqttErrorCode.CONNECTION_REFUSED_CONNECTION_RATE_EXCEEDED);
+                    session.getCtx().channel().writeAndFlush(disconnectReq).addListener(future -> {
+                        session.getCtx().channel().close();
+                    });
+                }
             })
-            .switchIfEmpty(Mono.defer(() ->{
+            .flatMap(session -> {
+                if (session != null) {
+                    log.info("Existing session found for clientId: {}，【{}】", clientId, session);
+                    storeManager.cancelRemoveSession(clientId);
+                    if (cleanSession) {
+                        // 使用 flatMap 确保 clearAll 操作被执行
+                        return storeManager.clearAll(clientId).then(Mono.just(session));
+                    }
+                }
+                return Mono.justOrEmpty(session);
+            })
+            .switchIfEmpty(Mono.defer(() -> {
                 existSession.set(false);
                 return createNewSession(clientId);
             }))
-            .flatMap(session -> completeSessionHandling(session, req, ctx, cleanSession,mqttVersion, existSession.get(),username))
+            .flatMap(session -> completeSessionHandling(session, req, ctx, cleanSession, mqttVersion, existSession.get(), username))
             .doOnSuccess(e -> setupHeartBeat(ctx, req.getVariableHead().getKeepAlive()));
-    }
+
+}
+
 
     /**
      * 会话处理完成
@@ -158,12 +195,26 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
                .setMqttVersion(mqttVersion)
                .setCtx(ctx);
 
-        TlMqttConnackAck connackResponse = TlMqttConnackAck.build(variableHead.getCleanSession(), existsSession, MqttErrorCode.CONNECTION_ACCEPTED,mqttVersion,req.getPayload().getClientId(),variableHead.getKeepAlive());
+
+        //会话存在标识位设置为0 表示不存在
+        int sessionPresent = 0;
+
         if(mqttVersion == MqttVersion.MQTT_5){
+            //如果服务端接受一个新开始（Clean Start）为1的连接，服务端在CONNACK报文中除了把原因码设置为0x00（成功）之外，还必须把会话存在标志设置为0 [MQTT-3.2.2-2]。
+            //如果服务端接受一个新开始（Clean Start）为0的连接，并且服务端已经保存了此客户标识符（ClientID）的会话状态（Session State），服务端在CONNACK报文中必须把会话存在标志设置为1。否则，服务端必须把会话存在标志设置为0。无论如何，服务端在CONNACK报文中必须把原因码设置为0x00（成功） [MQTT-3.2.2-3]。
+            if(!cleanSession) {
+                sessionPresent=1;
+            }
             //填充session的属性
             fillSession(session, variableHead);
+        }else{
+           // 如果服务端接受了一个CleanSession设置为1的连接，服务端必须将CONNACK包中的Session Present设置为0，并且CONNACK包的返回码也设置为0。
+            //如果服务端接受了一个CleanSession设置为0的连接，Session Present的值取决于服务端是否已经存储了客户端Id对应的绘画状态。如果服务端已经存储了会话状态，CONNACK包中的Session Present必须设置为1[MQTT-3.2.2-2]。如果服务端没有存储会话状态，CONNACK包的Session Present必须设置为0。另外CONNACK包中的返回码必须设为0[MQTT-3.2.2-3]。
+           if(!cleanSession && existsSession){
+               sessionPresent = 1;
+           }
         }
-
+        TlMqttConnackAck connackResponse = TlMqttConnackAck.build(sessionPresent, MqttErrorCode.SUCCESS,mqttVersion,req.getPayload().getClientId(),variableHead.getKeepAlive());
 
         registerClient(ctx.channel(),session);
         ctx.channel().writeAndFlush(connackResponse).addListener(future -> {
@@ -197,7 +248,6 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
                .setSessionExpiryInterval(variableHead.getSessionExpiryInterval())
                .setUserProperties(variableHead.getUserProperty())
                .setRequestResponseInformation(variableHead.isRequestResponseInformation());
-        //log.info("[{}]",variableHead.getMaximumPacketSize());
     }
 
     /**
@@ -229,6 +279,9 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
         ctx.pipeline().addLast(new IdleStateHandler(0, 0, keepAlive, TimeUnit.SECONDS));
     }
 
+    //todo
+    // 如果从服务端接收到了最大QoS等级，则客户端不能发送超过最大QoS等级所指定的QoS等级的PUBLISH报文 [MQTT-3.2.2-11]。服务端接收到超过其指定的最大服务质量的PUBLISH报文将造成协议错误（Protocol Error）。这种情况下应使用包含原因码为0x9B（不支持的QoS等级）的DISCONNECT报文进行处理，如4.13节所述。
+    //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。4.13节所述 [MQTT-3.2.2-12]。
     /**
      * 处理遗嘱消息
      *
@@ -236,12 +289,14 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
      * @return Mono<Void> 处理结果
      **/
     private Mono<Boolean> handleWillMessage(TlMqttConnectReq req) {
+        log.info("处理遗嘱消息");
         TlMqttConnectVariableHead variableHead = req.getVariableHead();
         if (variableHead.getWillFlag() != 1) {
             return Mono.empty();
         }
         TlMqttConnectPayload payload = req.getPayload();
         MqttQoS mqttQoS = MqttQoS.valueOf(variableHead.getWillQos());
+
 
         TlMqttPublishVariableHead pubVariableHead = TlMqttPublishVariableHead.builder()
                                                                              .topic(payload.getWillTopic())

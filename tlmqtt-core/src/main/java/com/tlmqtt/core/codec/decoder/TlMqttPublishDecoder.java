@@ -1,14 +1,18 @@
 package com.tlmqtt.core.codec.decoder;
 
 import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
+import com.tlmqtt.common.exception.TlProtocolErrorException;
+import com.tlmqtt.common.exception.TopicAliasInvalidException;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.UserProperty;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
+import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import io.netty.buffer.ByteBuf;
@@ -28,30 +32,37 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
     @Override
     public TlMqttPublishReq build(ByteBuf buf, int type, int remainingLength, TlMqttSession session ) {
 
-
-
-        TlMqttFixedHead fixedHead = decodeFixedHeader(type, remainingLength);
+        MqttVersion mqttVersion = session.getMqttVersion();
+        TlMqttFixedHead fixedHead = decodeFixedHeader(type, remainingLength,mqttVersion);
         MqttQoS qos = fixedHead.getQos();
         TlMqttPublishVariableHead variableHead = decodeVariableHeader(buf, qos,session);
         TlMqttPublishPayload payload = decodePayload(buf);
         TlMqttPublishReq.TlMqttPublishReqBuilder<?, ?> builder = TlMqttPublishReq.builder().fixedHead(fixedHead)
             .variableHead(variableHead).payload(payload);
-        if(session.getMqttVersion() == MqttVersion.MQTT_5){
+        if(mqttVersion == MqttVersion.MQTT_5){
             builder.acceptTime(getCurrentTime());
         }
         return builder.build();
     }
 
-    TlMqttFixedHead decodeFixedHeader(int type, int remainingLength) {
+    TlMqttFixedHead decodeFixedHeader(int type, int remainingLength,MqttVersion mqttVersion) {
         TlMqttFixedHead fixedHead = new TlMqttFixedHead();
         int messageType = type >> 4;
         int retain = (type) & 1;
         int qos = (type >> 1) & 3;
+        //接收到超过其指定的最大服务质量的PUBLISH报文将造成协议错误（Protocol Error）。这种情况下应使用包含原因码为0x9B（不支持的QoS等级）的DISCONNECT报文进行处理，如4.13节所述。
+        if(Constant.MAXIMUM_QOS<qos && mqttVersion == MqttVersion.MQTT_5){
+            throw new TlProtocolErrorException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.PUBLISH);
+        }
         int dup = (type >> 3) & 1;
         fixedHead.setMessageType(MqttMessageType.valueOf(messageType));
         fixedHead.setDup(dup != 0);
         fixedHead.setQos(MqttQoS.valueOf(qos));
         fixedHead.setRetain(retain != 0);
+        //如果服务端发送给客户端的CONNACK报文中包含保留可用属性，且属性值为0，但收到的PUBLISH报文中保留标志位为1，服务端使用包含原因码为0x9A（保留不支持）的DISCONNECT报文断开网络连接，如4.13节所述。
+        if(!Constant.RETAIN_AVAILABLE && retain!=0){
+            throw new TlProtocolErrorException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.PUBLISH);
+        }
         fixedHead.setLength(remainingLength);
 
 
@@ -94,8 +105,10 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
                     case TOPIC_ALIAS:
                         // 主题别名
                         int topicAlias = buf.readShort();
-                        if(topicAlias> Constant.TOPIC_ALIAS_MAXIMUM){
-                            throw new RuntimeException("主题别名不能大于200");
+
+                        //： 1) 主题别名为0或大于最大主题别名（Maximum Topic Alias），将造成协议错误（Protocol Error），接收端使用包含原因码为0x94（主题别名无效）的DISCONNECT报文断开网络连接
+                        if(topicAlias == 0 || topicAlias> Constant.TOPIC_ALIAS_MAXIMUM){
+                            throw new TlProtocolErrorException(MqttErrorCode.TOPIC_ALIAS_INVALID,MqttMessageType.PUBLISH);
                         }
                         builder.topicAlias(topicAlias);
                         break;

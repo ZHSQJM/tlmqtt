@@ -29,30 +29,27 @@ public class TlMqttConnackAck extends AbstractTlMessage {
 
     private TlMqttConnackVariableHead variableHead;
 
-    public static TlMqttConnackAck build(int currentSession, boolean existsSession, MqttErrorCode returnCode, MqttVersion mqttVersion,String clientId,short keepAlive){
-        /*如果服务端接受了一个CleanSession设置为1的连接，服务端必须将CONNACK包中的Session Present设置为0，并且CONNACK包的返回码也设置为0。
-         如果服务端接受了一个CleanSession设置为0的连接，Session Present的值取决于服务端是否已经存储了客户端Id对应的绘画状态。如果服务端已经存储了会话状态，CONNACK包中的Session Present必须设置为1[MQTT-3.2.2-2]。如果服务端没有存储会话状态，CONNACK包的Session Present必须设置为0。另外CONNACK包中的返回码必须设为0[MQTT-3.2.2-3]。
-         Session Present标识使得客户端能够建立连接，不论客户端和服务端在是否已经存储了会话状态上达成共识。*/
-        int sessionPresent = 0;
-        if(currentSession==0){
-            sessionPresent = existsSession?1:0;
-        }
+    public static TlMqttConnackAck build(int sessionPresent, MqttErrorCode returnCode, MqttVersion mqttVersion,String clientId,short keepAlive){
+
 
         TlMqttConnackVariableHead variableHead =TlMqttConnackVariableHead.builder().currentSession(sessionPresent).code(returnCode.byteValue()).build();
         int propertiesLength = 0;
         if(mqttVersion == MqttVersion.MQTT_5){
+            //如果会话过期间隔（Session Expiry Interval）值未指定，则使用CONNECT报文中指定的会话过期时间间隔。服务端使用此属性通知客户端它使用的会话过期时间间隔与客户端在CONNECT中发送的值不同。
             variableHead.setSessionExpiryInterval(Constant.SESSION_EXPIRY_INTERVAL);
+            //服务端使用此值限制服务端愿意为该客户端同时处理的QoS为1和QoS为2的发布消息最大数量。没有机制可以限制客户端试图发送的QoS为0的发布消息。 如果没有设置最大接收值，将使用默认值6553
             variableHead.setReceiveMaximum((short)200);
-            variableHead.setMaximumQoS(null);
-            variableHead.setRetainAvailable((byte) 1);
-            variableHead.setMaximumPacketSize(65535);
+            //最大服务质量 Maximum QoS 如果没有设置最大服务质量，客户端可使用最大QoS为2。
+            variableHead.setMaximumQoS(Constant.MAXIMUM_QOS);
+            variableHead.setRetainAvailable(Constant.RETAIN_AVAILABLE?(byte) 1:(byte) 0);
+            variableHead.setMaximumPacketSize(Constant.MAXIMUM_PACKET_SIZE);
             variableHead.setAssignedClientIdentifier(clientId);
             variableHead.setTopicAliasMaximum((short) Constant.TOPIC_ALIAS_MAXIMUM);
             variableHead.setReasonString(null);
             variableHead.setUserProperties(null);
-            variableHead.setWildcardSubscriptionsAvailable(true);
-            variableHead.setSubscriptionIdentifiersAvailable(true);
-            variableHead.setSharedSubscriptionAvailable(true);
+            variableHead.setWildcardSubscriptionsAvailable(Constant.WILDCARD_SUBSCRIPTION_AVAILABLE);
+            variableHead.setSubscriptionIdentifiersAvailable(Constant.SUBSCRIPTION_IDENTIFIERS_AVAILABLE);
+            variableHead.setSharedSubscriptionAvailable(Constant.SHARED_SUBSCRIPTION_AVAILABLE);
             variableHead.setServerKeepAlive(keepAlive);
             variableHead.setResponseInformation(null);
             variableHead.setServerReference(null);

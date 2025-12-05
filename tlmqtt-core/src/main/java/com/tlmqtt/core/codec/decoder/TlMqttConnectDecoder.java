@@ -2,15 +2,19 @@ package com.tlmqtt.core.codec.decoder;
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
+import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
 import com.tlmqtt.common.exception.TlMalformedPacketException;
+import com.tlmqtt.common.exception.TlMqttException;
 import com.tlmqtt.common.exception.TlProtocolErrorException;
+import com.tlmqtt.common.exception.UnAcceptableProtocolVersionException;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.UserProperty;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttConnectPayload;
 import com.tlmqtt.common.model.request.TlMqttConnectReq;
+import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
 import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
@@ -57,19 +61,20 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
          //支持多种协议的服务端使用协议名字段判断数据是否为MQTT报文。协议名必须是UTF-8字符串“MQTT”。如果服务端不愿意接受CONNECT但希望表明其MQTT服务端身份，
         // 可以发送包含原因码为0x84（不支持的协议版本）的CONNACK报文，然后必须关闭网络连接 [MQTT-3.1.2-1]。
         if(!Constant.PROTOCOL_NAME.equals(protocolName)){
-            throw new TlMalformedPacketException(MqttErrorCode.CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION,MqttMessageType.CONNECT);
+            throw new UnAcceptableProtocolVersionException();
         }
         short version = buf.readUnsignedByte();
         builder.protocolVersion(version);
         if(version != MqttVersion.MQTT_5.getLevel()  && version != MqttVersion.MQTT_3_1_1.getLevel() ){
-            throw new TlMalformedPacketException(MqttErrorCode.CONNECTION_REFUSED_UNACCEPTABLE_PROTOCOL_VERSION,MqttMessageType.CONNECT);
+            //支持多版本MQTT协议的服务端使用协议版本字段判定客户端正使用的MQTT协议版本。如果协议版本不是5且服务端不愿意接受此CONNECT报文，可以发送包含原因码0x84（不支持的协议版本）的CONNACK报文，然后必须关闭网络连接 [MQTT-3.1.2-2]。
+            throw new UnAcceptableProtocolVersionException();
         }
         //连接标识
         int connectFlag = buf.readUnsignedByte();
         int reserved = (connectFlag) & 1;
         if(reserved != 0){
-            //协议错误
-            throw new TlMalformedPacketException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+            //服务端必须验证CONNECT控制报文的保留标志位（第0位）是否为0 [MQTT-3.1.2-3]，如果不为0则此报文为无效报文。4.13节给出了错误处理信息。
+            throw new TlMalformedPacketException(MqttMessageType.CONNECT);
         }
         builder.reserved(reserved);
         int clearSession = (connectFlag >> 1) & 1;
@@ -79,8 +84,10 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         int willQos = (connectFlag >> 3) & 3;
         if(willQos == 3){
             //  不支持的QoS等级
-            throw new TlMalformedPacketException( MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.CONNECT);
+            throw new TlMalformedPacketException(MqttMessageType.CONNECT);
         }
+
+        //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。
         builder.willQos(willQos);
         int willRetain = (connectFlag >> 5) & 1;
         builder.willRetain(willRetain);
@@ -117,7 +124,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 2. 将cleanStart设置为0 确会话过期间隔不设置 就相当于3.1.1 将cleanSession设置为0
                     //默认为0但是如果不为0 说明之前设置过了
                     if(variableHead.getSessionExpiryInterval()!=0){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     int sessionExpiryInterval = buf.readInt();
                     variableHead.setSessionExpiryInterval(sessionExpiryInterval);
@@ -128,11 +135,11 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 跟随其后的是由双字节整数表示的最大接收值。包含多个接收最大值或接收最大值为0将造成协议错误（Protocol Error）。
                     if(variableHead.getReceiveMaximum()!=null){
                         //说明设置过了
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     short receiveMaximum = buf.readShort();
                     if(receiveMaximum==0){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     variableHead.setReceiveMaximum(receiveMaximum);
                     break;
@@ -144,13 +151,12 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 如果Packet太大以至于不能正常发送，那么服务器就需要丢弃
                     if(variableHead.getMaximumPacketSize()!=null){
                         //说明设置过了
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     int maximumPacketSize = buf.readInt();
                     if(maximumPacketSize==0){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
-                    log.info("最大的Max【{}】",maximumPacketSize);
                     variableHead.setMaximumPacketSize(maximumPacketSize);
                     break;
                 case TOPIC_ALIAS_MAXIMUM:
@@ -161,7 +167,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 当值为0时则别是客户端在该链接中不会接受任何主题别名 入股主题别名最大数量不存在或者值为0 则服务器不能发送任何主题别名给客户端
                     if(variableHead.getTopicMaxAlias()!=0){
                         //说明设置过了
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     short topicAliasMaximum= buf.readShort();
                     variableHead.setTopicMaxAlias(topicAliasMaximum);
@@ -174,7 +180,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 如果值为1 那么服务器会在CONNACK包中返回详情信息
                     byte requestResponseInformation = buf.readByte();
                     if(requestResponseInformation >1){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     variableHead.setRequestResponseInformation(requestResponseInformation==1);
                     break;
@@ -186,7 +192,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 如果值设置1 那么服务器就可以在任何备允许的报文中返回原因码或用户属性
                     byte requestProblemInformation = buf.readByte();
                     if(requestProblemInformation >1){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     variableHead.setRequestProblemInformation(requestProblemInformation==1);
                     break;
@@ -225,7 +231,6 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
 
     TlMqttConnectPayload decodePayload(ByteBuf buf, int willFlag, boolean usernameFlag,short version) {
         int clientIdLength = buf.readUnsignedShort();
-      //  log.info("clientIdLength=【{}】",clientIdLength);
         /*
          *如果是5.0 协议
          *1. 服务端可以允许客户端提供一个零字节的客户端标识符（clientId） 如果这样做了 服务端必须将这个作为特殊情况 并分配唯一的客户端标识符给那个客户端，
@@ -238,8 +243,11 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
             byte[] clientIdByte = new byte[clientIdLength];
             buf.readBytes(clientIdByte);
             String  clientId = new String(clientIdByte);
+            if(Constant.REFUSE_CLIENTS.contains(clientId)){
+                //如果clientId不被服务端接收，那么就返回0x85（客户端标识符无效）的原因码的CONNACK报文去相亲CONNECT报文，然后必须关闭网络连接
+                throw new TlMqttException(MqttErrorCode.REFUSED_CLIENT_IDENTIFIER,MqttMessageType.CONNECT,MqttMessageType.CONNACK);
+            }
             connectPayload.setClientId(clientId);
-            //todo 如果clientId不被服务端接收，那么就返回0x85（客户端标识符无效）的原因码的CONNACK报文去相亲CONNECT报文，然后必须关闭网络连接
         }
 
         if (willFlag == 1) {
@@ -288,11 +296,10 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 如果遗嘱延迟间隔没有设置 那么会将默认值设置0 也就意味着遗嘱消息的发布会有有任何延迟
                     // 服务器只有在遗嘱延迟间隔过期或者会话结束的时候才可以发布客户端的遗嘱消息，如果在遗嘱延迟间隔过期之前的在这个会话上建立了一个新的网络连接 那么服务器就不应该再发送任何遗嘱消息了
                     if(connectPayload.getWillDelayInterval()!=null){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
 
                     int willDelayInterval = buf.readInt();
-                    //log.info("willDelayInterval=【{}】",willDelayInterval);
                     connectPayload.setWillDelayInterval(willDelayInterval);
                     break;
                 case PAYLOAD_FORMAT_INDICATOR:
@@ -301,9 +308,9 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 当该属性值为1的时候，意味着遗嘱消息是utf-8的字符数据
                     //包含多个载荷格式指示（Payload Format Indicator）将造成协议错误（Protocol Error）
                     if(connectPayload.getPayloadFormatIndicator()!=null){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
-                    // todo 放在handler执行如果是1 但是数据不是字符串 那么就0x99
+                    // todo 包含多个载荷格式指示（Payload Format Indicator）将造成协议错误（Protocol Error）。服务端可以按照格式指示对遗嘱消息（Will Message）进行验证，如果验证失败发送一条包含原因码0x99（载荷格式无效）的CONNACK报文。如4.13节所述
                     int payloadFormatIndicator = buf.readByte();
                     connectPayload.setPayloadFormatIndicator(payloadFormatIndicator==1);
                     break;
@@ -312,7 +319,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
 
                     //包含多个消息过期间隔将导致协议错误
                     if(connectPayload.getMessageExpiryInterval()!=null){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     // 消息过期间隔
                     // 如果存在该属性，那么这4个字节的值就用来表示单位为秒的遗嘱消息的生命周期，并且当服务器饭吧遗嘱消息的时候会被作为发布过去间隔发送
@@ -325,18 +332,16 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 用来描述遗嘱消息内容的字符串
                     //包含多个内容类型（Content Type）将造成协议错误（Protocol Error）
                     if(connectPayload.getContentType()!=null){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
-                    //log.info("内容类型");
                     int contentLength = buf.readShort();
                     if(contentLength == 0){
                         break;
                     }
-                   // log.info("内容类型长度【{}】",contentLength);
+
                     byte[] willTopicByte = new byte[contentLength];
                     buf.readBytes(willTopicByte);
                     String content = new String(willTopicByte);
-                   // log.info("内容类型【{}】",content);
                     connectPayload.setContentType(content);
                     break;
                 case RESPONSE_TOPIC:
@@ -344,24 +349,24 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
                     // 通常是用来作为响应先
                        //。包含多个响应主题（Response Topic）将造成协议错误
                     if(connectPayload.getResponseTopic()!=null){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
-                    //log.info("响应主题");
+
                     int responseTopicLength = buf.readShort();
                     if(responseTopicLength==0){
                         break;
                     }
-                    log.info("响应主题长度【{}】",responseTopicLength);
+
                     byte[]responseTopicByte = new byte[responseTopicLength];
                     buf.readBytes(responseTopicByte);
                     String responseTopic = new String(responseTopicByte);
-                    log.info("响应主题【{}】",responseTopic);
+
                     connectPayload.setResponseTopic(responseTopic);
                     break;
                 case CORRELATION_DATA:
                     //包含多个对比数据将造成协议错误（Protocol Error）
                     if(connectPayload.getCorrelationData()!=null){
-                        throw new TlProtocolErrorException(MqttErrorCode.MALFORMED_MESSAGE,MqttMessageType.CONNECT);
+                        throw new TlProtocolErrorException(MqttMessageType.CONNECT);
                     }
                     int correlationDataLength = buf.readShort();
                     byte[]correlationDataByte = new byte[correlationDataLength];

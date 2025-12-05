@@ -3,14 +3,17 @@ package com.tlmqtt.core.handler;
 import com.tlmqtt.auth.acl.AclManager;
 import com.tlmqtt.bridge.TlBridgeManager;
 import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PubReasonCode;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
+import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import com.tlmqtt.common.model.request.TlMqttPubRecReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
+import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.response.TlMqttPubAck;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import com.tlmqtt.core.manager.TlStoreManager;
@@ -56,21 +59,24 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
         MqttQoS messageQos = fixedHead.getQos();
         String topic = variableHead.getTopic();
 
+        /*如果是保留消息 存储*/
+        if (retain) {
+            storeRetain(topic,req).subscribe();
+        }
+        //客户端不能发送超过最大报文长度（Maximum Packet Size）的报文给服务端 [MQTT-3.2.2-15]。收到长度超过限制的报文将导致协议错误，此时服务端应该发送包含原因码0x95（报文过长）的DISCONNECT报文给客户端
+        if(Constant.MAXIMUM_PACKET_SIZE < req.getFixedHead().getLength()){
+            TlMqttDisconnectReq disconnectReq = TlMqttDisconnectReq.build(MqttErrorCode.CONNECTION_REFUSED_MESSAGE_TOO_LARGE);
+        }
+
         String username =session.getUsername();
         String ip = session.getIp();
         if (!aclManager.checkPublishPermission(clientId,username,ip, topic)) {
             log.error("Client 【{}】 no permission to publish topic 【{}】", clientId, topic);
             return;
         }
-        if(req.getPayload().getContent().equals("ab")){
-            ctx.close();
-        }
+
         Long messageId = variableHead.getMessageId();
 
-        /*如果是保留消息 存储*/
-        if (retain) {
-            storeRetain(topic,req).subscribe();
-        }
 
 
         switch (messageQos) {

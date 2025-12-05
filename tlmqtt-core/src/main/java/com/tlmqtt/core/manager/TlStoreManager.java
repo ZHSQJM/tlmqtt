@@ -75,7 +75,7 @@ public class TlStoreManager extends HashedWheelTimer {
      **/
     public Mono<Void> clearAll(String clientId) {
 
-        //log.info("清除会话");
+        log.info("清除会话");
        return Mono.when(
             sessionService.clear(clientId),
             subscriptionService.clear(clientId),

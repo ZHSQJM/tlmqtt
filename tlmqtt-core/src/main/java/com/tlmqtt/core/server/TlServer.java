@@ -114,6 +114,8 @@ public class TlServer {
 
     private final TlUnSubscribeHandler unSubscribeEventHandler;
 
+    private final TlMqttDisconnectEncoder disconnectEncoder;
+
     private final TlExceptionHandler exceptionHandler;
 
     @Getter
@@ -171,6 +173,7 @@ public class TlServer {
         pubRelEncoder = new TlMqttPubRelEncoder();
         subAckEncoder = new TlMqttSubAckEncoder();
         unSubAckEncoder = new TlMqttUnSubAckEncoder();
+        disconnectEncoder = new TlMqttDisconnectEncoder();
         MqttConfiguration mqttConfiguration = new MqttConfiguration();
         TlMqttProperties mqttProperties = mqttConfiguration.getMqttProperties();
         TlSessionProperties session = mqttProperties.getSession();
@@ -271,7 +274,7 @@ public class TlServer {
                         pipeline.addFirst(sslContext.newHandler(ch.alloc()));
                     }
                     pipeline.addLast(new TlMqttMessageCodec(connectDecoder, disConnectDecoder, heartBeatDecoder, pubAckDecoder,pubCompDecoder, publishDecoder, pubRecDecoder, pubRelDecoder, subscribeDecoder, unSubscribeDecoder))
-                            .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder, pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder)
+                            .addLast(connackEncoder, headerBeatEncoder, pubAckEncoder, pubCompEncoder, publishEncoder, pubRecEncoder, pubRelEncoder, subAckEncoder, unSubAckEncoder,disconnectEncoder)
                             .addLast(connectEventHandler,disconnectEventHandler,heartBeatEventHandler, pubAckEventHandler,pubCompEventHandler,publishEventHandler,pubRecEventHandler,pubRelEventHandler,subscribeEventHandler,unSubscribeEventHandler)
                             .addLast(exceptionHandler);
                 }

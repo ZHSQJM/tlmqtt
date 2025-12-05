@@ -22,7 +22,7 @@ public class TlMqttSubscribeVariableHead {
     /**
      * 订阅标识符
      */
-    private int subscriptionIdentifier;
+    private Integer subscriptionIdentifier;
 
     /**
      * 用户属性

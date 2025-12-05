@@ -1,11 +1,20 @@
 package com.tlmqtt.core.handler;
 
 import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.enums.MqttErrorCode;
+import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.exception.TlMalformedPacketException;
+import com.tlmqtt.common.exception.TlMqttException;
 import com.tlmqtt.common.exception.TlProtocolErrorException;
+import com.tlmqtt.common.exception.TopicAliasInvalidException;
+import com.tlmqtt.common.exception.UnAcceptableProtocolVersionException;
 import com.tlmqtt.common.model.TlMqttSession;
+import com.tlmqtt.common.model.fix.TlMqttFixedHead;
+import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
+import com.tlmqtt.common.model.response.TlMqttConnackAck;
+import com.tlmqtt.common.model.variable.TlMqttDisconnectVariableHead;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import com.tlmqtt.core.manager.TlStoreManager;
 import com.tlmqtt.core.manager.ChannelManager;
@@ -53,7 +62,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
             return;
         }
         MqttVersion mqttVersion = session.getMqttVersion();
-        handleWillMessage(clientId,mqttVersion)
+        handleWillMessage(clientId, mqttVersion)
             .then(handleSessionCleanup(session))
             .doFinally(signalType -> channel.close())
             .subscribe();
@@ -64,7 +73,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
         channelManager.remove(clientId);
         boolean cleanSession = session.isCleanSession();
         //CleanStart=true：丢弃任何现有会话，建立全新会话（类似 MQTT 3.1.1 的 CleanSession=true）。
-        if(cleanSession){
+        if (cleanSession) {
             return storeManager.clearAll(clientId);
         }
 
@@ -75,11 +84,11 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
         //Session Expiry Interval=0xFFFFFFFF（无限）：会话永久保留（类似 MQTT 3.1.1 的 CleanSession=false 但无时间限制）135。
         if (mqttVersion == MqttVersion.MQTT_5) {
             int sessionExpiryInterval = session.getSessionExpiryInterval();
-            if(sessionExpiryInterval==0){
+            if (sessionExpiryInterval == 0) {
                 return storeManager.clearAll(clientId);
             }
            return storeManager.scheduleRemoveSession(session);
-        }else{
+        } else {
             return Mono.empty();
         }
     }
@@ -95,7 +104,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
      *
      * todo 当连接断开后，尽管会话还会保持，无论遗嘱消息是否发生，该条遗嘱消息不应该存在了
      */
-    private Mono<Boolean> handleWillMessage(String clientId,MqttVersion version) {
+    private Mono<Boolean> handleWillMessage(String clientId, MqttVersion version) {
 
         if (isNormalDisconnect(clientId)) {
             return storeManager.getPublishService()
@@ -103,23 +112,23 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
         }
         return storeManager.getPublishService()
             .findWill(clientId)
-            .doOnNext(req->log.info("获取遗嘱消息【{}】",req))
-            .flatMap(req->{
-                log.info("获取到遗嘱消息【{}】",req);
+            .doOnNext(req -> log.info("获取遗嘱消息【{}】", req))
+            .flatMap(req -> {
+                log.info("获取到遗嘱消息【{}】", req);
                 TlMqttPublishVariableHead variableHead = req.getVariableHead();
                 Integer willDelayInterval = variableHead.getWillDelayInterval();
-                if(willDelayInterval==null){
+                if (willDelayInterval == null) {
                     log.error("WillDelayInterval为空");
-                   return publishToSubscribers(req,clientId,version);
+                   return publishToSubscribers(req, clientId, version);
                 }
-                log.info("WillDelayInterval【{}】",willDelayInterval);
-                return messageManager.scheduleSendWillMessage(clientId,req,willDelayInterval)
+                log.info("WillDelayInterval【{}】", willDelayInterval);
+                return messageManager.scheduleSendWillMessage(clientId, req, willDelayInterval)
                     .then(Mono.empty());
             });
     }
 
-    private Mono<Boolean> publishToSubscribers(TlMqttPublishReq req,String clientId,MqttVersion version) {
-        messageManager.publish(req,clientId,version);
+    private Mono<Boolean> publishToSubscribers(TlMqttPublishReq req, String clientId, MqttVersion version) {
+        messageManager.publish(req, clientId, version);
         return Mono.empty();
     }
 
@@ -142,22 +151,71 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.info("异常");
+        log.error("异常[{}]", cause.getClass());
         ReferenceCountUtil.release(cause);
-        cause.printStackTrace();
-        if (cause instanceof TlProtocolErrorException){
+
+
+        /*当服务端检测到无效报文或协议错误，并且本规范中给出了相应的原因码时，它必须关闭网络连接 [MQTT-4.13.1-1]。
+         * 在CONNECT报文出错的情况下它可以在关闭网络连接之前发送包含原因码的CONNACK报文。
+         * 在其他报文出错的情况下它应该在关闭网络连接之前发送包含原因码的DISCONNECT报文。
+         * 使用原因码0x81（无效报文）或0x82（协议错误），除非包含3.2.2.2节 - 连接原因码 或3.14.2.1节 – 断开原因码 中定义的更具体的原因码。对其他会话没有影响*/
+        if (cause instanceof TlProtocolErrorException) {
             log.info("协议错误");
-
-        }else if(cause instanceof TlMalformedPacketException){
-
-            log.error("无效报文");
-        }
-        else if (cause instanceof SocketException) {
-            log.error("1关闭连接");
+            TlProtocolErrorException ex = (TlProtocolErrorException) cause;
+            MqttMessageType mqttMessageType = ex.getMqttMessageType();
+            if (mqttMessageType == MqttMessageType.CONNECT) {
+                TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrCode(), MqttVersion.MQTT_5, null, (short) 0);
+                ctx.channel().writeAndFlush(req);
+            } else {
+                TlMqttDisconnectReq req = TlMqttDisconnectReq.build(ex.getErrCode());
+                ctx.channel().writeAndFlush(req);
+            }
             ctx.close();
-        }
-        else {
-            log.error("2关闭连接");
+        } else if (cause instanceof TlMalformedPacketException) {
+            log.error("无效报文");
+            TlMalformedPacketException ex = (TlMalformedPacketException) cause;
+            MqttMessageType mqttMessageType = ex.getMqttMessageType();
+            if (mqttMessageType == MqttMessageType.CONNECT) {
+                TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrorCode(), MqttVersion.MQTT_5, null, (short) 0);
+                ctx.channel().writeAndFlush(req);
+            } else {
+                TlMqttDisconnectReq req = TlMqttDisconnectReq.build(ex.getErrorCode());
+                ctx.channel().writeAndFlush(req);
+            }
+            ctx.close();
+        } else if (cause instanceof UnAcceptableProtocolVersionException) {
+            log.info("不支持协议版本");
+            UnAcceptableProtocolVersionException ex = (UnAcceptableProtocolVersionException) cause;
+            TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrCode(), MqttVersion.MQTT_5, null, (short) 0);
+            ctx.channel().writeAndFlush(req);
+            ctx.close();
+        } else if (cause instanceof TlMqttException) {
+            TlMqttException ex = (TlMqttException) cause;
+            log.info("[{}]",ex);
+            MqttMessageType send = ex.getSend();
+            if(send == MqttMessageType.CONNACK){
+                TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrCode(), MqttVersion.MQTT_5, null, (short) 0);
+                ctx.channel().writeAndFlush(req).addListener(future -> {
+                    if(ex.getClose()){
+                        log.error("MQTT异常，关闭连接: {}", ex.getErrCode());
+                        ctx.close();
+                    }
+                });
+            }else if(send ==MqttMessageType.DISCONNECT){
+                TlMqttDisconnectReq req = TlMqttDisconnectReq.build(ex.getErrCode());
+                ctx.channel().writeAndFlush(req).addListener(future -> {
+                    log.error("MQTT异常，关闭连接: {}", ex.getErrCode());
+                    ctx.close();
+                });
+            }
+        } else if(cause instanceof  TopicAliasInvalidException){
+            log.error("TopicAliasInvalidException: {}", cause.getMessage());
+            TopicAliasInvalidException ex = ((TopicAliasInvalidException) cause);
+        }else if (cause instanceof SocketException) {
+            log.error("Socket异常，关闭连接");
+            ctx.close();
+        } else {
+            log.error("未知异常，关闭连接");
             ctx.close();
         }
     }

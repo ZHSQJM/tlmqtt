@@ -26,6 +26,8 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
     
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, T req) throws Exception {
+
+        //读取消息
         TlMqttSession session = null;
         Object o = ctx.channel().attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
         if (o != null) {
@@ -55,5 +57,8 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
     }
 
 
+    void validate(){
+
+    }
 
 }

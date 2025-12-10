@@ -3,17 +3,17 @@ package com.tlmqtt.core.handler;
 import com.tlmqtt.auth.acl.AclManager;
 import com.tlmqtt.bridge.TlBridgeManager;
 import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.config.TlConfig;
 import com.tlmqtt.common.enums.MqttErrorCode;
+import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PubReasonCode;
+import com.tlmqtt.common.exception.TlMqttException;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
-import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
-import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import com.tlmqtt.common.model.request.TlMqttPubRecReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
-import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.response.TlMqttPubAck;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import com.tlmqtt.core.manager.TlStoreManager;
@@ -21,7 +21,6 @@ import com.tlmqtt.core.manager.MessageManager;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,19 +58,26 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
         MqttQoS messageQos = fixedHead.getQos();
         String topic = variableHead.getTopic();
 
+        if(TlConfig.getStringList(TlConfig.INVALID_TOPIC_NAMES).contains(topic) && messageQos.value()>0){
+            throw new TlMqttException(MqttErrorCode.UNAUTHORIZED,false, MqttMessageType.PUBLISH,messageQos==MqttQoS.AT_LEAST_ONCE?MqttMessageType.PUBACK:MqttMessageType.PUBREL);
+        }
+
+        //todo 判断该标识符是否被占用
+        Long messageId1 = variableHead.getMessageId();
         /*如果是保留消息 存储*/
         if (retain) {
             storeRetain(topic,req).subscribe();
         }
-        //客户端不能发送超过最大报文长度（Maximum Packet Size）的报文给服务端 [MQTT-3.2.2-15]。收到长度超过限制的报文将导致协议错误，此时服务端应该发送包含原因码0x95（报文过长）的DISCONNECT报文给客户端
-        if(Constant.MAXIMUM_PACKET_SIZE < req.getFixedHead().getLength()){
-            TlMqttDisconnectReq disconnectReq = TlMqttDisconnectReq.build(MqttErrorCode.CONNECTION_REFUSED_MESSAGE_TOO_LARGE);
-        }
+
 
         String username =session.getUsername();
         String ip = session.getIp();
         if (!aclManager.checkPublishPermission(clientId,username,ip, topic)) {
             log.error("Client 【{}】 no permission to publish topic 【{}】", clientId, topic);
+            if(mqttVersion == MqttVersion.MQTT_5 && messageQos.value()>0){
+                //如果没有权限
+                throw new TlMqttException(MqttErrorCode.UNAUTHORIZED,false, MqttMessageType.PUBLISH,messageQos==MqttQoS.AT_LEAST_ONCE?MqttMessageType.PUBACK:MqttMessageType.PUBREL);
+            }
             return;
         }
 
@@ -92,8 +98,6 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
             default:
         }
         //转发给其他的订阅的客户端
-
-
         messageService.publish(req,clientId,mqttVersion);
     }
 

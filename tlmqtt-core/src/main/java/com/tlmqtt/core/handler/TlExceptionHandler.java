@@ -1,25 +1,20 @@
 package com.tlmqtt.core.handler;
 
 import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.exception.TlMalformedPacketException;
 import com.tlmqtt.common.exception.TlMqttException;
 import com.tlmqtt.common.exception.TlProtocolErrorException;
-import com.tlmqtt.common.exception.TopicAliasInvalidException;
 import com.tlmqtt.common.exception.UnAcceptableProtocolVersionException;
 import com.tlmqtt.common.model.TlMqttSession;
-import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.response.TlMqttConnackAck;
-import com.tlmqtt.common.model.variable.TlMqttDisconnectVariableHead;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import com.tlmqtt.core.manager.TlStoreManager;
 import com.tlmqtt.core.manager.ChannelManager;
 import com.tlmqtt.core.manager.MessageManager;
-import com.tlmqtt.core.task.TlWillTask;
 import io.netty.channel.*;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.AttributeKey;
@@ -47,7 +42,6 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
 
-        log.info("进入inactive的模块");
         Channel channel = ctx.channel();
         Object obj = channel.attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
         if (obj == null) {
@@ -121,7 +115,6 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
                     log.error("WillDelayInterval为空");
                    return publishToSubscribers(req, clientId, version);
                 }
-                log.info("WillDelayInterval【{}】", willDelayInterval);
                 return messageManager.scheduleSendWillMessage(clientId, req, willDelayInterval)
                     .then(Mono.empty());
             });
@@ -151,7 +144,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("异常[{}]", cause.getClass());
+
         ReferenceCountUtil.release(cause);
 
 
@@ -160,9 +153,9 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
          * 在其他报文出错的情况下它应该在关闭网络连接之前发送包含原因码的DISCONNECT报文。
          * 使用原因码0x81（无效报文）或0x82（协议错误），除非包含3.2.2.2节 - 连接原因码 或3.14.2.1节 – 断开原因码 中定义的更具体的原因码。对其他会话没有影响*/
         if (cause instanceof TlProtocolErrorException) {
-            log.info("协议错误");
             TlProtocolErrorException ex = (TlProtocolErrorException) cause;
-            MqttMessageType mqttMessageType = ex.getMqttMessageType();
+            log.error("协议错误", ex);
+            MqttMessageType mqttMessageType = ex.getReplayType();
             if (mqttMessageType == MqttMessageType.CONNECT) {
                 TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrCode(), MqttVersion.MQTT_5, null, (short) 0);
                 ctx.channel().writeAndFlush(req);
@@ -172,50 +165,47 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
             }
             ctx.close();
         } else if (cause instanceof TlMalformedPacketException) {
-            log.error("无效报文");
             TlMalformedPacketException ex = (TlMalformedPacketException) cause;
-            MqttMessageType mqttMessageType = ex.getMqttMessageType();
+            log.error("无效报文", ex);
+            MqttMessageType mqttMessageType = ex.getReplayType();
             if (mqttMessageType == MqttMessageType.CONNECT) {
-                TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrorCode(), MqttVersion.MQTT_5, null, (short) 0);
+                TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrCode(), MqttVersion.MQTT_5, null, (short) 0);
                 ctx.channel().writeAndFlush(req);
             } else {
-                TlMqttDisconnectReq req = TlMqttDisconnectReq.build(ex.getErrorCode());
+                TlMqttDisconnectReq req = TlMqttDisconnectReq.build(ex.getErrCode());
                 ctx.channel().writeAndFlush(req);
             }
             ctx.close();
         } else if (cause instanceof UnAcceptableProtocolVersionException) {
-            log.info("不支持协议版本");
+
             UnAcceptableProtocolVersionException ex = (UnAcceptableProtocolVersionException) cause;
+            log.error("协议不支持", ex);
             TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrCode(), MqttVersion.MQTT_5, null, (short) 0);
             ctx.channel().writeAndFlush(req);
             ctx.close();
         } else if (cause instanceof TlMqttException) {
             TlMqttException ex = (TlMqttException) cause;
-            log.info("[{}]",ex);
-            MqttMessageType send = ex.getSend();
+            log.error("mqtt异常", ex);
+            MqttMessageType send = ex.getReplayType();
             if(send == MqttMessageType.CONNACK){
                 TlMqttConnackAck req = TlMqttConnackAck.build(0, ex.getErrCode(), MqttVersion.MQTT_5, null, (short) 0);
                 ctx.channel().writeAndFlush(req).addListener(future -> {
                     if(ex.getClose()){
-                        log.error("MQTT异常，关闭连接: {}", ex.getErrCode());
                         ctx.close();
                     }
                 });
             }else if(send ==MqttMessageType.DISCONNECT){
                 TlMqttDisconnectReq req = TlMqttDisconnectReq.build(ex.getErrCode());
                 ctx.channel().writeAndFlush(req).addListener(future -> {
-                    log.error("MQTT异常，关闭连接: {}", ex.getErrCode());
                     ctx.close();
                 });
             }
-        } else if(cause instanceof  TopicAliasInvalidException){
-            log.error("TopicAliasInvalidException: {}", cause.getMessage());
-            TopicAliasInvalidException ex = ((TopicAliasInvalidException) cause);
-        }else if (cause instanceof SocketException) {
+        } else if (cause instanceof SocketException) {
             log.error("Socket异常，关闭连接");
             ctx.close();
         } else {
-            log.error("未知异常，关闭连接");
+            log.error("异常[{}]", cause);
+
             ctx.close();
         }
     }

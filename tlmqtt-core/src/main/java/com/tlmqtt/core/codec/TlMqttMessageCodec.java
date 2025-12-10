@@ -4,12 +4,10 @@ package com.tlmqtt.core.codec;
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.request.AbstractTlMessage;
-import com.tlmqtt.common.utils.TlLog;
 import com.tlmqtt.core.codec.decoder.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
-import io.netty.util.AttributeKey;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -69,7 +67,6 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
         }
         // 6. 数据完整：读取载荷部分到临时ByteBuf // 使用slice避免复制
         ByteBuf messageBuf = in.readSlice(remainingLength).retain();
-      //  TlLog.logger("mqtt 16 radix",messageBuf);
         try {
             // 7. 提取消息类型 (右移4位取高4位)
             int messageType = type >> Constant.MESSAGE_BIT;

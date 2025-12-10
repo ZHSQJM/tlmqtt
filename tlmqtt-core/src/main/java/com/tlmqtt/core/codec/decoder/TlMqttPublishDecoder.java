@@ -1,18 +1,19 @@
 package com.tlmqtt.core.codec.decoder;
 
-import com.tlmqtt.common.Constant;
+import cn.hutool.core.util.StrUtil;
+import com.tlmqtt.common.config.TlConfig;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
+import com.tlmqtt.common.exception.TlMalformedPacketException;
+import com.tlmqtt.common.exception.TlMqttException;
 import com.tlmqtt.common.exception.TlProtocolErrorException;
-import com.tlmqtt.common.exception.TopicAliasInvalidException;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.UserProperty;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
-import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import io.netty.buffer.ByteBuf;
@@ -21,7 +22,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentSkipListMap;
 
 /**
  * @author hszhou
@@ -51,7 +51,7 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
         int retain = (type) & 1;
         int qos = (type >> 1) & 3;
         //接收到超过其指定的最大服务质量的PUBLISH报文将造成协议错误（Protocol Error）。这种情况下应使用包含原因码为0x9B（不支持的QoS等级）的DISCONNECT报文进行处理，如4.13节所述。
-        if(Constant.MAXIMUM_QOS<qos && mqttVersion == MqttVersion.MQTT_5){
+        if(TlConfig.getInt(TlConfig.MAXIMUM_QOS)<qos && mqttVersion == MqttVersion.MQTT_5){
             throw new TlProtocolErrorException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.PUBLISH);
         }
         int dup = (type >> 3) & 1;
@@ -60,11 +60,15 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
         fixedHead.setQos(MqttQoS.valueOf(qos));
         fixedHead.setRetain(retain != 0);
         //如果服务端发送给客户端的CONNACK报文中包含保留可用属性，且属性值为0，但收到的PUBLISH报文中保留标志位为1，服务端使用包含原因码为0x9A（保留不支持）的DISCONNECT报文断开网络连接，如4.13节所述。
-        if(!Constant.RETAIN_AVAILABLE && retain!=0){
+        if(!TlConfig.getBoolean(TlConfig.RETAIN_AVAILABLE) && retain!=0){
             throw new TlProtocolErrorException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.PUBLISH);
         }
         fixedHead.setLength(remainingLength);
 
+        if(qos>0 && TlConfig.getInt(TlConfig.MAXIMUM_PACKET_SIZE) < remainingLength){
+            //客户端不能发送超过最大报文长度（Maximum Packet Size）的报文给服务端 [MQTT-3.2.2-15]。收到长度超过限制的报文将导致协议错误，此时服务端应该发送包含原因码0x95（报文过长）的DISCONNECT报文给客户端
+            throw new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_MESSAGE_TOO_LARGE,true,MqttMessageType.PUBLISH,MqttMessageType.DISCONNECT);
+        }
 
         return fixedHead;
     }
@@ -74,8 +78,11 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
         int topicLength = buf.readUnsignedShort();
         byte[] topic = new byte[topicLength];
         buf.readBytes(topic);
-        //todo  不能包含通配符 如果存在通配符则不能发布 抛异常
+        //不能包含通配符 如果存在通配符则不能发布 抛异常
         String topicName = new String(topic);
+        if(StrUtil.isNotEmpty(topicName) && (topicName.contains("#") || topicName.contains("+"))){
+           throw new TlMalformedPacketException(MqttMessageType.PUBLISH);
+        }
         TlMqttPublishVariableHead.TlMqttPublishVariableHeadBuilder builder = TlMqttPublishVariableHead.builder()
                                                                                                       .topic(topicName);
         if (qos != MqttQoS.AT_MOST_ONCE) {
@@ -85,8 +92,6 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
         if(session.getMqttVersion() == MqttVersion.MQTT_5){
             int propertyLength = decodeRemainingLength(buf);
             builder.propertiesLength(propertyLength);
-            //log.info("获取到publish的属性长度为【{}】",propertyLength);
-            // 4. 记录属性读取的起始位置
             final int propertiesStartIndex = buf.readerIndex();
             List<UserProperty> userProperties = new ArrayList<>();
             // 5. 循环读取属性直到达到属性长度
@@ -106,8 +111,8 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
                         // 主题别名
                         int topicAlias = buf.readShort();
 
-                        //： 1) 主题别名为0或大于最大主题别名（Maximum Topic Alias），将造成协议错误（Protocol Error），接收端使用包含原因码为0x94（主题别名无效）的DISCONNECT报文断开网络连接
-                        if(topicAlias == 0 || topicAlias> Constant.TOPIC_ALIAS_MAXIMUM){
+                        //1) 主题别名为0或大于最大主题别名（Maximum Topic Alias），将造成协议错误（Protocol Error），接收端使用包含原因码为0x94（主题别名无效）的DISCONNECT报文断开网络连接
+                        if(topicAlias == 0 || topicAlias> TlConfig.getInt(TlConfig.TOPIC_ALIAS_MAXIMUM)){
                             throw new TlProtocolErrorException(MqttErrorCode.TOPIC_ALIAS_INVALID,MqttMessageType.PUBLISH);
                         }
                         builder.topicAlias(topicAlias);
@@ -117,6 +122,9 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
                         byte[]responseTopicByte = new byte[responseTopicLength];
                         buf.readBytes(responseTopicByte);
                         String responseTopic = new String(responseTopicByte);
+                        if(responseTopic.contains("#") || responseTopic.contains("+")){
+                            throw new TlProtocolErrorException(MqttMessageType.PUBLISH);
+                        }
                         builder.responseTopic(responseTopic);
                         break;
                     case CORRELATION_DATA:
@@ -142,7 +150,7 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
                         //订阅标识符
                         int subscriptionIdentifier=decodeRemainingLength(buf);
                         if(subscriptionIdentifier==0){
-                            //throw new TlProtocolVersionException(MqttVersion.MQTT_5);
+                            throw new TlProtocolErrorException(MqttMessageType.PUBLISH);
                         }
                         builder.subscriptionIdentifier(subscriptionIdentifier);
                         break;
@@ -164,7 +172,13 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
             }
         }
 
-        return builder.build();
+        TlMqttPublishVariableHead publishVariableHead = builder.build();
+        //主题名长度为0且没有主题别名，将造成协议错误（Protocol Error）。
+        if(topicLength==0 && publishVariableHead.getTopicAlias()==null){
+            throw new TlProtocolErrorException(MqttErrorCode.PROTOCOL_ERROR,MqttMessageType.PUBLISH);
+        }
+
+        return publishVariableHead;
 
 
     }

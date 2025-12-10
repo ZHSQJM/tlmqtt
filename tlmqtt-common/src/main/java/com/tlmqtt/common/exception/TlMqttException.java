@@ -32,12 +32,12 @@ public class TlMqttException extends DecoderException {
     /**
      * 从哪个报文来的
      */
-    private final MqttMessageType from;
+    private final MqttMessageType acceptType;
 
     /**
      * 需要发送的报文
      */
-    private final MqttMessageType send;
+    private final MqttMessageType replayType;
 
     /**
      * Mqtt版本
@@ -45,19 +45,29 @@ public class TlMqttException extends DecoderException {
     private final MqttVersion version;
 
 
-    public TlMqttException(MqttErrorCode errCode,Boolean close, MqttMessageType from, MqttMessageType send){
+    public TlMqttException(MqttErrorCode errCode,Boolean close, MqttMessageType acceptType, MqttMessageType replayType){
         this.errCode = errCode;
         this.close = close;
-        this.from = from;
-        this.send = send;
+        this.acceptType = acceptType;
+        this.replayType = replayType;
         this.version = MqttVersion.MQTT_5;
     }
 
-    public TlMqttException(MqttErrorCode errCode, MqttMessageType from, MqttMessageType send){
+    public TlMqttException(MqttErrorCode errCode, MqttMessageType acceptType, MqttMessageType replayType){
         this.errCode = errCode;
         this.close = true;
-        this.from = from ;
-        this.send = send;
+        this.acceptType = acceptType ;
+        this.replayType = replayType;
         this.version = MqttVersion.MQTT_5;
     }
+
+    public TlMqttException(MqttErrorCode errCode, MqttMessageType replayType){
+        this.errCode = errCode;
+        this.close = true;
+        this.acceptType = null;
+        this.replayType = replayType;
+        this.version = MqttVersion.MQTT_5;
+    }
+
+
 }

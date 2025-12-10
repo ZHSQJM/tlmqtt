@@ -1,4 +1,4 @@
-package com.tlmqtt.common.config;
+package com.tlmqtt.common.properties;
 
 import com.tlmqtt.common.model.entity.TlAuthUser;
 import lombok.Data;

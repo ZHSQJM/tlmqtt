@@ -28,5 +28,11 @@ public class TlTopic {
     /**表示保留消息是否接收  0 表示只要订阅建立，就发送保留消息 1表示 只有全新的订阅 而不是重复的订阅就发送  2 表示建立时不发送保留消息*/
     private Integer retainHandling;
 
+    /**是否是共享订阅*/
+    private boolean share;
+
+    /**共享订阅的组名*/
+    private String group;
+
 }
 

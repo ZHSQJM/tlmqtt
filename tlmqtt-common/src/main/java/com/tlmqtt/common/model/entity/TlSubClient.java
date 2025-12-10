@@ -40,4 +40,8 @@ public class TlSubClient {
 
     /**保留处理方式*/
     private Boolean retainAsPublished;
+
+    private String group;
+
+
 }

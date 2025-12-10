@@ -1,5 +1,6 @@
 package com.tlmqtt.core.codec.decoder;
 import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.config.TlConfig;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
@@ -18,6 +19,8 @@ import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
 import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -84,12 +87,19 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         int willQos = (connectFlag >> 3) & 3;
         if(willQos == 3){
             //  不支持的QoS等级
-            throw new TlMalformedPacketException(MqttMessageType.CONNECT);
+            throw new TlMalformedPacketException(MqttMessageType.CONNACK);
         }
 
         //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。
+        if(TlConfig.getInt(TlConfig.MAXIMUM_QOS) <willQos && version == MqttVersion.MQTT_5.getLevel()){
+            throw new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.CONNACK);
+        }
         builder.willQos(willQos);
         int willRetain = (connectFlag >> 5) & 1;
+        //如果服务端收到一个包含保留标志位1的遗嘱消息的CONNECT报文且服务端不支持保留消息，服务端必须拒绝此连接请求，且应该发送包含原因码为0x9A（不支持保留）的CONNACK报文，随后必须关闭网络连接 [MQTT-3.2.2-13]
+        if(!TlConfig.getBoolean(TlConfig.RETAIN_AVAILABLE )&& willRetain==1){
+            throw new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_RETAIN_NOT_SUPPORTED,MqttMessageType.CONNACK);
+        }
         builder.willRetain(willRetain);
         int passwordFlag = (connectFlag >> 6) & 1;
         builder.passwordFlag(passwordFlag > 0);
@@ -243,7 +253,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
             byte[] clientIdByte = new byte[clientIdLength];
             buf.readBytes(clientIdByte);
             String  clientId = new String(clientIdByte);
-            if(Constant.REFUSE_CLIENTS.contains(clientId)){
+            if(TlConfig.getStringList(TlConfig.REFUSE_CLIENTS).contains(clientId)){
                 //如果clientId不被服务端接收，那么就返回0x85（客户端标识符无效）的原因码的CONNACK报文去相亲CONNECT报文，然后必须关闭网络连接
                 throw new TlMqttException(MqttErrorCode.REFUSED_CLIENT_IDENTIFIER,MqttMessageType.CONNECT,MqttMessageType.CONNACK);
             }

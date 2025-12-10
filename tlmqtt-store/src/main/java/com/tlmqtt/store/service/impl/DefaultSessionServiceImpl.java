@@ -42,9 +42,7 @@ public class DefaultSessionServiceImpl   implements SessionService {
     @Override
     public Mono<Boolean> clear(String clientId) {
         return Mono.fromSupplier(() -> CLIENT_SESSIONS.remove(clientId) != null).defaultIfEmpty(false)
-            .doOnError(e -> log.error("session: save clientId【{}】 failed",clientId, e))
-            .doOnSuccess(e->
-                log.debug("session: clean clientId 【{}】 session status【{}】",clientId,e));
+            .doOnError(e -> log.error("session: save clientId【{}】 failed",clientId, e));
     }
 
     @Override
@@ -54,6 +52,8 @@ public class DefaultSessionServiceImpl   implements SessionService {
             if (session == null) {
                 return false;
             }
+            //先移除相同的订阅
+            session.getTopics().remove(subClient.getTopic());
             session.getTopics().add(subClient.getTopic());
             return true;
         });

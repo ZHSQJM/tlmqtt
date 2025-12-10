@@ -65,9 +65,8 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
         MqttVersion mqttVersion = MqttVersion.valueOf((byte) protocolVersion);
         if (!authenticate(req)) {
             log.error("Authentication failed for client:【{}】", req.getPayload().getClientId());
-            throw new TlAuthenticationException(mqttVersion);
+            throw new TlAuthenticationException(MqttMessageType.CONNACK);
         }
-
         handlerSession(req, ctx,mqttVersion)
             .then(Mono.defer(() -> handleWillMessage(req)))
             .doOnSuccess(e->{
@@ -100,29 +99,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
 
      **/
     private Mono<Boolean> handlerSession(TlMqttConnectReq req, ChannelHandlerContext ctx,  MqttVersion mqttVersion) {
-
-        //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。
-        MqttQoS mqttQoS = MqttQoS.valueOf(req.getVariableHead().getWillQos());
-        if(Constant.MAXIMUM_QOS<mqttQoS.value() && mqttVersion == MqttVersion.MQTT_5){
-            TlMqttConnackAck connackResponse = TlMqttConnackAck.build(0, MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,mqttVersion,null,(short) 0);
-
-            ctx.channel().writeAndFlush(connackResponse);
-            // 直接返回错误Mono，不继续执行后续操作
-            return Mono.error(new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED, true, MqttMessageType.CONNECT, MqttMessageType.CONNACK));
-        }
-        //如果服务端收到一个包含保留标志位1的遗嘱消息的CONNECT报文且服务端不支持保留消息，服务端必须拒绝此连接请求，且应该发送包含原因码为0x9A（不支持保留）的CONNACK报文，随后必须关闭网络连接 [MQTT-3.2.2-13]
-        if(!Constant.RETAIN_AVAILABLE && req.getVariableHead().getWillRetain()==1){
-            TlMqttConnackAck connackResponse = TlMqttConnackAck.build(0, MqttErrorCode.CONNECTION_REFUSED_RETAIN_NOT_SUPPORTED,mqttVersion,null,(short) 0);
-             log.error("发送保留消息不支持");
-             ctx.channel().writeAndFlush(connackResponse);
-             // 直接返回错误Mono，不继续执行后续操作
-             return Mono.error(new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_RETAIN_NOT_SUPPORTED, true, MqttMessageType.CONNECT, MqttMessageType.CONNACK));
-        }
-
-
-        //如果服务端收到一个包含保留标志位1的遗嘱消息的CONNECT报文且服务端不支持保留消息，服务端必须拒绝此连接请求，且应该发送包含原因码为0x9A（不支持保留）的CONNACK报文，随后必须关闭网络连接 [MQTT-3.2.2-13]。
         String clientId;
-
         //如果客户端使用长度为0的客户标识符（ClientID），服务端必须回复包含分配客户标识符（Assigned Client Identifier）的CONNACK报文。分配客户标识符必须是没有被服务端的其他会话所使用的新客户标识符 [MQTT-3.2.2-16]。
         if(mqttVersion == MqttVersion.MQTT_5 && req.getPayload().getClientId() == null) {
            clientId = IdUtil.nanoId(12);
@@ -194,8 +171,6 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
                .setUsername(username)
                .setMqttVersion(mqttVersion)
                .setCtx(ctx);
-
-
         //会话存在标识位设置为0 表示不存在
         int sessionPresent = 0;
 
@@ -279,9 +254,6 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
         ctx.pipeline().addLast(new IdleStateHandler(0, 0, keepAlive, TimeUnit.SECONDS));
     }
 
-    //todo
-    // 如果从服务端接收到了最大QoS等级，则客户端不能发送超过最大QoS等级所指定的QoS等级的PUBLISH报文 [MQTT-3.2.2-11]。服务端接收到超过其指定的最大服务质量的PUBLISH报文将造成协议错误（Protocol Error）。这种情况下应使用包含原因码为0x9B（不支持的QoS等级）的DISCONNECT报文进行处理，如4.13节所述。
-    //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。4.13节所述 [MQTT-3.2.2-12]。
     /**
      * 处理遗嘱消息
      *
@@ -289,7 +261,6 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
      * @return Mono<Void> 处理结果
      **/
     private Mono<Boolean> handleWillMessage(TlMqttConnectReq req) {
-        log.info("处理遗嘱消息");
         TlMqttConnectVariableHead variableHead = req.getVariableHead();
         if (variableHead.getWillFlag() != 1) {
             return Mono.empty();
@@ -306,7 +277,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq>{
                                                                              .correlationData(payload.getCorrelationData())
                                                                              .userProperties(payload.getUserProperty())
                                                                              .contentType(payload.getContentType())
-            .willDelayInterval(payload.getWillDelayInterval())
+                                                                             .willDelayInterval(payload.getWillDelayInterval())
                                                                              .build();
 
         TlMqttPublishPayload pubPayload = TlMqttPublishPayload.builder()

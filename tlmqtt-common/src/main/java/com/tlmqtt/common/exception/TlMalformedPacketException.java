@@ -9,29 +9,13 @@ import io.netty.handler.codec.DecoderException;
  * 根据规范不能被正确解析的控制报文
  * @author hszhou
  */
-public class TlMalformedPacketException extends DecoderException {
+public class TlMalformedPacketException extends TlMqttException {
 
 
-    /**
-     * 报文错误码
-     */
-    private final MqttErrorCode errorCode;
-    /**
-     * 报文类型
-     */
-    private final MqttMessageType mqttMessageType;
-
-
-    public TlMalformedPacketException(MqttMessageType mqttMessageType){
-        this.errorCode = MqttErrorCode.MALFORMED_MESSAGE;
-        this.mqttMessageType = mqttMessageType;
+    public TlMalformedPacketException(MqttMessageType replayTpe) {
+        super(MqttErrorCode.MALFORMED_MESSAGE, replayTpe);
     }
-    
-    public MqttErrorCode getErrorCode() {
-        return errorCode;
-    }
-    
-    public MqttMessageType getMqttMessageType() {
-        return mqttMessageType;
-    }
+
+
+
 }

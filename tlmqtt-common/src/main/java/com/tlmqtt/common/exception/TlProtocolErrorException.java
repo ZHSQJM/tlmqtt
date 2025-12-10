@@ -13,25 +13,16 @@ import lombok.EqualsAndHashCode;
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-public class TlProtocolErrorException extends DecoderException {
+public class TlProtocolErrorException extends TlMqttException {
 
-    /**
-     * 报文错误码
-     */
-    private final MqttErrorCode errCode;
-    /**
-     * 报文类型
-     */
-    private final MqttMessageType mqttMessageType;
 
-    public TlProtocolErrorException( MqttMessageType mqttMessageType) {
-        this.errCode = MqttErrorCode.PROTOCOL_ERROR;
-        this.mqttMessageType = mqttMessageType;
+
+    public TlProtocolErrorException( MqttMessageType replayTpe) {
+        super(MqttErrorCode.PROTOCOL_ERROR, replayTpe);
     }
 
 
-    public TlProtocolErrorException(MqttErrorCode errorCode, MqttMessageType mqttMessageType) {
-        this.errCode =errorCode;
-        this.mqttMessageType = mqttMessageType;
+    public TlProtocolErrorException(MqttErrorCode errorCode, MqttMessageType replayTpe) {
+        super(errorCode, replayTpe);
     }
 }

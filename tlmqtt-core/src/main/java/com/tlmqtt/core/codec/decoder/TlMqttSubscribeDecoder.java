@@ -2,6 +2,7 @@ package com.tlmqtt.core.codec.decoder;
 
 
 import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.config.TlConfig;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
@@ -65,10 +66,14 @@ public class TlMqttSubscribeDecoder extends AbstractTlMqttDecoder {
                 switch (Objects.requireNonNull(propertiesCode)) {
                     case SUBSCRIPTION_IDENTIFIER:
                         //如果服务端在不支持订阅标识符（Subscription Identifier）的情况下收到了包含订阅标识符的SUBSCRIBE报文，将造成协议错误（Protocol Error）。此时服务端将发送包含原因码为0xA1（订阅标识符不支持）的DISCONNECT报文，如4.13节所述。
-                        if( !Constant.SUBSCRIPTION_IDENTIFIERS_AVAILABLE){
+                        if( !TlConfig.getBoolean(TlConfig.SUBSCRIPTION_IDENTIFIERS_AVAILABLE)){
                             throw new TlProtocolErrorException( MqttErrorCode.SUBSCRIPTION_IDENTIFIERS_AVAILABLE,MqttMessageType.SUBSCRIBE);
                         }
                         int subscriptionIdentifier = decodeRemainingLength(buf);
+                        //订阅标识符取值范围从1到268,435,455。订阅标识符的值为0或包含多个订阅标识符将造成协议错误（Protocol Error）。
+                        if(subscriptionIdentifier==0 || subscriptionIdentifier>268435455){
+                            throw new TlProtocolErrorException(MqttMessageType.SUBSCRIBE);
+                        }
                         builder.subscriptionIdentifier(subscriptionIdentifier);
                         break;
                     case USER_PROPERTY:
@@ -107,15 +112,35 @@ public class TlMqttSubscribeDecoder extends AbstractTlMqttDecoder {
             buf.readBytes(topicFilter);
             String topicFilterStr = new String(topicFilter);
             topic.setName(topicFilterStr);
+            topic.setShare(false);
             if(session.getMqttVersion()==MqttVersion.MQTT_5){
 
-                log.info("订阅的是【{}】",topicFilterStr);
+                if(topicFilterStr.startsWith(Constant.QUEUE_PREFIX_SUBSCRIBE)){
+                    //去掉前缀 获取真正的主题名称
+                    topicFilterStr = topicFilterStr.substring(Constant.QUEUE_PREFIX_SUBSCRIBE.length()+1);
+                    topic.setShare(true);
+                    topic.setGroup(topicFilterStr);
+                    topic.setName(topicFilterStr);
+                    //将其保存 键值对 间就是主题名称 值就是订阅者
+                }else if(topicFilterStr.startsWith(Constant.SHARE_PREFIX_SUBSCRIBE)){
+                    //去掉前缀 前缀是$share与分割符前面的第一个字符串
+
+                    //主题校验 必须是$share开头的 且中间的是组名  后面才是真正的订阅主题 如$share/group/a/1 其中group是组名 a/1是主题名称
+                    //必须有组
+
+                    //获取组名
+                    String group = topicFilterStr.substring(Constant.SHARE_PREFIX_SUBSCRIBE.length(),topicFilterStr.indexOf(Constant.TOPIC_SPLITTER));
+                    topicFilterStr = topicFilterStr.substring(topicFilterStr.indexOf(Constant.TOPIC_SPLITTER)+1);
+                    topic.setShare(true);
+                    topic.setGroup(group);
+                    topic.setName(topicFilterStr);
+                }
                 //如果服务端在不支持通配符订阅（Wildcard Subscription）的情况下收到了包含通配符订阅的SUBSCRIBE报文，将造成协议错误（Protocol Error）。此时服务端将发送包含原因码为0xA2（通配符订阅不支持）的DISCONNECT报文，如4.13节所述。
-                if((topicFilterStr.contains(Constant.ASTERISK) || topicFilterStr.contains(Constant.TOPIC_SPLITTER)) && !Constant.WILDCARD_SUBSCRIPTION_AVAILABLE){
+                if((topicFilterStr.contains(Constant.ASTERISK) || topicFilterStr.contains(Constant.TOPIC_SPLITTER)) && !TlConfig.getBoolean(TlConfig.WILDCARD_SUBSCRIPTION_AVAILABLE)){
                     throw new TlProtocolErrorException(MqttErrorCode.WILDCARD_SUBSCRIPTION_AVAILABLE,MqttMessageType.SUBSCRIBE);
                 }
                 //如果服务端在不支持共享订阅（Shared Subscription）的情况下收到了包含共享订阅的SUBSCRIBE报文，将造成协议错误（Protocol Error）。此时服务端将发送包含原因码为0x9E（共享订阅不支持）的DISCONNECT报文
-                if(topicFilterStr.startsWith(Constant.SHARE_PREFIX_SUBSCRIBE) && !Constant.SHARED_SUBSCRIPTION_AVAILABLE){
+                if((topicFilterStr.startsWith(Constant.SHARE_PREFIX_SUBSCRIBE)  || topicFilterStr.startsWith(Constant.QUEUE_PREFIX_SUBSCRIBE) )&& !TlConfig.getBoolean(TlConfig.SHARED_SUBSCRIPTION_AVAILABLE)){
                     throw new TlProtocolErrorException(MqttErrorCode.SHARED_SUBSCRIPTION_AVAILABLE,MqttMessageType.SUBSCRIBE);
                 }
 
@@ -133,25 +158,32 @@ public class TlMqttSubscribeDecoder extends AbstractTlMqttDecoder {
                 byte subscriptionOptions = buf.readByte();
                 int maxQos = subscriptionOptions & 0x03;
                 if (maxQos == 3) {
-                 // throw new TlProtocolErrorException(MqttErrorCode);
+                    throw new TlProtocolErrorException(MqttMessageType.SUBSCRIBE);
                 }
                 int retainHandling = (subscriptionOptions >> 4) & 0x03;
                 if (retainHandling == 3) {
-                  //throw new TlProtocolErrorException("Invalid retainHandling=3 in SUBSCRIBE packet");
+                  throw new TlProtocolErrorException(MqttMessageType.SUBSCRIBE);
                 }
 
                 topic.setQos(maxQos);
-                //todo 如果是共享订阅 那么这个noLocal不能为1
-                topic.setNoLocal((subscriptionOptions & 0x04) != 0);
+                int noLocal = subscriptionOptions & 0x04;
+                //订阅选项的第2比特表示非本地（No Local）选项。值为1，表示应用消息不能被转发给发布此消息的客户标识符 [MQTT-3.8.3-3]。共享订阅时把非本地选项设为1将造成协议错误
+                if(noLocal==1 && (topicFilterStr.startsWith(Constant.SHARE_PREFIX_SUBSCRIBE) || topicFilterStr.startsWith(Constant.QUEUE_PREFIX_SUBSCRIBE))){
+                    throw new TlProtocolErrorException(MqttMessageType.SUBSCRIBE);
+                }
+                topic.setNoLocal(noLocal != 0);
                 topic.setRetainAsPublished((subscriptionOptions & 0x08) != 0);
                 topic.setRetainHandling(retainHandling);
-                log.info("订阅最大maxQos【{}】,noLocal【{}】,retainAsPublished【{}】,retainHanding【{}】",maxQos,topic.getNoLocal(),topic.getRetainAsPublished(),topic.getRetainHandling());
 
             }else if(session.getMqttVersion()==MqttVersion.MQTT_3_1_1){
                  short qos = buf.readUnsignedByte();
                  topic.setQos((int) qos);
             }
             topics.add(topic);
+        }
+        //载荷必须包含至少一个主题过滤器/订阅选项对 [MQTT-3.8.3-2]。不包含载荷的SUBSCRIBE报文将造成协议错误（Protocol Error）。错误处理信息
+        if(topics.isEmpty()){
+            throw new TlProtocolErrorException(MqttMessageType.SUBSCRIBE);
         }
         payload.setTopics(topics);
         return payload;

@@ -48,10 +48,28 @@ public enum MqttErrorCode {
 
     //通配符订阅不支持
     WILDCARD_SUBSCRIPTION_AVAILABLE((byte)0xA2),
-    //订阅表示不可以
+    //订阅标识符不支持
     SUBSCRIPTION_IDENTIFIERS_AVAILABLE((byte)0xA1),
     //共享订阅不支持
     SHARED_SUBSCRIPTION_AVAILABLE((byte)0x9E),
+
+    //无匹配的订阅者（消息被接收，但是没有订阅者 只有服务端会发送次原因嘛 如果服务端得知没有匹配的订阅者 可以使用0x00（成功代替））--无用
+    NO_MATCHING_SUBSCRIBERS((byte)0x10),
+    //未指明的错误 (接收端不接受次消息 且不愿意透露错误原因或没有适应的原因码)--无用
+    NO_MATCHING_SUBSCRIBERS_UNSPECIFIED_ERROR((byte)0x80),
+    //实现特定错误(Publish报文有效 但是不被接收端所接受) --无用
+    IMPLEMENTATION_SPECIFIC_ERROR((byte)0x83),
+    //未授权
+    UNAUTHORIZED((byte)0x87),
+    //主题名无效 主题名格式正确 但未被客户端或服务端所接受
+    TOPIC_NAME_INVALID((byte)0x90),
+    // 报文标识符被占用 报文表示以被占用 肯呢个表明客户端和服务端之前的会话状态不匹配
+    MESSAGE_IDENTIFIER_IN_USE((byte)0x91),
+    //超出配合 已超出实现显示或管理限制
+    QUOTA_EXCEEDED((byte)0x97),
+    //主题过滤器无效 主题过滤器格式正确 但不被允许
+    TOPIC_INVALIDE((byte)0x8F),
+
     ;
 
 

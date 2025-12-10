@@ -34,7 +34,6 @@ public class TlPubRelHandler extends AbstractTlHandler<TlMqttPubRelReq> {
     public void handle(ChannelHandlerContext ctx, TlMqttPubRelReq req, TlMqttSession session) {
         String clientId = session.getClientId();
         MqttVersion mqttVersion = session.getMqttVersion();
-        log.debug("Handling 【PUBREL】 event from client:【{}】",clientId);
         //根据这个消息获取到对应的
         TlMqttPubRelVariableHead variableHead = req.getVariableHead();
         Long messageId = variableHead.getMessageId();

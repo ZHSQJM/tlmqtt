@@ -35,6 +35,8 @@ public class TlStoreManager extends HashedWheelTimer {
 
     private RetainService retainService;
 
+    private ShareSubscribeService shareSubscribeService;
+
 
     /**
      * 构造函数
@@ -45,12 +47,13 @@ public class TlStoreManager extends HashedWheelTimer {
      * @param retainService retain服务
      **/
     public TlStoreManager(SessionService sessionService, SubscriptionService subscriptionService, PublishService publishService,
-        PubrelService pubrelService,RetainService retainService) {
+        PubrelService pubrelService,RetainService retainService,ShareSubscribeService shareSubscribeService) {
         this.sessionService = sessionService;
         this.subscriptionService = subscriptionService;
         this.publishService = publishService;
         this.pubrelService = pubrelService;
         this.retainService = retainService;
+        this.shareSubscribeService = shareSubscribeService;
     }
 
 
@@ -74,8 +77,6 @@ public class TlStoreManager extends HashedWheelTimer {
      * @return void 清除成功返回void
      **/
     public Mono<Void> clearAll(String clientId) {
-
-        log.info("清除会话");
        return Mono.when(
             sessionService.clear(clientId),
             subscriptionService.clear(clientId),

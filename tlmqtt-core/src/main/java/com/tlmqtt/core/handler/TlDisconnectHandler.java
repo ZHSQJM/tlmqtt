@@ -26,10 +26,6 @@ public class TlDisconnectHandler extends AbstractTlHandler<TlMqttDisconnectReq> 
         log.debug("Handling 【DISCONNECT】 event from client:【{}】", clientId);
         //断开标志位设置为true 这样就不发生遗嘱消息了
         channel.attr(AttributeKey.valueOf(Constant.DISCONNECT)).set(true);
-        TlMqttDisconnectVariableHead variableHead = req.getVariableHead();
-        int reasonCode = variableHead.getReasonCode();
-     //   log.info("Disconnect reasonCode:【{}】", reasonCode);
-      //  log.error("关闭连接");
         channel.close();
     }
 

@@ -3,8 +3,13 @@ package com.tlmqtt.core.server;
 import com.tlmqtt.auth.AuthenticationManager;
 import com.tlmqtt.auth.acl.AclManager;
 import com.tlmqtt.bridge.TlBridgeManager;
-import com.tlmqtt.common.config.*;
 import com.tlmqtt.common.model.entity.TlAuthUser;
+import com.tlmqtt.common.properties.BusinessProperties;
+import com.tlmqtt.common.properties.ChannelProperties;
+import com.tlmqtt.common.properties.MqttConfiguration;
+import com.tlmqtt.common.properties.TlAuthProperties;
+import com.tlmqtt.common.properties.TlMqttProperties;
+import com.tlmqtt.common.properties.TlSessionProperties;
 import com.tlmqtt.core.codec.MqttWebSocketCodec;
 
 import com.tlmqtt.core.manager.TlStoreManager;
@@ -15,6 +20,8 @@ import com.tlmqtt.core.codec.encoder.*;
 import com.tlmqtt.core.handler.*;
 import com.tlmqtt.core.manager.RetryManager;
 import com.tlmqtt.core.manager.MessageManager;
+import com.tlmqtt.core.share.IShareSubscribeClientChoose;
+import com.tlmqtt.core.share.PollingShareSubscribeClientChoose;
 import com.tlmqtt.store.service.*;
 import com.tlmqtt.store.service.impl.*;
 import io.netty.bootstrap.ServerBootstrap;
@@ -126,6 +133,10 @@ public class TlServer {
     private final RetryManager retryManager;
     @Getter
     private final AuthenticationManager authenticationManager;
+    @Getter
+    private final IShareSubscribeClientChoose shareSubscribeClientChoose;
+
+
 
     private SslContext sslContext;
 
@@ -205,11 +216,13 @@ public class TlServer {
         RetainService retainService = new DefaultRetainServiceImpl();
         SessionService sessionService = new DefaultSessionServiceImpl();
         SubscriptionService subscriptionService = new DefaultSubscriptionServiceImpl(sessionService);
+         ShareSubscribeService shareSubscribeService = new DefaultShareSubscribeServiceImpl();
+        shareSubscribeClientChoose = new PollingShareSubscribeClientChoose();
         ChannelManager channelManager = new ChannelManager();
         AclManager aclManager = new AclManager();
         retryManager = new RetryManager(delay,maxRetry);
-        storeManager = new TlStoreManager(sessionService, subscriptionService, publishService, pubrelService, retainService);
-        MessageManager messageManager = new MessageManager(storeManager, channelManager,retryManager,executorService);
+        storeManager = new TlStoreManager(sessionService, subscriptionService, publishService, pubrelService, retainService,shareSubscribeService);
+        MessageManager messageManager = new MessageManager(storeManager, channelManager,retryManager,executorService,shareSubscribeClientChoose);
         bridgeManager = new TlBridgeManager();
         authenticationManager = new AuthenticationManager(enabled);
         authenticationManager.addFixUsers(user);

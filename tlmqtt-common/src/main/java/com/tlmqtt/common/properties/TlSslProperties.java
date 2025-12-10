@@ -1,4 +1,4 @@
-package com.tlmqtt.common.config;
+package com.tlmqtt.common.properties;
 
 import lombok.Data;
 /**

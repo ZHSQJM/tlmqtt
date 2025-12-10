@@ -60,7 +60,7 @@ public class SqlTlAuthentication extends AbstractTlAuthentication {
                     }
                 }
             } catch (Exception e) {
-                throw new TlAuthenticationException(MqttVersion.MQTT_3_1_1);
+                return false;
             }
         }
 

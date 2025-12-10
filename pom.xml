@@ -15,6 +15,7 @@
         <module>tlmqtt-auth</module>
         <module>tlmqtt-bridge</module>
         <module>tlmqtt-demo</module>
+        <module>tlmqtt-config</module>
     </modules>
 
     <!--项目地址-->
@@ -61,9 +62,10 @@
         <httpclient.version>4.5.13</httpclient.version>
         <disruptor.version>3.4.2</disruptor.version>
         <lombok.version>1.18.30</lombok.version>
-        <logback-classic.version>1.5.13</logback-classic.version>
+        <logback-classic.version>1.5.19</logback-classic.version>
         <slf4j.version>2.0.9</slf4j.version>
         <hutool.version>5.8.24</hutool.version>
+        <caffeine.version>3.2.0</caffeine.version>
     </properties>
 
     <dependencyManagement>
@@ -159,6 +161,12 @@
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -1,6 +1,7 @@
 package com.tlmqtt.core.manager;
 
 import cn.hutool.core.util.StrUtil;
+import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.exception.TlProtocolErrorException;
@@ -9,8 +10,8 @@ import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
+import com.tlmqtt.core.share.IShareSubscribeClientChoose;
 import com.tlmqtt.core.task.TlRetryTask;
-import com.tlmqtt.core.task.TlSessionTask;
 import com.tlmqtt.core.task.TlWillTask;
 import io.netty.channel.Channel;
 import io.netty.util.HashedWheelTimer;
@@ -20,6 +21,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
+
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.*;
@@ -47,6 +51,8 @@ public class MessageManager extends HashedWheelTimer {
 
     private final ExecutorService executorService;
 
+    private final IShareSubscribeClientChoose shareSession;
+
     // Map to track in-flight messages per client (clientId -> count)
     /**用于跟踪每个客户端已经发送中的消息个数*/
     private final Map<String, AtomicInteger> clientInFlightMessages = new ConcurrentHashMap<>();
@@ -69,7 +75,7 @@ public class MessageManager extends HashedWheelTimer {
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
         String topic = variableHead.getTopic();
         Integer topicAlias = variableHead.getTopicAlias();
-        //如果消息的客户端是5 那么需要判断topic与topicAlias是否都不为空 如果都不为空 那么就需要保存
+        //如果接收端已创建此主题别名的映射， a) 如果报文包含的主题名长度为0，接收端使用主题别名对应的主题名处理此报文 b) 如果报文包含的主题名长度不为0，接收端使用此主题名处理此报文，并更新此主题别名映射到此主题名
         if (mqttVersion == MqttVersion.MQTT_5 && topicAlias!=null) {
             if (StrUtil.isNotEmpty(topic)) {
                 aliasMap.computeIfAbsent(clientId, k -> new ConcurrentHashMap<>())
@@ -78,8 +84,19 @@ public class MessageManager extends HashedWheelTimer {
                 Map<String, String> clientAliases = aliasMap.get(clientId);
                 if (clientAliases != null) {
                     topic = clientAliases.get(topicAlias.toString());
+                }else{
+                    //如果接收端还没有创建此主题别名的映射， a) 如果报文包含的主题名长度为0，将造成协议错误，接收端使用包含原因码为0x82（协议错误）的DISCONNECT报文断开网络连接，
+                    throw new TlProtocolErrorException(MqttMessageType.PUBLISH);
                 }
             }
+        }
+        HashMap<String, List<TlSubClient>> groupMember = storeManager.getShareSubscribeService().getGroupMember(topic);
+        if(null != groupMember){
+            groupMember.forEach((groupName,channels) -> {
+                TlSubClient client = shareSession.choose(channels);
+                log.info("获取到【{}】",client.getClientId());
+                doPublish(req,client,clientId);
+            });
 
         }
         storeManager.getSubscriptionService()
@@ -99,6 +116,10 @@ public class MessageManager extends HashedWheelTimer {
      */
     private void doPublish(TlMqttPublishReq req, TlSubClient client,String publishClientId){
 
+        //如果是共享订阅就跳过 单独处理
+//        if(client.getIsShared()){
+//            return;
+//        }
         TlMqttFixedHead fixedHead = req.getFixedHead();
         int sendQos =fixedHead.getQos().value();
         int subQos = client.getQos();
@@ -169,7 +190,6 @@ public class MessageManager extends HashedWheelTimer {
          if (topicAlias != null && topicMaxAlias != null && topicAlias > topicMaxAlias) {
              log.warn("Client [{}] exceeded topic alias limit, dropping message", session.getClientId());
              //todo 服务的转发的消息主题大于客户端能接收到的最大值
-             throw new RuntimeException();
          }
          MqttVersion mqttVersion = session.getMqttVersion();
          Integer subscriptionIdentifier = client.getSubscriptionIdentifier();
@@ -192,7 +212,7 @@ public class MessageManager extends HashedWheelTimer {
                   .payloadFormatIndicator(req.getVariableHead().getPayloadFormatIndicator())
                   .messageExpiryInterval(req.getVariableHead().getMessageExpiryInterval())
                  //主体别名
-                  .topicAlias(req.getVariableHead().getTopicAlias())
+                 // .topicAlias(req.getVariableHead().getTopicAlias())
                   .responseTopic(req.getVariableHead().getResponseTopic())
                   .correlationData(req.getVariableHead().getCorrelationData())
                    .userProperties(req.getVariableHead().getUserProperties())
@@ -299,7 +319,6 @@ public class MessageManager extends HashedWheelTimer {
      * @param willDelayInterval 延迟消息
      */
     public Mono<Void> scheduleSendWillMessage(String clientId,TlMqttPublishReq req,int willDelayInterval){
-        log.debug("遗嘱消息延迟【{}】秒发送",willDelayInterval);
         TlWillTask willTask = new TlWillTask(clientId,this,req,willDelayInterval);
         Timeout timeout = this.newTimeout(willTask,willDelayInterval, TimeUnit.SECONDS);
         willTask.setTimeout(timeout);

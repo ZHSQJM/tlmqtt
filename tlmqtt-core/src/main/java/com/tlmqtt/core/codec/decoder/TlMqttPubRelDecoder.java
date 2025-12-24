@@ -1,6 +1,7 @@
 package com.tlmqtt.core.codec.decoder;
 
-import com.tlmqtt.common.Constant;
+
+import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
@@ -11,8 +12,6 @@ import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.request.TlMqttPubRelReq;
 import com.tlmqtt.common.model.variable.TlMqttPubRelVariableHead;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -25,9 +24,12 @@ import java.util.Objects;
 @Slf4j
 public class TlMqttPubRelDecoder extends AbstractTlMqttDecoder{
 
-    @Override
-    public TlMqttPubRelReq build(ByteBuf buf, int type,int remainingLength, TlMqttSession session ) {
+    public TlMqttPubRelDecoder(MqttConfiguration configuration){
+        super(configuration);
+    }
 
+    @Override
+    public TlMqttPubRelReq build(ByteBuf buf, int type,int remainingLength, TlMqttSession session) {
         TlMqttFixedHead fixedHead = decodeFixedHeader(type,remainingLength);
         TlMqttPubRelVariableHead variableHead = decodeVariableHeader(buf,session);
      return TlMqttPubRelReq.builder().fixedHead(fixedHead).variableHead(variableHead).build();
@@ -46,7 +48,7 @@ public class TlMqttPubRelDecoder extends AbstractTlMqttDecoder{
         int messageId = buf.readUnsignedShort();
         TlMqttPubRelVariableHead.TlMqttPubRelVariableHeadBuilder builder = TlMqttPubRelVariableHead.builder()
             .messageId((long) messageId);
-        if (session.getMqttVersion() == MqttVersion.MQTT_5 ) {
+        if (session.isVersion5()) {
 
 
             //原因码

@@ -1,29 +1,28 @@
 package com.tlmqtt.core.handler;
 
-import com.tlmqtt.auth.acl.AclManager;
-import com.tlmqtt.common.Constant;
+import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttQoS;
-import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.common.model.entity.TlTopic;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.request.TlMqttSubscribeReq;
 import com.tlmqtt.common.model.response.TlMqttSubAck;
-import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
-import com.tlmqtt.common.model.variable.TlMqttSubscribeVariableHead;
-import com.tlmqtt.core.manager.TlStoreManager;
-import com.tlmqtt.core.manager.MessageManager;
-import io.netty.channel.Channel;
+import com.tlmqtt.core.service.ForwardMessageService;
+import com.tlmqtt.store.service.PublishService;
+import com.tlmqtt.store.service.RetainService;
+import com.tlmqtt.store.service.ShareSubscribeService;
+import com.tlmqtt.store.service.SubscriptionService;
+import com.tlmqtt.store.service.session.SessionService;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -32,116 +31,134 @@ import java.util.stream.Collectors;
  * @author hszhou
  */
 @Slf4j
-@RequiredArgsConstructor
 @ChannelHandler.Sharable
 public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
 
-    private final TlStoreManager storeManager;
 
-    private final AclManager aclManager;
+    protected final ForwardMessageService forwardMessageService;
 
-    private final MessageManager messageManager;
-
-
-
+    public TlSubscribeHandler(ForwardMessageService forwardMessageService, AuthorizationManager authorizationManager,
+        ShareSubscribeService shareSubscribeService, SessionService sessionService,
+        RetainService retainService, PublishService publishService,
+        SubscriptionService subscriptionService) {
+        this.forwardMessageService = forwardMessageService;
+        super.setAuthorizationManager(authorizationManager);
+        super.setSessionService(sessionService);
+        super.setShareSubscribeService(shareSubscribeService);
+        super.setPublishService(publishService);
+        super.setRetainService(retainService);
+        super.setSubscriptionService(subscriptionService);
+    }
 
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttSubscribeReq req, TlMqttSession session) {
-        Channel channel = ctx.channel();
-        MqttVersion mqttVersion = session.getMqttVersion();
         String clientId = session.getClientId();
-        log.debug("Handling 【SUBSCRIBE】 event from client:【{}】", clientId);
-
+        int messageId = req.getVariableHead().getMessageId();
         List<TlTopic> topics = req.getPayload().getTopics();
-        Set<TlTopic> successTopic = new HashSet<>();
-        int[] codes = new int[topics.size()];
 
-        TlMqttSubscribeVariableHead variableHead = req.getVariableHead();
-        int messageId = variableHead.getMessageId();
+        List<TlTopic> authorizedTopics = new ArrayList<>();
+        int[] reasonCodes = new int[topics.size()];
 
-
-        //发送订阅确认
+        // 1. 权限校验与原因码准备
         for (int i = 0; i < topics.size(); i++) {
-            TlTopic tlTopic = topics.get(i);
-
-            String topicName = tlTopic.getName();
-
-            if (aclManager.checkSubscribePermission(session, topicName)) {
-                codes[i] = tlTopic.getQos();
-                successTopic.add(tlTopic);
+            TlTopic topic = topics.get(i);
+            if (authorizationManager.checkSubscribePermission(session, topic.getName())) {
+                reasonCodes[i] = topic.getQos();
+                authorizedTopics.add(topic);
             } else {
-                //这里有可能订阅多个主题 所有不能跑异常
-                codes[i] = MqttErrorCode.UNAUTHORIZED.byteValue();
+                // MQTT 5.0 0x87 (Not Authorized)
+                reasonCodes[i] = MqttErrorCode.UNAUTHORIZED.byteValue();
             }
-            log.info("【SUBSCRIBE】 event from client:【{}】--【{}】", clientId, topicName);
         }
-        TlMqttSubAck res = TlMqttSubAck.build(codes, messageId,null,null);
-        channel.writeAndFlush(res).addListener(future -> {
-            if (future.isSuccess()) {
-                session.getTopics().addAll(successTopic.stream().map(TlTopic::getName).collect(Collectors.toSet()));
-                storeManager.getSessionService()
-                    .save(session)
-                    .onErrorResume(e -> {
-                        // 3. 捕获异常并返回空流，防止进入 thenMany
-                        log.debug("Subscription aborted due to error: {}", e.getMessage());
-                        return Mono.empty();
-                    }).thenMany(Flux.fromIterable(successTopic).flatMap(topic -> {
-                        int qos= topic.getQos();
-                        Integer subscriptionIdentifier = variableHead.getSubscriptionIdentifier();
-                        Integer retainHandling = topic.getRetainHandling();
-                        TlSubClient client =  TlSubClient.builder()
-                            .qos(qos)
-                            .clientId(clientId)
-                            .topic(topic.getName())
-                            .mqttVersion(mqttVersion)
-                            .subscriptionIdentifier(subscriptionIdentifier)
-                            .isShared(topic.isShare())
-                            .retainAsPublished(topic.getRetainAsPublished())
-                            .noLocal(topic.getNoLocal())
-                            .group(topic.getGroup())
-                            .build();
-                        if(retainHandling != null  && retainHandling== 2){
-                            return Flux.empty();
-                        }
 
-                        // 使用Mono.when并行处理订阅操作
-                        Mono<Boolean> subscriptionOperation = client.getIsShared() 
-                            ? Mono.when(
-                                storeManager.getShareSubscribeService().subscribeShare(client),
-                                storeManager.getSubscriptionService().subscribe(client)
-                              ).then(Mono.just(true))
-                            : storeManager.getSubscriptionService().subscribe(client);
-                        
-                        //找到主题的保留消息
-                        return subscriptionOperation.thenMany(storeManager.getRetainService().find(topic.getName()).doOnNext(publishReq -> {
-                            log.debug("Send retain message 【{}】 to client 【{}】", publishReq.toString(), clientId);
-                            TlMqttPublishVariableHead publishReqVariableHead = publishReq.getVariableHead();
-                            Integer messageExpiryInterval = publishReqVariableHead.getMessageExpiryInterval();
-                            if (MqttVersion.MQTT_5 == mqttVersion && messageExpiryInterval != null) {
-                                long currentTime = System.currentTimeMillis()/1000;
-                                Long acceptTime = publishReq.getAcceptTime();
-                                if (acceptTime + messageExpiryInterval < currentTime) {
-                                    log.debug("Retain message 【{}】 is expired", publishReq);
-                                    return;
-                                }
-                                long remainingTime = messageExpiryInterval - (currentTime - acceptTime);
-                                publishReqVariableHead.setMessageExpiryInterval((int) remainingTime);
-                            }
-                            //这是保留消息的qos等级
-                            int retainQos = publishReq.getFixedHead().getQos().value();
-                            int realQos = Math.min(qos, retainQos);
-                            MqttQoS mqttQoS = MqttQoS.valueOf(realQos);
-                            TlMqttPublishReq publishMessage = messageManager.build(publishReq, mqttQoS,session,client);
-                            if(mqttQoS != MqttQoS.AT_MOST_ONCE){
-                                storeManager.savePublishReq(clientId, publishMessage.getVariableHead().getMessageId(), publishMessage).subscribe();
-                            }
-                            channel.writeAndFlush(publishMessage);
-                        }));
-                    })).subscribe();
+        // 2. 发送 SUBACK
+        TlMqttSubAck subAck = TlMqttSubAck.build(reasonCodes, messageId, null, null);
+        ctx.writeAndFlush(subAck).addListener(future -> {
+            if (future.isSuccess() && !authorizedTopics.isEmpty()) {
+                // 3. 执行订阅持久化与保留消息分发
+                executeSubscriptionLogic(session, authorizedTopics, req, ctx);
             }
         });
     }
 
+    private void executeSubscriptionLogic(TlMqttSession session, List<TlTopic> topics, TlMqttSubscribeReq req, ChannelHandlerContext ctx) {
+        String clientId = session.getClientId();
+        Integer subId = req.getVariableHead().getSubscriptionIdentifier();
 
+        // 更新 Session 内存中的主题列表
+        Set<String> newTopicNames = topics.stream().map(TlTopic::getName).collect(Collectors.toSet());
+        session.getTopics().addAll(newTopicNames);
+
+        sessionService.save(session)
+            .thenMany(Flux.fromIterable(topics))
+            .flatMap(topic -> {
+                TlSubClient client = buildSubClient(session, topic, subId);
+
+                // 根据是否共享订阅调用不同服务
+                Mono<Boolean> subMono = client.getIsShared()
+                    ? shareSubscribeService.subscribeShare(client)
+                    : subscriptionService.subscribe(client);
+
+                return subMono.thenMany(handleRetainMessages(session, topic, client, ctx));
+            })
+            .subscribeOn(Schedulers.boundedElastic())
+            .doOnError(e -> log.error("Subscription process error for client [{}]", clientId, e))
+            .subscribe();
+    }
+
+    private Flux<Void> handleRetainMessages(TlMqttSession session, TlTopic topic, TlSubClient client, ChannelHandlerContext ctx) {
+        // MQTT 5.0 Retain Handling:
+        // 2 = 不发送保留消息
+        if (topic.getRetainHandling() != null && topic.getRetainHandling() == 2) {
+            return Flux.empty();
+        }
+
+        // TODO: 如果 Retain Handling == 1，需判断是否是“重复订阅”，只有新订阅才发。目前简化处理。
+
+        return retainService.find(topic.getName())
+            .filter(publishReq -> !isExpired(publishReq))
+            .flatMap(publishReq -> {
+                // 计算 QoS 降级
+                int subQos = topic.getQos();
+                int pubQos = publishReq.getFixedHead().getQos().value();
+                MqttQoS realQos = MqttQoS.valueOf(Math.min(subQos, pubQos));
+
+                // 使用 ForwardMessageService 的 build 方法，它会自动从 Session 分配 MessageId
+                TlMqttPublishReq targetMessage = forwardMessageService.buildTargetReq(publishReq, realQos, session, client);
+
+                // 如果是 QoS 1/2，需要持久化并处理流量窗口
+                if (realQos != MqttQoS.AT_MOST_ONCE) {
+                    return publishService.save(session.getClientId(), targetMessage.getVariableHead().getMessageId(), targetMessage)
+                        .doOnSuccess(v -> {
+                            // 占用 In-Flight 窗口并发送
+                            session.getInFlightCount().incrementAndGet();
+                            ctx.writeAndFlush(targetMessage);
+                        }).then();
+                } else {
+                    ctx.writeAndFlush(targetMessage);
+                    return Mono.empty();
+                }
+            });
+    }
+
+    private TlSubClient buildSubClient(TlMqttSession session, TlTopic topic, Integer subId) {
+        return TlSubClient.builder()
+            .clientId(session.getClientId())
+            .topic(topic.getName())
+            .qos(topic.getQos())
+            .mqttVersion(session.getMqttVersion())
+            .subscriptionIdentifier(subId)
+            .isShared(topic.isShare())
+            .group(topic.getGroup())
+            .noLocal(topic.getNoLocal())
+            .retainAsPublished(topic.getRetainAsPublished())
+            .build();
+    }
+
+    private boolean isExpired(TlMqttPublishReq req) {
+        if (req.getVariableHead().getMessageExpiryInterval() == null) return false;
+        long now = System.currentTimeMillis() / 1000;
+        return (req.getAcceptTime() + req.getVariableHead().getMessageExpiryInterval()) < now;
+    }
 
 }

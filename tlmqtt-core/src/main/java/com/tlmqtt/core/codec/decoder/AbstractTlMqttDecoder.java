@@ -1,8 +1,7 @@
 package com.tlmqtt.core.codec.decoder;
 
 import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.config.TlConfig;
-import com.tlmqtt.common.enums.MqttErrorCode;
+import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.exception.TlMalformedPacketException;
@@ -18,12 +17,28 @@ import lombok.extern.slf4j.Slf4j;
  * @author hszhou
  */
 @Slf4j
-public abstract class  AbstractTlMqttDecoder {
+public abstract class  AbstractTlMqttDecoder  {
 
 
 
-    public AbstractTlMessage decode(ByteBuf buf,int type, int remainingLength, ChannelHandlerContext ctx,   MqttMessageType messageTypeEnum) {
+    /**
+     * 最大包大小
+     */
+    private int maximumPacketSize = 0;
+
+    public AbstractTlMqttDecoder(MqttConfiguration configuration) {
+       this.maximumPacketSize = configuration.getInt(MqttConfiguration.MAXIMUM_PACKET_SIZE);
+        configuration.addListener(property -> {
+            if (property == MqttConfiguration.Property.MAXIMUM_PACKET_SIZE) {
+                int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_PACKET_SIZE.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.maximumPacketSize = newValue;
+            }
+        });
+    }
+    public AbstractTlMessage decode(ByteBuf buf,int type, int remainingLength, ChannelHandlerContext ctx,   MqttMessageType messageTypeEnum ) {
         Object  sessionValue = ctx.channel().attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
+
         if(messageTypeEnum==MqttMessageType.CONNECT){
             //todo 在一个网络连接上，客户端只能发送一次CONNECT报文。服务端必须将客户端发送的第二个CONNECT报文当作协议违规处理并断开客户端的连接 [MQTT-3.1.0-2]。有关错误处理的信息请查看4.13节。
             if(sessionValue != null){
@@ -36,7 +51,7 @@ public abstract class  AbstractTlMqttDecoder {
         }
         TlMqttSession session = (TlMqttSession)sessionValue;
         if(session.getMqttVersion() == MqttVersion.MQTT_5){
-            if(buf.readableBytes() > TlConfig.getInt( TlConfig.MAXIMUM_PACKET_SIZE)){
+            if(buf.readableBytes() > maximumPacketSize){
                throw new TlProtocolErrorException(MqttMessageType.DISCONNECT);
             }
         }

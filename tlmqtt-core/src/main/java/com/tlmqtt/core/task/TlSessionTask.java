@@ -1,7 +1,7 @@
 package com.tlmqtt.core.task;
 
-import com.tlmqtt.core.manager.TlStoreManager;
-import com.tlmqtt.store.service.SessionService;
+
+import com.tlmqtt.store.service.session.SessionService;
 import io.netty.util.Timeout;
 import io.netty.util.TimerTask;
 import lombok.Data;
@@ -17,21 +17,22 @@ public class TlSessionTask implements TimerTask {
 
     private String clientId;
 
-    private TlStoreManager storeManager;
+  //  private TlStoreManager storeManager;
+    private SessionService sessionService;
 
     private volatile boolean cancelled = false;
 
     private volatile Timeout timeout;
 
-    public TlSessionTask(String clientId,TlStoreManager storeManager) {
+    public TlSessionTask(String clientId,SessionService storeManager) {
         this.clientId = clientId;
-        this.storeManager = storeManager;
+        this.sessionService = storeManager;
     }
 
     @Override
     public void run(Timeout timeout) throws Exception {
-        log.info("开始删除会话");
-        storeManager.clearAll(clientId);
+
+        sessionService.clearAll(clientId);
     }
 
 

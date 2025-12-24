@@ -1,7 +1,7 @@
 package com.tlmqtt.core.share;
 
 import com.tlmqtt.common.model.entity.TlSubClient;
-import io.netty.channel.Channel;
+
 
 import java.util.List;
 
@@ -15,8 +15,9 @@ public interface IShareSubscribeClientChoose {
 
     /**
      * 选择一个session
-     * @param channels 会话
+     * @param subClients 订阅的client列表
+     * @param content 消息内容
      * @return 选择的session
      */
-    TlSubClient choose(List<TlSubClient> channels);
+    TlSubClient choose(List<TlSubClient> subClients,String content);
 }

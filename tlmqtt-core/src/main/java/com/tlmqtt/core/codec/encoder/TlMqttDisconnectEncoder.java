@@ -3,7 +3,6 @@ package com.tlmqtt.core.codec.encoder;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
-import com.tlmqtt.common.model.response.TlMqttHeartBeatAck;
 import com.tlmqtt.common.model.variable.TlMqttDisconnectVariableHead;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;

@@ -1,9 +1,9 @@
 package com.tlmqtt.core.codec.decoder;
 import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.config.TlConfig;
+import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
-import com.tlmqtt.common.enums.MqttQoS;
+
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
 import com.tlmqtt.common.exception.TlMalformedPacketException;
@@ -15,11 +15,9 @@ import com.tlmqtt.common.model.entity.UserProperty;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttConnectPayload;
 import com.tlmqtt.common.model.request.TlMqttConnectReq;
-import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
 import io.netty.buffer.ByteBuf;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,11 +30,45 @@ import java.util.Objects;
 @Slf4j
 public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
 
+    private  int maximumQos;
+    private  boolean retainAvailable;
+    private  List<String> invalidTopicNames;
+    private List<String> refuseClients;
 
+    public  TlMqttConnectDecoder(MqttConfiguration configuration){
+        super(configuration);
+        this.maximumQos = configuration.getInt(MqttConfiguration.MAXIMUM_QOS);
+        this.retainAvailable = configuration.getBoolean(MqttConfiguration.RETAIN_AVAILABLE);
+        this.invalidTopicNames = configuration.getList(MqttConfiguration.INVALID_TOPIC_NAMES);
+        this.refuseClients = configuration.getList(MqttConfiguration.REFUSE_CLIENTS);
 
+        configuration.addListener(property -> {
+            if (property == MqttConfiguration.Property.MAXIMUM_PACKET_SIZE) {
+                int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_PACKET_SIZE.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.maximumQos = newValue;
+            }
+            if (property == MqttConfiguration.Property.RETAIN_AVAILABLE) {
+                boolean newValue = configuration.getBoolean(MqttConfiguration.Property.RETAIN_AVAILABLE.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.retainAvailable = newValue;
+            }
+            if (property == MqttConfiguration.Property.INVALID_TOPIC_NAMES) {
+                List<String> newValue = configuration.getList(MqttConfiguration.Property.INVALID_TOPIC_NAMES.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.invalidTopicNames = newValue;
+            }
+            if (property == MqttConfiguration.Property.REFUSE_CLIENTS) {
+                List<String>  newValue = configuration.getList(MqttConfiguration.Property.REFUSE_CLIENTS.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.refuseClients = newValue;
+            }
+        });
+    }
     @Override
-    public TlMqttConnectReq build(ByteBuf buf, int type, int remainingLength, TlMqttSession session) {
-        TlMqttFixedHead fixedHead = decodeFixedHeader(type,remainingLength);
+    public TlMqttConnectReq build(ByteBuf buf, int type, int remainingLength, TlMqttSession session ) {
+
+        TlMqttFixedHead fixedHead = decodeFixedHeader(remainingLength);
         TlMqttConnectVariableHead variableHead = decodeVariableHeader(buf);
         TlMqttConnectPayload payload = decodePayload(buf, variableHead.getWillFlag(), variableHead.isUsernameFlag(),variableHead.getProtocolVersion());
          return TlMqttConnectReq.builder()
@@ -46,14 +78,14 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
     }
 
 
-    TlMqttFixedHead decodeFixedHeader(int type,int remainingLength) {
+    TlMqttFixedHead decodeFixedHeader(int remainingLength) {
         return TlMqttFixedHead.builder()
                               .messageType(MqttMessageType.CONNECT)
                               .length(remainingLength).build();
     }
 
 
-    TlMqttConnectVariableHead decodeVariableHeader(ByteBuf buf) {
+    TlMqttConnectVariableHead decodeVariableHeader(ByteBuf buf ) {
         TlMqttConnectVariableHead.TlMqttConnectVariableHeadBuilder builder = TlMqttConnectVariableHead.builder();
         int protocolLength = buf.readUnsignedShort();
         byte[] protocolNameByte = new byte[protocolLength];
@@ -85,19 +117,19 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         int willFlag = (connectFlag >> 2) & 1;
         builder.willFlag(willFlag);
         int willQos = (connectFlag >> 3) & 3;
-        if(willQos == 3){
+        if(willQos ==Constant.ERROR_QOS){
             //  不支持的QoS等级
             throw new TlMalformedPacketException(MqttMessageType.CONNACK);
         }
 
         //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。
-        if(TlConfig.getInt(TlConfig.MAXIMUM_QOS) <willQos && version == MqttVersion.MQTT_5.getLevel()){
+        if(maximumQos <willQos && version == MqttVersion.MQTT_5.getLevel()){
             throw new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.CONNACK);
         }
         builder.willQos(willQos);
         int willRetain = (connectFlag >> 5) & 1;
         //如果服务端收到一个包含保留标志位1的遗嘱消息的CONNECT报文且服务端不支持保留消息，服务端必须拒绝此连接请求，且应该发送包含原因码为0x9A（不支持保留）的CONNACK报文，随后必须关闭网络连接 [MQTT-3.2.2-13]
-        if(!TlConfig.getBoolean(TlConfig.RETAIN_AVAILABLE )&& willRetain==1){
+        if(!retainAvailable&& willRetain==1){
             throw new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_RETAIN_NOT_SUPPORTED,MqttMessageType.CONNACK);
         }
         builder.willRetain(willRetain);
@@ -116,8 +148,12 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         return variableHead ;
     }
 
-    private void processVariableProperty(ByteBuf buf,TlMqttConnectVariableHead variableHead) {
-
+    /**
+     * 解析变量属性
+     * @param buf 字节数组
+     * @param variableHead 可变头
+     */
+    private void processVariableProperty(ByteBuf buf,TlMqttConnectVariableHead variableHead ) {
         //properties的长度
         int propertyLength = decodeRemainingLength(buf);
         // 4. 记录属性读取的起始位置
@@ -253,7 +289,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
             byte[] clientIdByte = new byte[clientIdLength];
             buf.readBytes(clientIdByte);
             String  clientId = new String(clientIdByte);
-            if(TlConfig.getStringList(TlConfig.REFUSE_CLIENTS).contains(clientId)){
+            if(refuseClients.contains(clientId)){
                 //如果clientId不被服务端接收，那么就返回0x85（客户端标识符无效）的原因码的CONNACK报文去相亲CONNECT报文，然后必须关闭网络连接
                 throw new TlMqttException(MqttErrorCode.REFUSED_CLIENT_IDENTIFIER,MqttMessageType.CONNECT,MqttMessageType.CONNACK);
             }
@@ -268,6 +304,13 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
             byte[] willTopicByte = new byte[willTopicLength];
             buf.readBytes(willTopicByte);
             String willTopic = new String(willTopicByte);
+            //todo 校验主题名称是否有效
+//            if(willTopic.equals("11")){
+//                throw new TlMqttException(MqttErrorCode.TOPIC_INVALIDE,MqttMessageType.CONNECT,MqttMessageType.DISCONNECT);
+//            }
+            if(invalidTopicNames.contains(willTopic)){
+                throw new TlMqttException(MqttErrorCode.TOPIC_NAME_INVALID,MqttMessageType.CONNECT,MqttMessageType.DISCONNECT);
+            }
             connectPayload.setWillTopic(willTopic);
 
             int messageLength = buf.readUnsignedShort();
@@ -293,6 +336,11 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         return connectPayload;
     }
 
+    /**
+     * 解析属性
+     * @param buf 字节数组
+     * @param connectPayload 载荷
+     */
     private void processPayloadProperty(ByteBuf buf,TlMqttConnectPayload connectPayload ) {
         int propertyLength = decodeRemainingLength(buf);
         final int propertiesStartIndex = buf.readerIndex();

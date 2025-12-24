@@ -1,7 +1,6 @@
 package com.tlmqtt.common.model.request;
 
 import com.tlmqtt.common.enums.MqttMessageType;
-import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttUnSubscribePayload;
 import com.tlmqtt.common.model.variable.TlMqttUnSubscribeVariableHead;
 import lombok.*;
@@ -14,7 +13,6 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @ToString
-@Accessors
 @SuperBuilder
 public class TlMqttUnSubscribeReq  extends AbstractTlMessage {
 

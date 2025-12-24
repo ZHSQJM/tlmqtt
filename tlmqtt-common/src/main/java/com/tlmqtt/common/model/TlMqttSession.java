@@ -1,8 +1,10 @@
 package com.tlmqtt.common.model;
 
 
+import com.tlmqtt.common.MessageIdManager;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.model.entity.UserProperty;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -12,7 +14,11 @@ import lombok.experimental.Accessors;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * @author hszhou
@@ -28,7 +34,7 @@ public class TlMqttSession {
     /**断开时 是否清除会话*/
     private boolean cleanSession;
     /**订阅的主题*/
-    private Set<String> topics =new HashSet<>();
+    private Set<String> topics;
     /**协议版本*/
     private MqttVersion mqttVersion;
     /**用户名*/
@@ -39,6 +45,8 @@ public class TlMqttSession {
     private Short keepAlive;
     /**channel*/
     private ChannelHandlerContext ctx;
+    /**是否从存储中恢复会话*/
+    private boolean fromStore;
 
 
     /**会话的过期时间
@@ -87,13 +95,6 @@ public class TlMqttSession {
      携带设备固件版本
      传输自定义元数据*/
     private List<UserProperty> userProperties;
-    /**
-     * 是否是3.1.1版本
-     * @return boolean 是否
-     */
-    public boolean isVersion3() {
-        return mqttVersion == MqttVersion.MQTT_3_1_1;
-    }
 
     /**
      * 是否是5版本
@@ -102,5 +103,27 @@ public class TlMqttSession {
     public boolean isVersion5() {
         return mqttVersion == MqttVersion.MQTT_5;
     }
+
+    // --- 核心状态管理组件 ---
+
+    /**
+     * 每个会话独享的消息ID生成器
+     * 确保分配出的 ID 在 1-65535 之间且不重复
+     */
+    private final MessageIdManager messageIdManager = new MessageIdManager();
+
+    /**
+     * 当前正在传输中（未收到 ACK）的消息计数
+     * 对应 MQTT 5.0 的 Receive Maximum
+     */
+    private final AtomicInteger inFlightCount = new AtomicInteger(0);
+
+    /**
+     * 消息积压队列
+     * 当 inFlightCount 达到上限时，后续消息进入此队列
+     */
+    private final Queue<TlMqttPublishReq> messageQueue = new ConcurrentLinkedQueue<>();
+
+
 
 }

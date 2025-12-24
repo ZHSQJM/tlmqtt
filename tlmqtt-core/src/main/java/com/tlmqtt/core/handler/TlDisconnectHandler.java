@@ -3,21 +3,20 @@ package com.tlmqtt.core.handler;
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.TlMqttDisconnectReq;
-import com.tlmqtt.common.model.variable.TlMqttDisconnectVariableHead;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author hszhou
  */
 @Slf4j
-@RequiredArgsConstructor
 @ChannelHandler.Sharable
 public class TlDisconnectHandler extends AbstractTlHandler<TlMqttDisconnectReq> {
+
+
 
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttDisconnectReq req, TlMqttSession session) {

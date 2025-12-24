@@ -11,7 +11,6 @@ import com.tlmqtt.common.model.variable.TlMqttSubAckVariableHead;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 
@@ -27,11 +26,7 @@ public class TlMqttSubAckEncoder extends AbstractTlMqttEncoder<TlMqttSubAck> {
     @Override
     protected void encode(ChannelHandlerContext ctx, TlMqttSubAck res, ByteBuf out, MqttMessageType mqttMessageType) {
 
-        //log.info("进入到subAck的编码器");
-
         TlMqttSession session = (TlMqttSession) ctx.channel().attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
-
-
         MqttVersion mqttVersion = session.getMqttVersion();
         TlMqttSubAckVariableHead variableHead = res.getVariableHead();
         TlMqttSubAckPayload payload = res.getPayload();

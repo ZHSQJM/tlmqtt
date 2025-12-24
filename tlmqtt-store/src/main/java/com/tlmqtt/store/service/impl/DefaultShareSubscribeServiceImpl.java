@@ -1,6 +1,6 @@
 package com.tlmqtt.store.service.impl;
 
-import cn.hutool.core.util.StrUtil;
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.tlmqtt.common.model.entity.TlSubClient;
@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * @author zhouhs
@@ -21,60 +22,95 @@ import java.util.Objects;
  **/
 public class DefaultShareSubscribeServiceImpl implements ShareSubscribeService {
 
+    // 主题 -> 该主题下的所有共享组名
+    private final Cache<String, List<String>> TOPIC_GROUP = Caffeine.newBuilder().build();
 
-    /*主题与分组订阅关系*/
-    /***主题对应的分组
-     * topic--> topic::group/topic */
-    private static final Cache<String, List<String>> TOPIC_GROUP = Caffeine.newBuilder().build();
-
-    /**组与成员的关系
-     * 组对应的成员
-     *
-     * */
-    private static final Cache<String, List<TlSubClient>> GROUP_MEMBER = Caffeine.newBuilder().build();
+    // 组名 -> 组内的成员列表
+    private final Cache<String, List<TlSubClient>> GROUP_MEMBER = Caffeine.newBuilder().build();
 
     @Override
-    public Mono<Boolean> subscribeShare( TlSubClient client) {
-        //否则主题与分组的订阅关系就是主题与对应的组集合 组名就是主题名加组名(防止同一个组订阅了不同的主题)
-        TOPIC_GROUP.get(client.getTopic(), key -> new ArrayList<>()).add(client.getGroup());
-        GROUP_MEMBER.get(client.getGroup(), key -> new ArrayList<>()).add(client);
-        return Mono.just(true);
+    public Mono<Boolean> subscribeShare(TlSubClient client) {
+        return Mono.fromSupplier(() -> {
+            String topic = client.getTopic();
+            String group = client.getGroup();
+
+            // 1. 维护主题与组的关系
+            List<String> groups = TOPIC_GROUP.get(topic, k -> new CopyOnWriteArrayList<>());
+            if (!groups.contains(group)) {
+                groups.add(group);
+            }
+
+            // 2. 维护组与成员的关系 (使用 CopyOnWriteArrayList 保证并发安全)
+            List<TlSubClient> members = GROUP_MEMBER.get(group, k -> new CopyOnWriteArrayList<>());
+            // 避免重复添加同一个客户端
+            members.removeIf(m -> m.getClientId().equals(client.getClientId()));
+            members.add(client);
+
+            return true;
+        });
     }
 
     @Override
-    public Mono<Boolean> unsubscribeShare( TlSubClient client) {
+    public Mono<Boolean> unsubscribeShare(TlSubClient client) {
+        return Mono.fromSupplier(() -> {
+            String group = client.getGroup();
+            String topic = client.getTopic();
 
+            // 1. 移除成员
+            List<TlSubClient> members = GROUP_MEMBER.getIfPresent(group);
+            if (members != null) {
+                members.removeIf(m -> m.getClientId().equals(client.getClientId()));
 
-        Objects.requireNonNull(GROUP_MEMBER.getIfPresent(client.getGroup())).removeIf(client::equals);
-        if(Objects.requireNonNull(GROUP_MEMBER.getIfPresent(client.getGroup())).isEmpty()){
-            GROUP_MEMBER.invalidate(client.getGroup());
-        }
-        if(Objects.requireNonNull(TOPIC_GROUP.getIfPresent(client.getTopic())).isEmpty()){
-            TOPIC_GROUP.invalidate(client.getTopic());
-        }
-        return Mono.just(true);
+                // 2. 如果组内没成员了，彻底销毁该组
+                if (members.isEmpty()) {
+                    GROUP_MEMBER.invalidate(group);
+
+                    // 3. 同时从主题关联中移除该组名 (修复你的原逻辑漏洞)
+                    List<String> groups = TOPIC_GROUP.getIfPresent(topic);
+                    if (groups != null) {
+                        groups.remove(group);
+                        if (groups.isEmpty()) {
+                            TOPIC_GROUP.invalidate(topic);
+                        }
+                    }
+                }
+            }
+            return true;
+        });
     }
 
-    /**
-     * 获取组对应的成员
-     * @param topicName 主题名称
-     * @return 组与成员关系
-     */
     @Override
-    public HashMap<String, List<TlSubClient>> getGroupMember(String topicName){
-        //表示没有找到任何组
+    public HashMap<String, List<TlSubClient>> getGroupMember(String topicName) {
         List<String> groupNames = TOPIC_GROUP.getIfPresent(topicName);
-        if(groupNames==null){
+        if (groupNames == null || groupNames.isEmpty()) {
             return null;
         }
 
-        HashMap<String, List<TlSubClient>> groupMember = new HashMap<>();
-        groupNames.forEach(groupName -> {
-            List<TlSubClient> ifPresent = GROUP_MEMBER.getIfPresent(groupName);
-            if(ifPresent!=null){
-                groupMember.put(groupName,ifPresent);
+        HashMap<String, List<TlSubClient>> result = new HashMap<>();
+        for (String groupName : groupNames) {
+            List<TlSubClient> members = GROUP_MEMBER.getIfPresent(groupName);
+            if (members != null && !members.isEmpty()) {
+                result.put(groupName, members);
             }
-        });
-        return groupMember.isEmpty()?null:groupMember;
+        }
+        return result.isEmpty() ? null : result;
+    }
+
+    /**
+     * 实现观察者接口：Session销毁时自动清理该客户端在所有组中的订阅
+     */
+    @Override
+    public Mono<Void> onSessionCleared(String clientId) {
+        return Mono.fromRunnable(() -> {
+            // 遍历所有组，移除该客户端
+            GROUP_MEMBER.asMap().forEach((group, members) -> {
+                if (members.removeIf(m -> m.getClientId().equals(clientId))) {
+                    if (members.isEmpty()) {
+                        // 如果移除后组空了，这里可以进一步清理，但为了性能通常建议在下次心跳或反注册时清理
+                        // 或者简单的全部反查一遍
+                    }
+                }
+            });
+        }).then();
     }
 }

@@ -1,7 +1,6 @@
 package com.tlmqtt.common.model.request;
 
 import com.tlmqtt.common.enums.MqttMessageType;
-import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttConnectPayload;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
 import lombok.*;
@@ -15,7 +14,6 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @ToString
-@Accessors
 @SuperBuilder
 public class TlMqttConnectReq  extends AbstractTlMessage {
 

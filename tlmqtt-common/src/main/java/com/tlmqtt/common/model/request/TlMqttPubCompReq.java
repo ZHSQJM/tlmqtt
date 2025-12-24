@@ -19,7 +19,6 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @ToString
-@Accessors
 @SuperBuilder
 public class TlMqttPubCompReq extends AbstractTlMessage{
 

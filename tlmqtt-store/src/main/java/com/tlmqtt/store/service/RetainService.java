@@ -1,12 +1,14 @@
 package com.tlmqtt.store.service;
 
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
+import com.tlmqtt.store.service.session.listener.SessionEventListener;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 /**
  * @author hszhou
  */
-public interface RetainService {
+public interface RetainService  extends SessionEventListener {
 
     /**
      * 保存保留下线
@@ -23,7 +25,7 @@ public interface RetainService {
      * @param topic 主题
      * @return 保留消息
      */
-    Mono<TlMqttPublishReq> find(String topic);
+    Flux<TlMqttPublishReq> find(String topic);
 
     /**
      * 清除主题topic的保留消息

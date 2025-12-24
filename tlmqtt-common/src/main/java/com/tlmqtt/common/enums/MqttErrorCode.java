@@ -69,6 +69,8 @@ public enum MqttErrorCode {
     QUOTA_EXCEEDED((byte)0x97),
     //主题过滤器无效 主题过滤器格式正确 但不被允许
     TOPIC_INVALIDE((byte)0x8F),
+    //订阅未发现
+    NO_SUBSCRIPTION_EXISTED((byte)0x11),
 
     ;
 

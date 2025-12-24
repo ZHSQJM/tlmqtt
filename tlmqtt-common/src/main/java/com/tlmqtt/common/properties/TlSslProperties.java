@@ -1,6 +1,7 @@
 package com.tlmqtt.common.properties;
 
 import lombok.Data;
+
 /**
  * 是否开启ssl配置
  *

@@ -12,7 +12,6 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @ToString
-@Accessors
 @SuperBuilder
 public class TlMqttHeartBeatAck extends AbstractTlMessage {
 

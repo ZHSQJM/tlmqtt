@@ -12,7 +12,6 @@ import lombok.EqualsAndHashCode;
  * @author hszhou
  */
 @EqualsAndHashCode(callSuper = true)
-@Data
 public class TlProtocolErrorException extends TlMqttException {
 
 

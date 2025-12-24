@@ -1,0 +1,337 @@
+package com.tlmqtt.core.service;
+
+import cn.hutool.core.util.StrUtil;
+import com.tlmqtt.common.enums.MqttMessageType;
+import com.tlmqtt.common.enums.MqttQoS;
+import com.tlmqtt.common.enums.MqttVersion;
+import com.tlmqtt.common.exception.TlProtocolErrorException;
+import com.tlmqtt.common.model.TlMqttSession;
+import com.tlmqtt.common.model.entity.TlSubClient;
+import com.tlmqtt.common.model.fix.TlMqttFixedHead;
+import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
+import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
+import com.tlmqtt.core.manager.ChannelManager;
+import com.tlmqtt.core.manager.RetryManager;
+import com.tlmqtt.core.share.IShareSubscribeClientChoose;
+import com.tlmqtt.core.task.TlRetryTask;
+import com.tlmqtt.store.service.PublishService;
+import com.tlmqtt.store.service.ShareSubscribeService;
+import com.tlmqtt.store.service.SubscriptionService;
+import com.tlmqtt.store.service.session.SessionService;
+import io.netty.channel.Channel;
+import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+/**
+ * @author zhouhs
+ * @version 0.1.0
+ * @since 0.1.0
+ **/
+@Slf4j
+public class ForwardMessageService2 {
+
+    private final AliasService aliasService;
+
+    private final ShareSubscribeService shareSubscribeService;
+
+    private final IShareSubscribeClientChoose shareSubscribeClientChoose;
+
+    private final SubscriptionService subscriptionService;
+
+    private final SessionService sessionService;
+
+
+    private final PublishService publishService;
+
+    private final ChannelManager channelManager;
+
+    private final RetryManager retryManager;
+
+
+    // Map to track in-flight messages per client (clientId -> count)
+    /**用于跟踪每个客户端已经发送中的消息个数*/
+    private static final Map<String, AtomicInteger> clientInFlightMessages = new ConcurrentHashMap<>();
+
+    // Map to store receiveMaximum per client (clientId -> receiveMaximum)
+    /**用于存储每个客户端的接收最大消息数*/
+    private static final Map<String, Integer> clientReceiveMaximums = new ConcurrentHashMap<>();
+
+    /**用于存储每个客户端的待处理的发布消息请求*/
+    private static final Map<String, Queue<TlMqttPublishReq>> pendingPublishRequests = new ConcurrentHashMap<>();
+
+    public ForwardMessageService2(AliasService aliasService, ShareSubscribeService shareSubscribeService,
+        IShareSubscribeClientChoose shareSubscribeClientChoose, SubscriptionService subscriptionService,
+        SessionService sessionService, PublishService publishService, ChannelManager channelManager,
+        RetryManager retryManager ) {
+        this.aliasService = aliasService;
+        this.shareSubscribeService = shareSubscribeService;
+        this.shareSubscribeClientChoose = shareSubscribeClientChoose;
+        this.subscriptionService = subscriptionService;
+        this.sessionService = sessionService;
+        this.publishService = publishService;
+        this.channelManager = channelManager;
+        this.retryManager = retryManager;
+    }
+
+    public void publish(TlMqttPublishReq req,String clientId, MqttVersion mqttVersion){
+        TlMqttPublishVariableHead variableHead = req.getVariableHead();
+        String topic = variableHead.getTopic();
+        Integer topicAlias = variableHead.getTopicAlias();
+        //如果接收端已创建此主题别名的映射， a) 如果报文包含的主题名长度为0，接收端使用主题别名对应的主题名处理此报文 b) 如果报文包含的主题名长度不为0，接收端使用此主题名处理此报文，并更新此主题别名映射到此主题名
+        if (mqttVersion == MqttVersion.MQTT_5 && topicAlias!=null) {
+            if (StrUtil.isNotEmpty(topic)) {
+                aliasService.put(clientId,topicAlias,topic);
+            } else {;
+                topic = aliasService.get(clientId,topicAlias);
+                if (topic != null) {
+                    //如果接收端还没有创建此主题别名的映射， a) 如果报文包含的主题名长度为0，将造成协议错误，接收端使用包含原因码为0x82（协议错误）的DISCONNECT报文断开网络连接，
+                    throw new TlProtocolErrorException(MqttMessageType.PUBLISH);
+                }
+            }
+        }
+        TlMqttPublishPayload payload = req.getPayload();
+        HashMap<String, List<TlSubClient>> groupMember = shareSubscribeService.getGroupMember(topic);
+        if(null != groupMember){
+            groupMember.forEach((groupName,subClients) -> {
+                TlSubClient client = shareSubscribeClientChoose.choose(subClients,payload.getContent().toString());
+                log.info("组【{}】的成员获取到【{}】",groupName,client.getClientId());
+                doPublish(req,client,clientId);
+            });
+
+        }
+        subscriptionService
+            .find(topic)
+            .doOnNext(client -> doPublish(req,client,clientId))
+            .doOnError(e -> log.error("Publish failed for topic [{}]", req.getVariableHead().getTopic(), e))
+            .publishOn(Schedulers.boundedElastic())
+            .subscribe();
+
+    }
+
+    /**
+     * 转发消息到各个订阅的客户端
+     * @param req 原始消息
+     * @param client 订阅的客户端
+     * @param publishClientId 发布的客户端
+     */
+    private void doPublish(TlMqttPublishReq req, TlSubClient client,String publishClientId){
+
+ 
+        TlMqttFixedHead fixedHead = req.getFixedHead();
+        int sendQos =fixedHead.getQos().value();
+        int subQos = client.getQos();
+        //在发布和订阅的消息qos会出现降级
+        int realQos = Math.min(sendQos, subQos);
+        MqttQoS mqttQoS = MqttQoS.valueOf(realQos);
+        String clientId = client.getClientId();
+        sessionService
+            .find(client.getClientId())
+            .flatMap(session -> {
+                Boolean noLocal = client.getNoLocal();
+                log.info("client=[{}],noLocal=[{}]",client.getClientId(),noLocal);
+                if(null != noLocal && noLocal && client.getClientId().equals(publishClientId)){
+                    return Mono.empty();
+                }
+                // 如果是qos0的消息 直接转发
+                TlMqttPublishReq publishReq = build(req, mqttQoS,session,client);
+                MqttVersion mqttVersion = session.getMqttVersion();
+                if(mqttVersion == MqttVersion.MQTT_5){
+                    int length = publishReq.getFixedHead().getLength();
+                    Integer maximumPacketSize = session.getMaximumPacketSize();
+                    if (maximumPacketSize != null && length > maximumPacketSize) {
+                        log.warn("Client [{}] exceeded maximum packet size, dropping message", clientId);
+                        return Mono.empty();
+                    }
+
+//                    int receiveMaximum = clientReceiveMaximums.computeIfAbsent(
+//                        clientId,
+//                        k -> session.getReceiveMaximum() != null ? session.getReceiveMaximum() : 65535
+//                    );
+//                    AtomicInteger inFlightCount = clientInFlightMessages.computeIfAbsent(
+//                        clientId,
+//                        k -> new AtomicInteger(0)
+//                    );
+//                    if (inFlightCount.get() >= receiveMaximum) {
+//                        log.debug("Client [{}] has reached receiveMaximum limit ({}), queuing message", clientId, receiveMaximum);
+//                        Queue<TlMqttPublishReq> queue = pendingPublishRequests.computeIfAbsent(
+//                            clientId, k -> new LinkedBlockingDeque<>(1024));
+//                        queue.offer(publishReq);
+//                        //添加到队列中
+//                        return Mono.empty(); // Or implement a proper queue
+//                    }
+//                    inFlightCount.incrementAndGet();
+                }
+                if(mqttQoS == MqttQoS.AT_MOST_ONCE){
+                    return Mono.just(publishReq);
+                }
+                return publishService.save(clientId, publishReq.getVariableHead().getMessageId(), publishReq);
+            })
+            .doOnError(e -> log.error("Publish failed for client [{}]", clientId, e))
+            .doOnSuccess(publishReq -> {
+                // I/O操作回到Netty线程
+                //log.info("保存到内存在的是【{}】",publishReq.getVariableHead().getMessageId());
+                send(publishReq,clientId);
+            })
+            .subscribe();
+
+    }
+
+
+
+
+    public TlMqttPublishReq build(TlMqttPublishReq req,MqttQoS mqttQoS, TlMqttSession session,TlSubClient client ){
+        TlMqttPublishVariableHead variableHead = req.getVariableHead();
+        TlMqttFixedHead fixedHead = req.getFixedHead();
+        Integer topicAlias = variableHead.getTopicAlias();
+        Short topicMaxAlias = session.getTopicMaxAlias();
+        if (topicAlias != null && topicMaxAlias != null && topicAlias > topicMaxAlias) {
+            log.warn("Client [{}] exceeded topic alias limit, dropping message", session.getClientId());
+            //todo 服务的转发的消息主题大于客户端能接收到的最大值
+        }
+        MqttVersion mqttVersion = session.getMqttVersion();
+        Integer subscriptionIdentifier = client.getSubscriptionIdentifier();
+        //是否是保留消息
+        boolean retain = fixedHead.isRetain();
+        if(MqttVersion.MQTT_5==mqttVersion && !client.getRetainAsPublished() ){
+            retain = false;
+        }
+        // 创建新的fixedHead副本，避免共享同一个对象导致的问题
+        TlMqttFixedHead newFixedHead = TlMqttFixedHead.builder()
+            .messageType(req.getFixedHead().getMessageType())
+            .dup(req.getFixedHead().isDup())
+            .qos(mqttQoS)
+            .retain(retain)
+            .build();
+
+        //从新复制一份variableHead
+        TlMqttPublishVariableHead newVariableHead = TlMqttPublishVariableHead.builder()
+            .topic(req.getVariableHead().getTopic())
+            .payloadFormatIndicator(req.getVariableHead().getPayloadFormatIndicator())
+            .messageExpiryInterval(req.getVariableHead().getMessageExpiryInterval())
+            //主体别名
+            // .topicAlias(req.getVariableHead().getTopicAlias())
+            .responseTopic(req.getVariableHead().getResponseTopic())
+            .correlationData(req.getVariableHead().getCorrelationData())
+            .userProperties(req.getVariableHead().getUserProperties())
+            .subscriptionIdentifier(subscriptionIdentifier==null?req.getVariableHead().getSubscriptionIdentifier():subscriptionIdentifier)
+            .contentType(req.getVariableHead().getContentType())
+            .propertiesLength(req.getVariableHead().getPropertiesLength())
+            .build();
+
+        // 如果QoS不是AT_MOST_ONCE，则需要生成新的消息ID
+        if (mqttQoS != MqttQoS.AT_MOST_ONCE) {
+//            Long messageId = idGeneratorService.nextId();
+//            newVariableHead.setMessageId(messageId);
+        }
+        TlMqttPublishReq publishReq = TlMqttPublishReq.build(
+            newFixedHead,
+            newVariableHead,
+            req.getPayload(),
+            mqttVersion);
+        publishReq.setAcceptTime(req.getAcceptTime());
+        return publishReq;
+    }
+
+
+
+
+
+
+
+    /**
+     * 客户端断开连接时调用
+     * 用于清除2个
+     * @param clientId 客户端ID
+     **/
+    public void clientDisconnected(String clientId) {
+//        clientInFlightMessages.remove(clientId);
+//        clientReceiveMaximums.remove(clientId);
+//        pendingPublishRequests.remove(clientId);
+    }
+
+    /**
+     * 消息完成时调用
+     * @param clientId 客户端ID
+     **/
+    public void ack(String clientId) {
+        //AtomicInteger inFlightCount = clientInFlightMessages.get(clientId);
+
+//        if (inFlightCount != null) {
+//            int newCount = inFlightCount.decrementAndGet();
+//            log.debug("Message completed for client [{}], in-flight count now {}", clientId, newCount);
+//            Queue<TlMqttPublishReq> tlMqttPublishReqs = pendingPublishRequests.get(clientId);
+//            if(tlMqttPublishReqs== null){
+//                return;
+//            }
+         //  TlMqttPublishReq poll = tlMqttPublishReqs.poll();
+//            send(poll, clientId);
+//        }
+    }
+
+    private void send(TlMqttPublishReq req, String clientId) {
+        if (req == null) {
+            return;
+        }
+        Channel channel = channelManager.getChannel(clientId);
+        if (channel != null && channel.isActive()) {
+            MqttQoS mqttQoS = req.getFixedHead().getQos();
+            channel.eventLoop().execute(() -> {
+                // log.info("开始转发消息到客户端【{}】,【{}】",clientId,req);
+                channel.writeAndFlush(req).addListener(future -> {
+                    if (!future.isSuccess()) {
+                        log.error("Failed to send message to client [{}]", clientId, future.cause());
+                        return;
+                    }
+                    if (mqttQoS == MqttQoS.EXACTLY_ONCE || mqttQoS == MqttQoS.AT_LEAST_ONCE) {
+                        Long messageId = req.getVariableHead().getMessageId();
+                        TlRetryTask task = new TlRetryTask(messageId, req, channel);
+                        retryManager.schedulePublishRetry(messageId, task);
+                    }
+                    log.info("Sent message to client [{}],消息是【{}】", clientId,req);
+                });
+
+            });
+        }
+    }
+
+
+
+    /**
+     * 发送遗嘱消息
+     * @param clientId 客户端ID
+     * @param req 发布消息
+     * @param willDelayInterval 延迟消息
+     */
+//        public Mono<Void> scheduleSendWillMessage(String clientId,TlMqttPublishReq req,int willDelayInterval){
+//            TlWillTask willTask = new TlWillTask(clientId,this,req,willDelayInterval);
+//            Timeout timeout = this.newTimeout(willTask,willDelayInterval, TimeUnit.SECONDS);
+//            willTask.setTimeout(timeout);
+//            willTaskMap.put(willTask.getClientId(),willTask);
+//            return Mono.empty();
+//        }
+
+
+    /**
+     * 取消定时删除会话
+     *
+     * @param clientId 客户端id
+     */
+//    public void cancelSendWillMessage(String clientId){
+//        TlWillTask willTask = willTaskMap.get(clientId);
+//        if(willTask!=null){
+//            log.info("取消定时任务");
+//            willTask.cancel();
+//        }
+//        willTaskMap.remove(clientId);
+//    }
+
+}

@@ -1,6 +1,6 @@
 package com.tlmqtt.core.codec.decoder;
 
-import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
@@ -11,8 +11,6 @@ import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.request.TlMqttPubRecReq;
 import com.tlmqtt.common.model.variable.TlMqttPubRecVariableHead;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -25,18 +23,20 @@ import java.util.Objects;
 @Slf4j
 public class TlMqttPubRecDecoder extends AbstractTlMqttDecoder {
 
+
+    public TlMqttPubRecDecoder(MqttConfiguration configuration){
+        super(configuration);
+    }
     @Override
-    public TlMqttPubRecReq build(ByteBuf buf, int type, int remainingLength, TlMqttSession session) {
-
-
-        TlMqttFixedHead fixedHead = decodeFixedHeader(type,remainingLength);
+    public TlMqttPubRecReq build(ByteBuf buf, int type, int remainingLength, TlMqttSession session){
+        TlMqttFixedHead fixedHead = decodeFixedHeader(remainingLength);
         TlMqttPubRecVariableHead variableHead = decodeVariableHeader(buf, session);
         return TlMqttPubRecReq.builder().fixedHead(fixedHead).variableHead(variableHead).build();
 
 
     }
 
-    TlMqttFixedHead decodeFixedHeader(int type,int remainingLength) {
+    TlMqttFixedHead decodeFixedHeader(int remainingLength) {
         return TlMqttFixedHead.builder().messageType(MqttMessageType.PUBREC)
             .length(remainingLength).build();
     }
@@ -45,7 +45,7 @@ public class TlMqttPubRecDecoder extends AbstractTlMqttDecoder {
         int messageId = buf.readUnsignedShort();
         TlMqttPubRecVariableHead.TlMqttPubRecVariableHeadBuilder builder = TlMqttPubRecVariableHead.builder()
             .messageId((long) messageId);
-        if (session.getMqttVersion()== MqttVersion.MQTT_5) {
+        if (session.isVersion5()) {
             //原因码
             byte reasonCode = buf.readByte();
             builder.reasonCode(reasonCode);

@@ -1,6 +1,7 @@
 package com.tlmqtt.store.service;
 
 import com.tlmqtt.common.model.entity.TlSubClient;
+import com.tlmqtt.store.service.session.listener.SessionEventListener;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -8,7 +9,7 @@ import reactor.core.publisher.Mono;
  * @author hszhou
 
  */
-public interface SubscriptionService {
+public interface SubscriptionService extends SessionEventListener {
 
 
     /**

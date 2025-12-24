@@ -10,10 +10,19 @@ import lombok.Data;
 @Data
 public class TlSessionProperties {
 
+    /**
+     * 会话默认的超时时间
+     */
     private int timeout;
 
+    /**
+     * 重发消息的延迟时间
+     */
     private int delay;
 
+    /**
+     * 最大重试次数
+     */
     private int maxRetry;
 
 }

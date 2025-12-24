@@ -2,6 +2,7 @@ package com.tlmqtt.core.codec.decoder;
 
 
 import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
@@ -13,8 +14,6 @@ import com.tlmqtt.common.model.payload.TlMqttUnSubscribePayload;
 import com.tlmqtt.common.model.request.TlMqttUnSubscribeReq;
 import com.tlmqtt.common.model.variable.TlMqttUnSubscribeVariableHead;
 import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -27,17 +26,21 @@ import java.util.Objects;
 @Slf4j
 public class TlMqttUnSubscribeDecoder extends AbstractTlMqttDecoder {
 
+
+    public TlMqttUnSubscribeDecoder(MqttConfiguration configuration) {
+        super(configuration);
+    }
     @Override
     public TlMqttUnSubscribeReq build(ByteBuf buf, int type,int remainingLength,TlMqttSession session) {
 
-        TlMqttFixedHead fixedHead = decodeFixedHeader(type,remainingLength);
+        TlMqttFixedHead fixedHead = decodeFixedHeader(remainingLength);
         TlMqttUnSubscribeVariableHead variableHead = decodeVariableHeader(buf,session);
-        TlMqttUnSubscribePayload payload = decodePayload(buf);
+        TlMqttUnSubscribePayload payload = decodePayload(buf,session.getMqttVersion());
         return TlMqttUnSubscribeReq.builder().fixedHead(fixedHead).variableHead(variableHead).payload(payload).build();
     }
 
 
-    TlMqttFixedHead decodeFixedHeader(int type,int remainingLength) {
+    TlMqttFixedHead decodeFixedHeader(int remainingLength) {
         return TlMqttFixedHead.builder().messageType(MqttMessageType.UNSUBSCRIBE)
             .length(remainingLength).build();
     }
@@ -48,7 +51,7 @@ public class TlMqttUnSubscribeDecoder extends AbstractTlMqttDecoder {
         int messageId = buf.readUnsignedShort();
         TlMqttUnSubscribeVariableHead.TlMqttUnSubscribeVariableHeadBuilder builder = TlMqttUnSubscribeVariableHead.builder()
             .messageId(messageId);
-        if(session.getMqttVersion() == MqttVersion.MQTT_5){
+        if(session.isVersion5()){
             int propertyLength = decodeRemainingLength(buf);
             // 4. 记录属性读取的起始位置
             final int propertiesStartIndex = buf.readerIndex();
@@ -76,7 +79,7 @@ public class TlMqttUnSubscribeDecoder extends AbstractTlMqttDecoder {
     }
 
 
-    TlMqttUnSubscribePayload decodePayload(ByteBuf buf) {
+    TlMqttUnSubscribePayload decodePayload(ByteBuf buf,MqttVersion mqttVersion) {
         TlMqttUnSubscribePayload payload = new TlMqttUnSubscribePayload();
         List<TlTopic> topics = new ArrayList<>();
 
@@ -86,7 +89,30 @@ public class TlMqttUnSubscribeDecoder extends AbstractTlMqttDecoder {
             byte[] topicFilter = new byte[topicFilterLength];
             buf.readBytes(topicFilter);
             String topicFilterStr = new String(topicFilter);
-            topic.setName(topicFilterStr);
+
+            if(mqttVersion==MqttVersion.MQTT_5 && topicFilterStr.startsWith(Constant.QUEUE_PREFIX_SUBSCRIBE)){
+                //去掉前缀 获取真正的主题名称
+                topicFilterStr = topicFilterStr.substring(Constant.QUEUE_PREFIX_SUBSCRIBE.length());
+                topic.setShare(true);
+                topic.setGroup(topicFilterStr);
+                topic.setName(topicFilterStr);
+                //将其保存 键值对 间就是主题名称 值就是订阅者
+            }else if(mqttVersion==MqttVersion.MQTT_5 && topicFilterStr.startsWith(Constant.SHARE_PREFIX_SUBSCRIBE)) {
+                String withoutPrefix = topicFilterStr.substring(Constant.SHARE_PREFIX_SUBSCRIBE.length());
+
+                // 找到第一个斜杠的位置
+                int firstSlashIndex = withoutPrefix.indexOf("/");
+                if (firstSlashIndex != -1) {
+                    String group = withoutPrefix.substring(0, firstSlashIndex);
+                    String subPath = withoutPrefix.substring(firstSlashIndex + 1);
+                    topic.setShare(true);
+                    topic.setGroup(group);
+                    topic.setName(subPath);
+                }
+            }else{
+                topic.setName(topicFilterStr);
+                topic.setShare(false);
+            }
             topics.add(topic);
         }
         payload.setTopics(topics);

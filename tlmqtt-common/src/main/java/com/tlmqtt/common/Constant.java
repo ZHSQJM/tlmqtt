@@ -1,5 +1,8 @@
 package com.tlmqtt.common;
 
+import com.tlmqtt.common.model.TlMqttSession;
+import io.netty.util.AttributeKey;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -12,20 +15,17 @@ public class Constant {
      * 协议名称
      */
     public static final String PROTOCOL_NAME = "MQTT";
-    /**
-     * 保存在通道中客户端的KEY
-     */
-    public static final String CLIENT_ID = "client_id";
+
+
 
     /**
      * 保存到通道中的断开连接是否发送了disconnect报文
      */
     public static final String DISCONNECT = "disconnect_flag";
+    public static final String MQTT_SESSION = "session";
+    public static final AttributeKey<Boolean> DISCONNECT_KEY = AttributeKey.valueOf(Constant.DISCONNECT);
+    public static final AttributeKey<TlMqttSession> SESSION_KEY = AttributeKey.valueOf(Constant.MQTT_SESSION);
 
-    /**
-     * 保存在通道中的消息KEY 用于在接收pubrel的时候获取对应的消息
-     */
-    public static final String PUB_MSG = "pub_msg";
 
     /**
      * 消息位移的位数
@@ -38,10 +38,23 @@ public class Constant {
     public static final String ASTERISK = "*";
     public static final String COMMA = "\\,";
     public static final String VERTICAL_LINE ="\\|";
-    public static final String MQTT_SESSION = "session";
+
 
     /**分组订阅的前缀*/
-    public static final String SHARE_PREFIX_SUBSCRIBE = "$share";
+    public static final String SHARE_PREFIX_SUBSCRIBE = "$share/";
 
-    public static final String QUEUE_PREFIX_SUBSCRIBE = "$queue";
+    public static final String QUEUE_PREFIX_SUBSCRIBE = "$queue/";
+
+    /**错误的QOS等级*/
+    public static final int ERROR_QOS = 3;
+
+    /**
+     * acl控制的类型
+     */
+    public static final String CLIENT = "client";
+    public static final String IP = "ip";
+    public static final String USER = "user";
+
+    /**优雅停机后的时间*/
+    public static final long TIMEOUT = 10; ;
 }

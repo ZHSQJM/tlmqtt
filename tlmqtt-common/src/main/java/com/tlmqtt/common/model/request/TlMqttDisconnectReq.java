@@ -13,7 +13,6 @@ import lombok.experimental.SuperBuilder;
  */
 @EqualsAndHashCode(callSuper = true)
 @ToString
-@Accessors
 @SuperBuilder
 @Data
 public class TlMqttDisconnectReq extends AbstractTlMessage {

@@ -1,9 +1,7 @@
 package com.tlmqtt.core.handler;
 
-import com.tlmqtt.auth.acl.AclManager;
-import com.tlmqtt.bridge.TlBridgeManager;
-import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.config.TlConfig;
+import com.tlmqtt.authorization.base.AuthorizationManager;
+import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
@@ -16,149 +14,136 @@ import com.tlmqtt.common.model.request.TlMqttPubRecReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.response.TlMqttPubAck;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
-import com.tlmqtt.core.manager.TlStoreManager;
-import com.tlmqtt.core.manager.MessageManager;
+
+import com.tlmqtt.core.service.ForwardMessageService;
+import com.tlmqtt.store.service.PublishService;
+import com.tlmqtt.store.service.RetainService;
+
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.AttributeKey;
-import lombok.RequiredArgsConstructor;
+import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 /**
- * @author hszhou
+ * MQTT 消息发布处理器 (入站)
+ * 负责处理客户端发送到 Broker 的 PUBLISH 报文
+ * * @author hszhou
  */
 @Slf4j
-@RequiredArgsConstructor
 @ChannelHandler.Sharable
 public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
 
-    private final TlStoreManager storeManager;
-
-    private final AclManager aclManager;
-
-    private final TlBridgeManager bridgeManager;
-
-    private final MessageManager messageService;
+    private final ForwardMessageService forwardMessageService;
 
 
+
+    public TlPublishHandler(RetainService retainService, AuthorizationManager authorizationManager,
+        ForwardMessageService forwardMessageService, PublishService publishService) {
+        this.forwardMessageService = forwardMessageService;
+        this.publishService = publishService;
+        super.setAuthorizationManager(authorizationManager);
+        super.setRetainService(retainService);
+    }
 
     @Override
-    public void handle(ChannelHandlerContext ctx, TlMqttPublishReq req, TlMqttSession session) {
-
+    public void handle(ChannelHandlerContext ctx, TlMqttPublishReq req,
+        TlMqttSession session) {
         String clientId = session.getClientId();
-
-        Channel channel = ctx.channel();
         MqttVersion mqttVersion = session.getMqttVersion();
         TlMqttFixedHead fixedHead = req.getFixedHead();
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
 
-        boolean retain = fixedHead.isRetain();
         MqttQoS messageQos = fixedHead.getQos();
         String topic = variableHead.getTopic();
-
-        if(TlConfig.getStringList(TlConfig.INVALID_TOPIC_NAMES).contains(topic) && messageQos.value()>0){
-            throw new TlMqttException(MqttErrorCode.UNAUTHORIZED,false, MqttMessageType.PUBLISH,messageQos==MqttQoS.AT_LEAST_ONCE?MqttMessageType.PUBACK:MqttMessageType.PUBREL);
-        }
-
-        //todo 判断该标识符是否被占用
-        Long messageId1 = variableHead.getMessageId();
-        /*如果是保留消息 存储*/
-        if (retain) {
-            storeRetain(topic,req).subscribe();
-        }
-
-
-        String username =session.getUsername();
-        String ip = session.getIp();
-        if (!aclManager.checkPublishPermission(clientId,username,ip, topic)) {
-            log.error("Client 【{}】 no permission to publish topic 【{}】", clientId, topic);
-            if(mqttVersion == MqttVersion.MQTT_5 && messageQos.value()>0){
-                //如果没有权限
-                throw new TlMqttException(MqttErrorCode.UNAUTHORIZED,false, MqttMessageType.PUBLISH,messageQos==MqttQoS.AT_LEAST_ONCE?MqttMessageType.PUBACK:MqttMessageType.PUBREL);
+        boolean retain = fixedHead.isRetain();
+        // 1. ACL 发布权限校验
+        if (!authorizationManager.checkPublishPermission(clientId, session.getUsername(), session.getIp(), topic)) {
+            log.error("ACL Deny: Client [{}] has no permission to publish to [{}]", clientId, topic);
+            if (session.isVersion5()&& messageQos.value() > 0) {
+                ctx.fireExceptionCaught(new TlMqttException(MqttErrorCode.UNAUTHORIZED, false, MqttMessageType.PUBLISH,
+                    messageQos == MqttQoS.AT_LEAST_ONCE ? MqttMessageType.PUBACK : MqttMessageType.PUBREL));
             }
-            return;
+            return; // QoS 0 直接丢弃
+        }
+
+        // 3. 保留消息 (Retain) 处理
+        if (retain) {
+            storeRetain(topic, req).subscribe();
         }
 
         Long messageId = variableHead.getMessageId();
 
-
-
+        // 4. 根据 QoS 分流处理核心逻辑
         switch (messageQos) {
-            case AT_LEAST_ONCE:
-                sendAck(messageId, channel,mqttVersion);
+            case AT_MOST_ONCE:
+                forwardMessageService.publish(req, clientId, mqttVersion);
                 break;
-            case EXACTLY_ONCE:
-                //这里需要保存消息 key是messageId，value是req，在收到rel消息后 需要将这个消息转发到其他订阅的客户端 在rel只能收到messageId，没有其他的信息
-                channel.attr(AttributeKey.valueOf(Constant.PUB_MSG)).set(req);
-                //发送rec消息给发送者
-                sendRec(messageId, channel,mqttVersion);
-                return;
-            default:
-        }
-        //转发给其他的订阅的客户端
-        messageService.publish(req,clientId,mqttVersion);
-    }
 
+            case AT_LEAST_ONCE:
+                // 先执行转发，确保消息送达订阅者
+                forwardMessageService.publish(req, clientId, mqttVersion);
+                // 再回复客户端 PUBACK
+                sendAck(messageId, ctx.channel(), mqttVersion);
+                break;
+
+            case EXACTLY_ONCE:
+                // QoS 2 必须先存入 Inbound 暂存区，回复 REC。
+                // 真正的转发由 TlPubRelHandler 在收到客户端释放信号后再触发。
+                handleQoS2Inbound(ctx, req, clientId, messageId, mqttVersion);
+                break;
+
+            default:
+                log.warn("Unknown QoS level: [{}] from client [{}]", messageQos, clientId);
+        }
+    }
     /**
-     * @description: 在新订阅的时候发送
-     * @author hszhou
-     * 2025-04-29 18:29:08
-     * @param:
-     * @param: topic 主题
-     * @param: content 内容
-     * @param: qos
-     * @param: messageId
-     * @return: Mono<Boolean>
-     **/
-    private Mono<Boolean> storeRetain(String topic,TlMqttPublishReq req) {
+     * QoS 2 入站暂存处理
+     */
+    private void handleQoS2Inbound (ChannelHandlerContext ctx, TlMqttPublishReq req, String clientId, Long
+    messageId, MqttVersion version){
+        // 关键：增加引用计数，防止 Netty 在异步存储完成前回收内存
+        ReferenceCountUtil.retain(req);
+
+        publishService.save(clientId, messageId, req)
+            .subscribeOn(Schedulers.boundedElastic())
+            .doFinally(signal -> {
+                // 存储操作结束后释放引用
+                ReferenceCountUtil.release(req);
+            }).subscribe(v -> {
+                // 存储成功，回复 PUBREC
+                sendRec(messageId, ctx.channel(), version);
+            }, e -> {
+                log.error("Failed to persist QoS 2 inbound message for [{}], id [{}]", clientId, messageId, e);
+                // 如果存储失败，通常不回 REC，客户端会因超时重发 PUBLISH
+            });
+    }
+    /**
+     * 保留消息持久化逻辑
+     */
+    private Mono<Boolean> storeRetain(String topic, TlMqttPublishReq req) {
         return Mono.defer(() -> {
-            Object content = req.getPayload().getContent();
-            if ("".equals(content) || null == content) {
-                return storeManager.getRetainService().clear(topic);
+            Object content = req.getPayload() != null ? req.getPayload().getContent() : null;
+            // MQTT 规范：Payload 为空代表删除该主题的保留消息
+            if (content == null || ("".equals(content))) {
+                log.debug("Clearing retain message for topic: [{}]", topic);
+                return retainService.clear(topic);
             } else {
-                req.setAcceptTime(System.currentTimeMillis()/1000);
-                return storeManager.getRetainService().save(topic, req);
+                req.setAcceptTime(System.currentTimeMillis() / 1000);
+                return retainService.save(topic, req);
             }
         });
     }
 
-    /**
-     * 构建ack消息发送返回
-     * @param channel 消息ID
-     * @param messageId channel
-     */
-    private void sendAck(Long messageId,Channel channel,MqttVersion mqttVersion) {
-
-        /*
-         * 0	0x00	成功	消息被接收。QoS为1的消息已发布。
-         * 16	0x10	无匹配的订阅者	消息被接收，但没有订阅者。只有服务端会发送此原因码。如果服务端得知没有匹配的订阅者，服务端可以使用此原因码代替0x00（成功）。
-         * 128	0x80	未指明的错误	接收端不接受此消息，且不愿意透露错误原因或没有适用的原因码。
-         * 131	0x83	实现特定错误	PUBLISH报文有效，但不被接收端所接受。
-         * 135	0x87	未授权	PUBLISH报文未授权。
-         * 144	0x90	主题名无效	主题名格式正确，但未被客户端或服务端所接受。
-         * 145	0x91	报文标识符被占用	报文标识符已被占用。可能表明客户端和服务端之间的会话状态不匹配。
-         * 151	0x97	超出配额	已超出实现限制或管理限制。
-         * 153	0x99	载荷格式无效	载荷格式与载荷格式指示符不匹配。
-         **/
-        TlMqttPubAck res = TlMqttPubAck.build(messageId, PubReasonCode.SUCCESS.getCode(), null, null,mqttVersion);
+    private void sendAck(Long messageId, Channel channel, MqttVersion mqttVersion) {
+        TlMqttPubAck res = TlMqttPubAck.build(messageId, PubReasonCode.SUCCESS.getCode(), null, null, mqttVersion);
         channel.writeAndFlush(res);
     }
 
-    /**
-     * @description: 发送rec消息给客户端
-     * @author hszhou
-     * 2025-05-08 16:21:42
-     * @param: channel
-     * @param: messageId
-     * @param: clientId
-     * @return: void
-     **/
-    private void sendRec(Long messageId,Channel channel,MqttVersion mqttVersion) {
-        TlMqttPubRecReq res = TlMqttPubRecReq.build(messageId, PubReasonCode.SUCCESS.getCode(), null, null,mqttVersion);
+    private void sendRec(Long messageId, Channel channel, MqttVersion mqttVersion) {
+        TlMqttPubRecReq res = TlMqttPubRecReq.build(messageId, PubReasonCode.SUCCESS.getCode(), null, null, mqttVersion);
         channel.writeAndFlush(res);
     }
-
-
 }

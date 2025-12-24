@@ -14,7 +14,6 @@ import lombok.experimental.SuperBuilder;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @ToString
-@Accessors
 @SuperBuilder
 public class TlMqttPubRelReq extends AbstractTlMessage {
 

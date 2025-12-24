@@ -25,7 +25,6 @@ public class TlMqttPublishEncoder extends AbstractTlMqttEncoder<TlMqttPublishReq
     @Override
     protected void encode(ChannelHandlerContext ctx, TlMqttPublishReq req, ByteBuf out, MqttMessageType mqttMessageType)  {
 
-        log.info("encode publish req[{}]",req);
         TlMqttFixedHead fixedHead = req.getFixedHead();
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
         int type = getFixedHeaderByte(fixedHead);
@@ -62,7 +61,7 @@ public class TlMqttPublishEncoder extends AbstractTlMqttEncoder<TlMqttPublishReq
         Object content = req.getPayload().getContent();
         byte[] bytes = content.toString().getBytes();
         out.writeBytes(bytes);
-        log.info("encode publish req[{}] finished",req);
+        log.debug("encode publish req[{}] finished",req);
     }
     private void writeProperties(TlMqttPublishVariableHead variableHead, ByteBuf out) {
         Boolean payloadFormatIndicator = variableHead.getPayloadFormatIndicator();

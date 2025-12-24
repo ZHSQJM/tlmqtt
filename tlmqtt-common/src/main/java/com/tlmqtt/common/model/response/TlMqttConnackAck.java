@@ -1,7 +1,6 @@
 package com.tlmqtt.common.model.response;
 
-import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.config.TlConfig;
+import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
@@ -23,34 +22,31 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @ToString
-@Accessors
 @SuperBuilder
 @Slf4j
 public class TlMqttConnackAck extends AbstractTlMessage {
 
     private TlMqttConnackVariableHead variableHead;
 
-    public static TlMqttConnackAck build(int sessionPresent, MqttErrorCode returnCode, MqttVersion mqttVersion,String clientId,short keepAlive){
-
-
+    public static TlMqttConnackAck build(int sessionPresent, MqttErrorCode returnCode, MqttVersion mqttVersion,String clientId,short keepAlive,  MqttConfiguration mqttConfiguration){
         TlMqttConnackVariableHead variableHead =TlMqttConnackVariableHead.builder().currentSession(sessionPresent).code(returnCode.byteValue()).build();
         int propertiesLength = 0;
         if(mqttVersion == MqttVersion.MQTT_5){
             //如果会话过期间隔（Session Expiry Interval）值未指定，则使用CONNECT报文中指定的会话过期时间间隔。服务端使用此属性通知客户端它使用的会话过期时间间隔与客户端在CONNECT中发送的值不同。
-            variableHead.setSessionExpiryInterval(TlConfig.getInt(TlConfig.SESSION_EXPIRY_INTERVAL));
+            variableHead.setSessionExpiryInterval(mqttConfiguration.getInt(MqttConfiguration.SESSION_EXPIRY_INTERVAL));
             //服务端使用此值限制服务端愿意为该客户端同时处理的QoS为1和QoS为2的发布消息最大数量。没有机制可以限制客户端试图发送的QoS为0的发布消息。 如果没有设置最大接收值，将使用默认值6553
             variableHead.setReceiveMaximum((short)200);
             //最大服务质量 Maximum QoS 如果没有设置最大服务质量，客户端可使用最大QoS为2。
-            variableHead.setMaximumQoS(TlConfig.getInt(TlConfig.MAXIMUM_QOS));
-            variableHead.setRetainAvailable(TlConfig.getBoolean(TlConfig.RETAIN_AVAILABLE)?(byte) 1:(byte) 0);
-            variableHead.setMaximumPacketSize(TlConfig.getInt(TlConfig.MAXIMUM_PACKET_SIZE));
+            variableHead.setMaximumQoS(mqttConfiguration.getInt(MqttConfiguration.MAXIMUM_QOS));
+            variableHead.setRetainAvailable(mqttConfiguration.getBoolean(MqttConfiguration.RETAIN_AVAILABLE)?(byte) 1:(byte) 0);
+            variableHead.setMaximumPacketSize(mqttConfiguration.getInt(MqttConfiguration.MAXIMUM_PACKET_SIZE));
             variableHead.setAssignedClientIdentifier(clientId);
-            variableHead.setTopicAliasMaximum((short)TlConfig.getInt(TlConfig.TOPIC_ALIAS_MAXIMUM));
+            variableHead.setTopicAliasMaximum((short)mqttConfiguration.getInt(MqttConfiguration.TOPIC_ALIAS_MAXIMUM).intValue());
             variableHead.setReasonString(null);
             variableHead.setUserProperties(null);
-            variableHead.setWildcardSubscriptionsAvailable(TlConfig.getBoolean(TlConfig.WILDCARD_SUBSCRIPTION_AVAILABLE));
-            variableHead.setSubscriptionIdentifiersAvailable(TlConfig.getBoolean(TlConfig.SUBSCRIPTION_IDENTIFIERS_AVAILABLE));
-            variableHead.setSharedSubscriptionAvailable(TlConfig.getBoolean(TlConfig.SHARED_SUBSCRIPTION_AVAILABLE));
+            variableHead.setWildcardSubscriptionsAvailable(mqttConfiguration.getBoolean(MqttConfiguration.WILDCARD_SUBSCRIPTION_AVAILABLE));
+            variableHead.setSubscriptionIdentifiersAvailable(mqttConfiguration.getBoolean(MqttConfiguration.SUBSCRIPTION_IDENTIFIERS_AVAILABLE));
+            variableHead.setSharedSubscriptionAvailable(mqttConfiguration.getBoolean(MqttConfiguration.SHARED_SUBSCRIPTION_AVAILABLE));
             variableHead.setServerKeepAlive(keepAlive);
             variableHead.setResponseInformation(null);
             variableHead.setServerReference(null);

@@ -1,7 +1,8 @@
 package com.tlmqtt.core.codec.decoder;
 
 import cn.hutool.core.util.StrUtil;
-import com.tlmqtt.common.config.TlConfig;
+import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
@@ -28,9 +29,44 @@ import java.util.Objects;
  */
 @Slf4j
 public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
+    private  int maximumQos;
+    private  boolean retainAvailable;
+    private  List<String> invalidTopicNames;
+    private int topicAliasMaximum;
+
+
+    public  TlMqttPublishDecoder(MqttConfiguration configuration){
+        super(configuration);
+        this.maximumQos = configuration.getInt(MqttConfiguration.MAXIMUM_QOS);
+        this.retainAvailable = configuration.getBoolean(MqttConfiguration.RETAIN_AVAILABLE);
+        this.invalidTopicNames = configuration.getList(MqttConfiguration.INVALID_TOPIC_NAMES);
+        this.topicAliasMaximum = configuration.getInt(MqttConfiguration.TOPIC_ALIAS_MAXIMUM);
+        configuration.addListener(property -> {
+            if (property == MqttConfiguration.Property.MAXIMUM_QOS) {
+                int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_QOS.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.maximumQos = newValue;
+            }
+            if (property == MqttConfiguration.Property.RETAIN_AVAILABLE) {
+                boolean newValue = configuration.getBoolean(MqttConfiguration.Property.RETAIN_AVAILABLE.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.retainAvailable = newValue;
+            }
+            if (property == MqttConfiguration.Property.INVALID_TOPIC_NAMES) {
+                List<String> newValue = configuration.getList(MqttConfiguration.Property.INVALID_TOPIC_NAMES.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.invalidTopicNames = newValue;
+            }
+            if (property == MqttConfiguration.Property.TOPIC_ALIAS_MAXIMUM) {
+                int  newValue = configuration.getInt(MqttConfiguration.Property.TOPIC_ALIAS_MAXIMUM.getKey());
+                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                this.topicAliasMaximum = newValue;
+            }
+        });
+    }
 
     @Override
-    public TlMqttPublishReq build(ByteBuf buf, int type, int remainingLength, TlMqttSession session ) {
+    public TlMqttPublishReq build(ByteBuf buf, int type, int remainingLength, TlMqttSession session) {
 
         MqttVersion mqttVersion = session.getMqttVersion();
         TlMqttFixedHead fixedHead = decodeFixedHeader(type, remainingLength,mqttVersion);
@@ -39,19 +75,27 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
         TlMqttPublishPayload payload = decodePayload(buf);
         TlMqttPublishReq.TlMqttPublishReqBuilder<?, ?> builder = TlMqttPublishReq.builder().fixedHead(fixedHead)
             .variableHead(variableHead).payload(payload);
-        if(mqttVersion == MqttVersion.MQTT_5){
+        if(session.isVersion5()){
             builder.acceptTime(getCurrentTime());
         }
         return builder.build();
     }
 
-    TlMqttFixedHead decodeFixedHeader(int type, int remainingLength,MqttVersion mqttVersion) {
+
+    /**
+     * 解码固定报头
+     * @param type 类型
+     * @param remainingLength 剩余长度
+     * @param mqttVersion mqtt版本
+     * @return 固定报头
+     */
+    TlMqttFixedHead decodeFixedHeader(int type, int remainingLength,MqttVersion mqttVersion ) {
         TlMqttFixedHead fixedHead = new TlMqttFixedHead();
         int messageType = type >> 4;
         int retain = (type) & 1;
         int qos = (type >> 1) & 3;
         //接收到超过其指定的最大服务质量的PUBLISH报文将造成协议错误（Protocol Error）。这种情况下应使用包含原因码为0x9B（不支持的QoS等级）的DISCONNECT报文进行处理，如4.13节所述。
-        if(TlConfig.getInt(TlConfig.MAXIMUM_QOS)<qos && mqttVersion == MqttVersion.MQTT_5){
+        if(maximumQos<qos && mqttVersion == MqttVersion.MQTT_5){
             throw new TlProtocolErrorException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.PUBLISH);
         }
         int dup = (type >> 3) & 1;
@@ -60,28 +104,36 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
         fixedHead.setQos(MqttQoS.valueOf(qos));
         fixedHead.setRetain(retain != 0);
         //如果服务端发送给客户端的CONNACK报文中包含保留可用属性，且属性值为0，但收到的PUBLISH报文中保留标志位为1，服务端使用包含原因码为0x9A（保留不支持）的DISCONNECT报文断开网络连接，如4.13节所述。
-        if(!TlConfig.getBoolean(TlConfig.RETAIN_AVAILABLE) && retain!=0){
+        if(!retainAvailable && retain!=0){
             throw new TlProtocolErrorException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,MqttMessageType.PUBLISH);
         }
         fixedHead.setLength(remainingLength);
-
-        if(qos>0 && TlConfig.getInt(TlConfig.MAXIMUM_PACKET_SIZE) < remainingLength){
-            //客户端不能发送超过最大报文长度（Maximum Packet Size）的报文给服务端 [MQTT-3.2.2-15]。收到长度超过限制的报文将导致协议错误，此时服务端应该发送包含原因码0x95（报文过长）的DISCONNECT报文给客户端
-            throw new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_MESSAGE_TOO_LARGE,true,MqttMessageType.PUBLISH,MqttMessageType.DISCONNECT);
-        }
 
         return fixedHead;
     }
 
 
+    /**
+     * 解码可变报头
+     * @param buf 数据流
+     * @param qos QoS等级
+     * @param session 会话
+     * @return 可变报头
+     */
     TlMqttPublishVariableHead decodeVariableHeader(ByteBuf buf, MqttQoS qos, TlMqttSession session) {
         int topicLength = buf.readUnsignedShort();
         byte[] topic = new byte[topicLength];
         buf.readBytes(topic);
         //不能包含通配符 如果存在通配符则不能发布 抛异常
         String topicName = new String(topic);
-        if(StrUtil.isNotEmpty(topicName) && (topicName.contains("#") || topicName.contains("+"))){
+        boolean correctTopic = StrUtil.isNotEmpty(topicName) && (topicName.contains(Constant.TOPIC_SPLITTER) || topicName.contains(
+            Constant.ASTERISK));
+        if(correctTopic){
            throw new TlMalformedPacketException(MqttMessageType.PUBLISH);
+        }
+        if (invalidTopicNames.contains(topicName) && qos.value() > 0) {
+            throw new TlMqttException(MqttErrorCode.UNAUTHORIZED, false, MqttMessageType.PUBLISH,
+                        qos == MqttQoS.AT_LEAST_ONCE ? MqttMessageType.PUBACK : MqttMessageType.PUBREL);
         }
         TlMqttPublishVariableHead.TlMqttPublishVariableHeadBuilder builder = TlMqttPublishVariableHead.builder()
                                                                                                       .topic(topicName);
@@ -89,7 +141,7 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
             int messageId = buf.readUnsignedShort();
             builder.messageId((long)messageId);
         }
-        if(session.getMqttVersion() == MqttVersion.MQTT_5){
+        if(session.isVersion5()){
             int propertyLength = decodeRemainingLength(buf);
             builder.propertiesLength(propertyLength);
             final int propertiesStartIndex = buf.readerIndex();
@@ -112,7 +164,7 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
                         int topicAlias = buf.readShort();
 
                         //1) 主题别名为0或大于最大主题别名（Maximum Topic Alias），将造成协议错误（Protocol Error），接收端使用包含原因码为0x94（主题别名无效）的DISCONNECT报文断开网络连接
-                        if(topicAlias == 0 || topicAlias> TlConfig.getInt(TlConfig.TOPIC_ALIAS_MAXIMUM)){
+                        if(topicAlias == 0 || topicAlias> topicAliasMaximum){
                             throw new TlProtocolErrorException(MqttErrorCode.TOPIC_ALIAS_INVALID,MqttMessageType.PUBLISH);
                         }
                         builder.topicAlias(topicAlias);

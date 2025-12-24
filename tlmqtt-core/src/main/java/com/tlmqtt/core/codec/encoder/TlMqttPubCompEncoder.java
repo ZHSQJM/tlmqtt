@@ -12,7 +12,6 @@ import com.tlmqtt.common.model.variable.TlMqttPubCompVariableHead;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.MessageToByteEncoder;
 import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 

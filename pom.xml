@@ -12,10 +12,13 @@
         <module>tlmqtt-common</module>
         <module>tlmqtt-core</module>
         <module>tlmqtt-store</module>
-        <module>tlmqtt-auth</module>
-        <module>tlmqtt-bridge</module>
+        <module>tlmqtt-authentication</module>
+        <module>tlmqtt-source</module>
         <module>tlmqtt-demo</module>
-        <module>tlmqtt-config</module>
+        <module>tlmqtt-spring-boot-starter</module>
+        <module>tlmqtt-rule</module>
+        <module>tlmqtt-bootstrap</module>
+        <module>tlmqtt-authorization</module>
     </modules>
 
     <!--项目地址-->
@@ -62,8 +65,8 @@
         <httpclient.version>4.5.13</httpclient.version>
         <disruptor.version>3.4.2</disruptor.version>
         <lombok.version>1.18.30</lombok.version>
-        <logback-classic.version>1.5.19</logback-classic.version>
-        <slf4j.version>2.0.9</slf4j.version>
+        <logback.version>1.4.14</logback.version>
+        <slf4j.version>1.7.36</slf4j.version>
         <hutool.version>5.8.24</hutool.version>
         <caffeine.version>3.2.0</caffeine.version>
     </properties>
@@ -175,17 +178,15 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <version>${lombok.version}</version>
+
         </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>${logback-classic.version}</version>
-        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>${slf4j.version}</version>
         </dependency>
+
     </dependencies>
 
     <profiles>

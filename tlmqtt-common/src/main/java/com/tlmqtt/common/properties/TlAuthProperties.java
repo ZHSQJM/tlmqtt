@@ -14,9 +14,10 @@ import java.util.List;
 @Data
 public class TlAuthProperties {
 
+    /** 是否开启认证 */
     private boolean enabled;
 
-    private List<TlAuthUser> user = new ArrayList<>();
+   private List<TlAuthUser> user = new ArrayList<>();
 
 
 }

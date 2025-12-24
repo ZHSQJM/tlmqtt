@@ -2,6 +2,7 @@ package com.tlmqtt.store.service;
 
 import com.tlmqtt.common.model.request.TlMqttPubRelReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
+import com.tlmqtt.store.service.session.listener.SessionEventListener;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -9,7 +10,7 @@ import reactor.core.publisher.Mono;
  * @author hszhou
 
  */
-public interface PubrelService {
+public interface PubrelService extends SessionEventListener {
 
     /**
      * 保存订阅者的某个rel的消息

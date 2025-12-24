@@ -1,0 +1,40 @@
+package com.tlmqtt.authentication.sql;
+
+import lombok.Data;
+import lombok.experimental.Accessors;
+
+/**
+ * 数据库对象实体类
+ *
+ * @author  hszhou
+ */
+@Data
+@Accessors(chain = true)
+public class SqlEntityInfo {
+
+    /**地址*/
+    private String host;
+
+    /**端口号*/
+    private String port;
+
+    /**用户名*/
+    private String username;
+
+    /**密码*/
+    private String password;
+
+    /**数据库名*/
+    private String  database;
+
+    /**表名*/
+    private String table;
+
+    /**用户名字段*/
+    private String usernameColumn;
+
+    /**密码字段*/
+    private String passwordColumn;
+
+    private String driverClassName;
+}

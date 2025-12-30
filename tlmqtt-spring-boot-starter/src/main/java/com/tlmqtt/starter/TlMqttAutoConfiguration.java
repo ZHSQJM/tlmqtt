@@ -4,6 +4,7 @@ import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.bootstrap.TlBootstrap;
 import com.tlmqtt.common.config.MqttConfiguration;
+import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.common.properties.TlAuthProperties;
 import com.tlmqtt.common.properties.TlSessionProperties;
 import com.tlmqtt.core.alias.AliasService;
@@ -34,6 +35,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.util.List;
+
 /**
  * @author zhouhs
  * @version 0.1.0
@@ -44,6 +47,8 @@ import org.springframework.context.annotation.Configuration;
 @EnableConfigurationProperties(TlMqttProperties.class)
 public class TlMqttAutoConfiguration {
 
+    @Autowired(required = false)
+    private List<PublishInterceptor> interceptors;
 
     @Bean
     public TlBootstrap bootstrap(@Autowired TlMqttProperties mqttProperties,
@@ -83,6 +88,7 @@ public class TlMqttAutoConfiguration {
                  .authenticationManager(authenticationManager)
                  .authorizationManager(authorizationManager)
                  .mqttConfiguration(mqttConfiguration)
+           .interceptors(interceptors)
                  .start();
     }
 

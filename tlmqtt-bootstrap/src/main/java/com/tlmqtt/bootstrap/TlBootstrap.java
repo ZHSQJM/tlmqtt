@@ -4,6 +4,7 @@ import cn.hutool.core.thread.ThreadFactoryBuilder;
 import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.common.config.MqttConfiguration;
+import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.common.properties.TlBusinessProperties;
 import com.tlmqtt.common.properties.TlMqttServerProperties;
 import com.tlmqtt.core.alias.AliasService;
@@ -18,6 +19,7 @@ import com.tlmqtt.store.service.SubscriptionService;
 import com.tlmqtt.store.service.session.SessionService;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -69,6 +71,11 @@ public class TlBootstrap {
     }
     public TlBootstrap authorizationManager(AuthorizationManager authorizationManager){
         containerBuilder.authorizationManager(authorizationManager);
+        return this;
+    }
+
+    public TlBootstrap interceptors(List<PublishInterceptor> interceptors) {
+        containerBuilder.interceptors(interceptors);
         return this;
     }
     public TlBootstrap mqttConfiguration(MqttConfiguration mqttConfiguration) {

@@ -3,6 +3,7 @@ package com.tlmqtt.bootstrap;
 import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.common.config.MqttConfiguration;
+import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.common.properties.TlMqttServerProperties;
 import com.tlmqtt.common.properties.TlSessionProperties;
 import com.tlmqtt.core.channel.TlChannelService;
@@ -30,6 +31,7 @@ import com.tlmqtt.store.service.session.SessionService;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -57,7 +59,7 @@ public class MqttComponentContainer {
     private final AuthorizationManager authorizationManager;
     private final MqttConfiguration mqttConfiguration;
 
-
+    private final List<PublishInterceptor> interceptors;
 
     private TlConnectHandler connectHandler;
     private TlDisconnectHandler disconnectHandler;
@@ -85,7 +87,7 @@ public class MqttComponentContainer {
         this.heartBeatHandler = new TlHeartBeatHandler();
         this.pubAckHandler = new TlPubAckHandler(publishService, forwardService);
         this.pubCompHandler = new TlPubCompHandler(forwardService, pubrelService);
-        this.publishHandler = new TlPublishHandler(retainService, authorizationManager, forwardService, publishService);
+        this.publishHandler = new TlPublishHandler(retainService, authorizationManager, forwardService, publishService,interceptors);
         this.pubRecHandler = new TlPubRecHandler(publishService, pubrelService, forwardService);
         this.pubRelHandler = new TlPubRelHandler(forwardService, publishService);
         this.subscribeHandler = new TlSubscribeHandler(forwardService, authorizationManager, shareSubscribeService, sessionService, retainService, publishService, subscriptionService);

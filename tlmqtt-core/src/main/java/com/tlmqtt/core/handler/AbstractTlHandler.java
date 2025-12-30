@@ -7,8 +7,9 @@ import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.AbstractTlMessage;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.core.channel.TlChannelService;
-import com.tlmqtt.core.service.PublishInterceptor;
+import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.store.service.PublishService;
 import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
@@ -44,8 +45,7 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
     protected  AuthenticationManager authenticationManager;
     protected  AuthorizationManager authorizationManager;
     protected  MqttConfiguration mqttConfiguration;
-
-    protected List<PublishInterceptor<T>> interceptors = new ArrayList<>();
+    protected List<PublishInterceptor> interceptors = new ArrayList<>();
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, T req) throws Exception {
@@ -58,14 +58,18 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
         }
 
         if (req.getFixedHead().getMessageType() == MqttMessageType.PUBLISH && !interceptors.isEmpty()) {
-            for (PublishInterceptor<T> interceptor : interceptors) {
-                req = interceptor.intercept(ctx, req, session);
+            // 强转为 Publish 请求进行拦截
+            TlMqttPublishReq publishReq = (TlMqttPublishReq) req;
+            for (PublishInterceptor interceptor : interceptors) {
+                publishReq = interceptor.intercept(ctx, publishReq, session);
                 // 如果某个拦截器返回 null，表示终止后续处理和 Handler 执行
-                if (req == null) {
+                if (publishReq == null) {
                     log.debug("Message processing terminated by interceptor: {}", interceptor.getClass().getSimpleName());
                     return;
                 }
             }
+            // 将处理后的结果转回 T
+            req = (T) publishReq;
         }
         handle(ctx,req,session);
 

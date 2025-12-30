@@ -7,6 +7,7 @@ import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PubReasonCode;
 import com.tlmqtt.common.exception.TlMqttException;
+import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.request.TlMqttPubRecReq;
@@ -26,6 +27,8 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.List;
+
 /**
  * MQTT 消息发布处理器 (入站)
  * 负责处理客户端发送到 Broker 的 PUBLISH 报文
@@ -37,14 +40,13 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
 
     private final ForwardMessageService forwardMessageService;
 
-
-
     public TlPublishHandler(RetainService retainService, AuthorizationManager authorizationManager,
-        ForwardMessageService forwardMessageService, PublishService publishService) {
+        ForwardMessageService forwardMessageService, PublishService publishService,List<PublishInterceptor> interceptors) {
         this.forwardMessageService = forwardMessageService;
         this.publishService = publishService;
         super.setAuthorizationManager(authorizationManager);
         super.setRetainService(retainService);
+        super.setInterceptors(interceptors);
     }
 
     @Override

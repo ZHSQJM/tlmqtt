@@ -1,7 +1,7 @@
-package com.tlmqtt.core.service;
+package com.tlmqtt.common.interceptor;
 
 import com.tlmqtt.common.model.TlMqttSession;
-import com.tlmqtt.common.model.request.AbstractTlMessage;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import io.netty.channel.ChannelHandlerContext;
 
 /**
@@ -11,7 +11,7 @@ import io.netty.channel.ChannelHandlerContext;
  * @author zhouhs
  * @since 0.1.0
  **/
-public interface PublishInterceptor<TlMqttPublishReq> {
+public interface PublishInterceptor {
     
     /**
      * 拦截器顺序

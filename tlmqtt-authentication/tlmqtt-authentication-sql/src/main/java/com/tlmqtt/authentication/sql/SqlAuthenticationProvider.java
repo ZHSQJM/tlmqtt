@@ -18,7 +18,7 @@ public class SqlAuthenticationProvider implements TlAuthenticationProvider {
 
     @Override
     public int order() {
-        return 30;
+        return 3;
     }
 
     @Override

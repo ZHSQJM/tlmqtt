@@ -12,8 +12,8 @@ import io.netty.handler.codec.DecoderException;
 public class TlMalformedPacketException extends TlMqttException {
 
 
-    public TlMalformedPacketException(MqttMessageType replayTpe) {
-        super(MqttErrorCode.MALFORMED_MESSAGE, replayTpe);
+    public TlMalformedPacketException(MqttMessageType acceptType,MqttMessageType replayType) {
+        super(MqttErrorCode.MALFORMED_MESSAGE, true, acceptType,null,replayType);
     }
 
 

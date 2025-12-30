@@ -6,12 +6,14 @@ import com.tlmqtt.bootstrap.TlBootstrap;
 import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.properties.TlAuthProperties;
 import com.tlmqtt.common.properties.TlSessionProperties;
-import com.tlmqtt.core.manager.ChannelManager;
-import com.tlmqtt.core.manager.RetryManager;
-import com.tlmqtt.core.service.AliasService;
-import com.tlmqtt.core.service.DefaultAliasServiceImpl;
+import com.tlmqtt.core.alias.AliasService;
+import com.tlmqtt.core.alias.DefaultAliasServiceImpl;
+import com.tlmqtt.core.channel.DefaultChannelServiceImpl;
+import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.core.share.IShareSubscribeClientChoose;
 import com.tlmqtt.core.share.RandomSubscribeClientChoose;
+import com.tlmqtt.core.task.HashedWheelTimerTlSchedulerTaskServiceImpl;
+import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
 import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
@@ -53,8 +55,8 @@ public class TlMqttAutoConfiguration {
         @Autowired IShareSubscribeClientChoose shareSubscribeClientChoose,
         @Autowired ShareSubscribeService shareSubscribeService,
         @Autowired AliasService aliasService,
-        @Autowired ChannelManager channelManager,
-        @Autowired RetryManager retryManager,
+        @Autowired TlSchedulerTaskService schedulerTaskService,
+        @Autowired TlChannelService channelService,
         @Autowired AuthenticationManager authenticationManager,
         @Autowired AuthorizationManager authorizationManager,
         @Autowired MqttConfiguration mqttConfiguration) {
@@ -76,8 +78,8 @@ public class TlMqttAutoConfiguration {
                  .shareSubscribeClientChoose(shareSubscribeClientChoose)
                  .shareSubscribeService(shareSubscribeService)
                  .aliasService(aliasService)
-                 .channelManager(channelManager)
-                 .retryManager(retryManager)
+                 .schedulerTaskService(schedulerTaskService)
+                 .channelService(channelService)
                  .authenticationManager(authenticationManager)
                  .authorizationManager(authorizationManager)
                  .mqttConfiguration(mqttConfiguration)
@@ -143,15 +145,18 @@ public class TlMqttAutoConfiguration {
         return new DefaultAliasServiceImpl();
     }
 
+    @ConditionalOnMissingBean(TlSchedulerTaskService.class)
     @Bean
-    public ChannelManager channelManager(){
-        return new ChannelManager();
+    public TlSchedulerTaskService schedulerTaskService(){
+        return new HashedWheelTimerTlSchedulerTaskServiceImpl();
     }
 
+    @ConditionalOnMissingBean(TlChannelService.class)
     @Bean
-    public RetryManager retryManager(@Autowired TlSessionProperties sessionProperties){
-      return  new RetryManager(sessionProperties.getDelay(), sessionProperties.getMaxRetry());
+    public TlChannelService channelService(){
+        return new DefaultChannelServiceImpl();
     }
+
     @Bean
     public AuthenticationManager authenticationManager(@Autowired TlAuthProperties authProperties){
         return new AuthenticationManager(authProperties.isEnabled(), authProperties.getUser());

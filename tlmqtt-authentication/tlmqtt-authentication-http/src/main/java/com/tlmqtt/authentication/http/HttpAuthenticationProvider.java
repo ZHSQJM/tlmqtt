@@ -18,7 +18,7 @@ public class HttpAuthenticationProvider implements TlAuthenticationProvider {
 
     @Override
     public int order() {
-        return 30;
+        return 2;
     }
 
     @Override

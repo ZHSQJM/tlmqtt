@@ -4,10 +4,11 @@ import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.config.MqttConfiguration;
+import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.AbstractTlMessage;
-import com.tlmqtt.core.manager.ChannelManager;
-import com.tlmqtt.core.manager.RetryManager;
+import com.tlmqtt.core.channel.TlChannelService;
+import com.tlmqtt.core.service.PublishInterceptor;
 import com.tlmqtt.store.service.PublishService;
 import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
@@ -20,6 +21,8 @@ import io.netty.util.AttributeKey;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 抽象处理器 用户处理消息
@@ -37,14 +40,12 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
     protected  PubrelService pubrelService;
     protected  RetainService retainService;
     protected  ShareSubscribeService shareSubscribeService;
-    protected  ChannelManager channelManager;
+    protected  TlChannelService channelService;
     protected  AuthenticationManager authenticationManager;
-    protected  RetryManager retryManager;
     protected  AuthorizationManager authorizationManager;
-    protected MqttConfiguration mqttConfiguration;
+    protected  MqttConfiguration mqttConfiguration;
 
-
-
+    protected List<PublishInterceptor<T>> interceptors = new ArrayList<>();
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, T req) throws Exception {
@@ -56,6 +57,16 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
             session = (TlMqttSession) mqttSession;
         }
 
+        if (req.getFixedHead().getMessageType() == MqttMessageType.PUBLISH && !interceptors.isEmpty()) {
+            for (PublishInterceptor<T> interceptor : interceptors) {
+                req = interceptor.intercept(ctx, req, session);
+                // 如果某个拦截器返回 null，表示终止后续处理和 Handler 执行
+                if (req == null) {
+                    log.debug("Message processing terminated by interceptor: {}", interceptor.getClass().getSimpleName());
+                    return;
+                }
+            }
+        }
         handle(ctx,req,session);
 
     }

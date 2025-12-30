@@ -21,9 +21,9 @@ import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
-import com.tlmqtt.core.manager.ChannelManager;
-import com.tlmqtt.core.manager.RetryManager;
-import com.tlmqtt.core.task.TlRetryTask;
+import com.tlmqtt.core.channel.TlChannelService;
+import com.tlmqtt.core.service.ForwardMessageService;
+import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
 import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
@@ -37,7 +37,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.InetSocketAddress;
-import java.time.Duration;
 import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 
@@ -51,17 +50,21 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
 
 
 
+    private final TlSchedulerTaskService schedulerTaskService;
+    private final  ForwardMessageService forwardMessageService;
+
     public TlConnectHandler(SessionService sessionService, PublishService publishService, PubrelService pubrelService,
-        RetainService retainService, ChannelManager channelManager, AuthenticationManager authenticationManager,
-        RetryManager retryManager, MqttConfiguration mqttConfiguration) {
+        RetainService retainService, TlChannelService channelService, AuthenticationManager authenticationManager,
+        MqttConfiguration mqttConfiguration,TlSchedulerTaskService schedulerTaskService,ForwardMessageService forwardMessageService) {
         super.setSessionService(sessionService);
         super.setPublishService(publishService);
         super.setPubrelService(pubrelService);
         super.setRetainService(retainService);
         super.setAuthenticationManager(authenticationManager);
-        super.setRetryManager(retryManager);
-        super.setChannelManager(channelManager);
+        super.setChannelService(channelService);
         super.setMqttConfiguration(mqttConfiguration);
+        this.schedulerTaskService = schedulerTaskService;
+        this.forwardMessageService = forwardMessageService;
     }
 
     @Override
@@ -72,15 +75,15 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
         String clientId = resolveClientId(req, version);
         // 1. 认证检查
         if (!authenticate(req)) {
-           log.warn("Authentication failed for client: [{}]", clientId);
-            ctx.fireExceptionCaught(new TlAuthenticationException(MqttMessageType.CONNACK));
+            log.warn("Authentication failed for client: [{}]", clientId);
+            ctx.fireExceptionCaught(new TlAuthenticationException(true,MqttMessageType.CONNECT,MqttMessageType.CONNACK));
             return;
         }
 
         // 2. 开启响应式处理流水线
         processConnection(clientId,ctx, req, version)
             //// 防止数据库挂起导致连接卡死
-            .timeout(Duration.ofSeconds(30))
+            //.timeout(Duration.ofSeconds(30))
             .doOnError(error -> log.error("Connection processing failed for [{}]: {}", clientId, error.getMessage()))
             .subscribe(); // 在Netty Handler中，这是链路的终点
     }
@@ -109,9 +112,10 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
 
         //是否是清除会话 true 表示是 false表示不是
         boolean cleanSession = req.getVariableHead().getCleanSession() != 0;
+
         return sessionService.find(clientId)
             // 1. 获取已存在的会话
-            .flatMap(existingSession -> handleExistingSession(existingSession, version, cleanSession))
+            .flatMap(existingSession -> handleExistingSession(existingSession, cleanSession))
             .switchIfEmpty(createNewSession(clientId))
             .flatMap(session -> {
                 // 更新会话状态与属性
@@ -131,25 +135,41 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
      * @param: cleanSession  是否清理会话
      * @return: reactor.core.publisher.Mono<com.tlmqtt.common.model.TlMqttSession>
      **/
-    private Mono<TlMqttSession> handleExistingSession(TlMqttSession oldSession, MqttVersion version, boolean cleanSession) {
+    private Mono<TlMqttSession> handleExistingSession(TlMqttSession oldSession , boolean cleanSession) {
         String clientId = oldSession.getClientId();
         Mono<Void> kickOutAction = Mono.empty();
         //如果上次的连接还存在并且还在连接 那么就把山谷的连接给关闭掉 保持唯一连接
         if (oldSession.getCtx() != null && oldSession.getCtx().channel().isActive()) {
-            log.info("Client [{}] conflict. Kicking out old connection.", clientId);
-            MqttErrorCode code = (version == MqttVersion.MQTT_5)
-                ? MqttErrorCode.CONNECTION_REFUSED_CONNECTION_RATE_EXCEEDED
-                : MqttErrorCode.SUCCESS;
-            kickOutAction = closeChannel(oldSession.getCtx().channel(), code);
+            kickOutAction = closeChannel(oldSession);
         }
-        // 协议要求：如果是 cleanSession，则清除旧状态
-        Mono<Void> clearAction = cleanSession ? sessionService.clearAll(clientId).then() : Mono.empty();
-        return kickOutAction.then(clearAction).then(sessionService.cancelRemoveSession(clientId))
-            //// 标记为从存储恢复
-            .thenReturn(oldSession.setFromStore(true));
+
+        if (cleanSession) {
+            // 2. 如果是 CleanSession=1，清理所有存储并返回 Empty，触发 switchIfEmpty 创建全新实例
+            return kickOutAction
+                .then(sessionService.clearAll(clientId))
+                .then(Mono.defer(() -> {
+                    // 也要取消所有可能的定时任务，防止清理后还有残留任务被触发
+                    return cancelAllTasks(clientId);
+                }))
+                .then(Mono.empty());
+        } else {
+            // 3. 如果是 CleanSession=0，恢复旧会话
+            return kickOutAction.then(cancelAllTasks(clientId)).thenReturn(oldSession.setFromStore(true));
+        }
     }
 
-
+    /**
+     * 核心优化：统筹取消该客户端关联的所有调度任务
+     */
+    private Mono<Void> cancelAllTasks(String clientId) {
+        // 使用 Flux.merge 确保并行触发，并收集结果
+        return Flux.merge(
+            schedulerTaskService.cancel(clientId + Constant.WILL)
+                .doOnSuccess(v -> log.debug("遗嘱任务清理指令已发出: {}", clientId)),
+            schedulerTaskService.cancel(clientId + Constant.MQTT_SESSION)
+                .doOnSuccess(v -> log.debug("Session清理任务清理指令已发出: {}", clientId))
+        ).then(); // 确保所有 cancel 执行完毕后再返回 Void
+    }
     private Mono<Void> saveAndResponse(ChannelHandlerContext ctx, TlMqttConnectReq req, TlMqttSession session, boolean sessionPresent) {
         MqttVersion version = session.getMqttVersion();
         TlMqttConnackAck connack = TlMqttConnackAck.build(sessionPresent ? 1 : 0, MqttErrorCode.SUCCESS, version,
@@ -161,17 +181,18 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
                 setupHeartBeat(ctx, session.getKeepAlive());
             })
             // 2. 发送响应报文
-            .then(Mono.create(sink -> {
-                ctx.channel().writeAndFlush(connack).addListener(f -> {
-                    if (f.isSuccess()) sink.success();
-                    else sink.error(f.cause());
-                });
-            }))
+            .then(Mono.create(sink -> ctx.channel().writeAndFlush(connack).addListener(f -> {
+                if (f.isSuccess()) {
+                    sink.success();
+                } else {
+                    sink.error(f.cause());
+                }
+            })))
             // 3. 顺序处理后续业务逻辑
             .then(sessionService.save(session))
             .then(handleWillMessage(req))
             .then(handleRepublish(session, cleanSessionFromReq(req)))
-            .doOnSuccess(v -> log.info("Client [{}] fully initialized.", session.getClientId()));
+            .doOnSuccess(v -> log.info("客户端 [{}] 连接成功", session.getClientId()));
     }
 
     //offlineMessageService.triggerRedelivery(session, ctx.channel());
@@ -186,53 +207,42 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
 
     private Mono<Void> handleRepublish(TlMqttSession session, boolean cleanSession) {
         // 如果是清理会话，则不重新发送
-        if (cleanSession) return Mono.empty();
+        if (cleanSession) {
+            return Mono.empty();
+        }
         String clientId = session.getClientId();
-        Channel channel = session.getCtx().channel();
-
         // 使用 concatMap 确保前一个消息写完后再处理下一个，或者简单控制并发
         Flux<Void> pubFlow = publishService.findAll(clientId)
-            .concatMap(pub -> republishSinglePublish(clientId, channel, pub));
+            .concatMap(pub -> republishSinglePublish(clientId, pub));
 
         Flux<Void> relFlow = pubrelService.findAll(clientId)
-            .concatMap(rel -> republishSinglePubRel(clientId, channel, rel));
+            .concatMap(rel -> republishSinglePubRel(clientId, rel));
 
         return Flux.concat(pubFlow, relFlow).then();
+
+
     }
 
-    private Mono<Void> republishSinglePublish(String clientId, Channel channel, TlMqttPublishReq req) {
+    private Mono<Void> republishSinglePublish(String clientId, TlMqttPublishReq req) {
+        long msgId = req.getVariableHead().getMessageId();
+
+        // 1. 检查是否过期 (MQTT 5.0)
         if (isExpired(req)) {
-            return publishService.clear(clientId, req.getVariableHead().getMessageId()).then();
+            return publishService.clear(clientId, msgId).then();
         }
-        return Mono.fromRunnable(() -> {
-            channel.writeAndFlush(req);
-            long msgId = req.getVariableHead().getMessageId();
-            retryManager.schedulePublishRetry(msgId, new TlRetryTask(msgId, req, channel));
-        });
+
+        // 3. 调用递归重试逻辑 (从第 1 次发送开始算起)
+        // 这里直接复用之前在 ForwardMessageService 中定义的 scheduleWithRetry
+        return forwardMessageService.scheduleWithRetry(Constant.PUBLISH, clientId, req, 1);
     }
 
     /**
      * 重发单个 PUBREL 报文 (QoS 2 第二阶段)
      */
-    private Mono<Void> republishSinglePubRel(String clientId, Channel channel, TlMqttPubRelReq relReq) {
-        return Mono.fromRunnable(() -> {
-            long messageId = relReq.getVariableHead().getMessageId();
-
-            log.debug("Republishing PUBREL for client: [{}], messageId: [{}]", clientId, messageId);
-
-            // 1. 发送 PUBREL 报文
-            channel.writeAndFlush(relReq).addListener(future -> {
-                if (future.isSuccess()) {
-                    // 2. 注册重试任务
-                    // 注意：TlRetryTask 需要能识别不同的消息类型（PUBLISH 或 PUBREL）
-                    TlRetryTask retryTask = new TlRetryTask(messageId, relReq, channel);
-                    retryManager.schedulePubrelRetry(messageId, retryTask);
-                } else {
-                    log.error("Failed to resend PUBREL to client [{}], msgId: [{}]", clientId, messageId, future.cause());
-                }
-            });
-        });
+    private Mono<Void> republishSinglePubRel(String clientId, TlMqttPubRelReq relReq) {
+        return forwardMessageService.scheduleWithRetry(Constant.PUBREL, clientId, relReq, 1);
     }
+
 
     /**
      * 解析clientId 如果为空并且是v5则生成一个
@@ -262,25 +272,34 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
         private void registerToChannel(Channel channel, TlMqttSession session) {
             channel.attr(Constant.DISCONNECT_KEY).set(false);
             channel.attr(Constant.SESSION_KEY).set(session);
-            channelManager.put(session.getClientId(), channel);
+            channelService.put(session.getClientId(), channel);
         }
 
-        private Mono<Void> closeChannel(Channel channel, MqttErrorCode code) {
+        private Mono<Void> closeChannel(TlMqttSession oldSession) {
             return Mono.create(sink -> {
-                TlMqttDisconnectReq disconnect = TlMqttDisconnectReq.build(code);
-                channel.writeAndFlush(disconnect).addListener(f -> {
-                    channel.close();
-                    sink.success();
-                });
+                Channel channel = oldSession.getCtx().channel();
+                if(oldSession.isVersion5()){
+                    TlMqttDisconnectReq disconnect = TlMqttDisconnectReq.build(MqttErrorCode.CONNECTION_REFUSED_CONNECTION_RATE_EXCEEDED);
+                    oldSession.getCtx().channel().writeAndFlush(disconnect)
+                        .addListener(f -> sink.success());
+                }else{
+                     channel.close().addListener(f -> sink.success());
+                }
+
+
             });
+
+
         }
 
         private boolean isExpired(TlMqttPublishReq req) {
-            if (req.getMqttVersion() != MqttVersion.MQTT_5)
+            if (req.getMqttVersion() != MqttVersion.MQTT_5) {
                 return false;
+            }
             Integer expiry = req.getVariableHead().getMessageExpiryInterval();
-            if (expiry == null || req.getAcceptTime() == null)
+            if (expiry == null || req.getAcceptTime() == null) {
                 return false;
+            }
             return (System.currentTimeMillis() / 1000) > (req.getAcceptTime() + expiry);
         }
 

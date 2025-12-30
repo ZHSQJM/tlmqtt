@@ -9,8 +9,6 @@ import com.tlmqtt.store.service.session.SessionService;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -25,8 +23,7 @@ public class DefaultSubscriptionServiceImpl implements SubscriptionService {
     private final TlTopicTrie trie;
     private final SessionService sessionService;
 
-    // 反向索引：记录每个客户端订阅了哪些主题，用于快速清理
-    // Key: clientId, Value: Set of Topics
+    /**反向索引：记录每个客户端订阅了哪些主题，用于快速清理  Key: clientId, Value: Set of Topics*/
     private final Cache<String, Set<String>> clientSubscriptionCache = Caffeine.newBuilder()
         .expireAfterAccess(24, TimeUnit.HOURS)
         .build();
@@ -81,7 +78,7 @@ public class DefaultSubscriptionServiceImpl implements SubscriptionService {
     @Override
     public Mono<Void> onSessionCleared(String clientId) {
         return Mono.fromRunnable(() -> {
-            log.info("Observer:[SubscriptionService] cleaning data for clientId[{}]", clientId);
+            //log.info("Observer:[SubscriptionService] cleaning data for clientId[{}]", clientId);
             Set<String> topics = clientSubscriptionCache.getIfPresent(clientId);
             if (topics != null) {
                 // 利用反向索引进行精准删除，而不是全树扫描
@@ -91,6 +88,7 @@ public class DefaultSubscriptionServiceImpl implements SubscriptionService {
                     trie.remove(topic, subClient);
                 });
                 clientSubscriptionCache.invalidate(clientId);
+                log.debug("清除订阅客户端【{}】订阅的主题",clientId);
             }
         }).then();
     }

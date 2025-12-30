@@ -1,20 +1,17 @@
 package com.tlmqtt.core.handler;
 
+import com.tlmqtt.common.Constant;
+import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.TlMqttPubRecReq;
 import com.tlmqtt.common.model.request.TlMqttPubRelReq;
-import com.tlmqtt.common.model.variable.TlMqttPubRecVariableHead;
-import com.tlmqtt.core.manager.RetryManager;
 
-import com.tlmqtt.core.task.TlRetryTask;
-
+import com.tlmqtt.core.service.ForwardMessageService;
 import com.tlmqtt.store.service.PublishService;
 import com.tlmqtt.store.service.PubrelService;
-import com.tlmqtt.store.service.RetainService;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.scheduler.Schedulers;
 
 /**
  * @author hszhou
@@ -22,13 +19,17 @@ import reactor.core.scheduler.Schedulers;
 @Slf4j
 @ChannelHandler.Sharable
 public class TlPubRecHandler extends AbstractTlHandler<TlMqttPubRecReq> {
+
+
     private final PubrelService pubrelService;
 
-    public TlPubRecHandler(PublishService publishService,
-        PubrelService pubrelService,
-        RetryManager retryManager) {
+
+    private final ForwardMessageService forwardMessageService;
+
+    public TlPubRecHandler(PublishService publishService, PubrelService pubrelService, ForwardMessageService forwardMessageService
+         ) {
         super.setPublishService(publishService);
-        super.setRetryManager(retryManager);
+        this.forwardMessageService = forwardMessageService;
         this.pubrelService = pubrelService;
     }
 
@@ -39,31 +40,22 @@ public class TlPubRecHandler extends AbstractTlHandler<TlMqttPubRecReq> {
 
         log.debug("Received PUBREC from client: [{}], messageId: [{}]", clientId, messageId);
 
-        // 1. 立即停止 PUBLISH 报文的重试 (第一阶段结束)
-        retryManager.cancelPublishRetry(messageId);
+        // // 1. 停止 PUBLISH 重试
+        TlMqttPubRelReq relReq = TlMqttPubRelReq.build(messageId, MqttErrorCode.SUCCESS.byteValue());
+        forwardMessageService.cancel(clientId, Constant.PUBLISH, messageId)
+            // 2. 清除 publish消息
+            .then(publishService.clear(clientId, messageId))
+            .then(pubrelService.save(clientId, messageId, relReq))
+            // 3. 开启 PUBREL 重试
+            .then(forwardMessageService.scheduleWithRetry(Constant.PUBREL, clientId, relReq, 1))
+            .subscribe();
 
-        // 2. 逻辑链条：清除 PUBLISH 存储 -> 构建并保存 PUBREL -> 发送并启动 PUBREL 重试
-        publishService
-            .clear(clientId, messageId) // 清理第一阶段消息
-            .subscribeOn(Schedulers.boundedElastic())
-            .flatMap(oldPubReq -> {
-                // 协议要求：即便没找到原消息（例如由于意外重启），也要回复 PUBREL
-                TlMqttPubRelReq relReq = TlMqttPubRelReq.build(messageId);
-                return pubrelService.save(clientId, messageId, relReq);
-            })
-            .doOnError(e -> log.error("Error processing PUBREC for client [{}], id [{}]", clientId, messageId, e))
-            .subscribe(relReq -> {
-                // 3. 执行发送并开启第二阶段重试
-                ctx.channel().eventLoop().execute(() -> {
-                    ctx.writeAndFlush(relReq).addListener(future -> {
-                        if (future.isSuccess()) {
-                            // 开启针对 PUBREL 的重试任务
-                            TlRetryTask retryTask = new TlRetryTask(messageId, relReq, ctx.channel());
-                            retryManager.schedulePubrelRetry(messageId, retryTask);
-                            log.debug("Sent PUBREL to [{}], msgId: [{}]", clientId, messageId);
-                        }
-                    });
-                });
-            });
+
     }
+
+
+
+
+
+
 }

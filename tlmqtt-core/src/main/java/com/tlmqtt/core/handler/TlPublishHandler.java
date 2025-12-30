@@ -1,7 +1,6 @@
 package com.tlmqtt.core.handler;
 
 import com.tlmqtt.authorization.base.AuthorizationManager;
-import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
@@ -63,7 +62,8 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
         if (!authorizationManager.checkPublishPermission(clientId, session.getUsername(), session.getIp(), topic)) {
             log.error("ACL Deny: Client [{}] has no permission to publish to [{}]", clientId, topic);
             if (session.isVersion5()&& messageQos.value() > 0) {
-                ctx.fireExceptionCaught(new TlMqttException(MqttErrorCode.UNAUTHORIZED, false, MqttMessageType.PUBLISH,
+                Long messageId = variableHead.getMessageId();
+                ctx.fireExceptionCaught(new TlMqttException(MqttErrorCode.UNAUTHORIZED, false, MqttMessageType.PUBLISH,messageId,
                     messageQos == MqttQoS.AT_LEAST_ONCE ? MqttMessageType.PUBACK : MqttMessageType.PUBREL));
             }
             return; // QoS 0 直接丢弃

@@ -6,10 +6,10 @@ import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.properties.TlBusinessProperties;
 import com.tlmqtt.common.properties.TlMqttServerProperties;
-import com.tlmqtt.core.manager.ChannelManager;
-import com.tlmqtt.core.manager.RetryManager;
-import com.tlmqtt.core.service.AliasService;
+import com.tlmqtt.core.alias.AliasService;
+import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.core.share.IShareSubscribeClientChoose;
+import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
 import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
@@ -53,14 +53,16 @@ public class TlBootstrap {
     public TlBootstrap shareSubscribeClientChoose(IShareSubscribeClientChoose s) { containerBuilder.shareChoose(s); return this; }
     public TlBootstrap aliasService(AliasService s) { containerBuilder.aliasService(s); return this; }
 
-    public TlBootstrap channelManager(ChannelManager channelManager){
-        containerBuilder.channelManager(channelManager);
+    public TlBootstrap channelService(TlChannelService channelService){
+        containerBuilder.channelService(channelService);
         return this;
     }
-    public TlBootstrap retryManager(RetryManager retryManager){
-        containerBuilder.retryManager(retryManager);
+    public TlBootstrap schedulerTaskService(TlSchedulerTaskService s) {
+        containerBuilder.schedulerTaskService(s);
         return this;
     }
+
+
     public TlBootstrap authenticationManager(AuthenticationManager authenticationManager){
         containerBuilder.authenticationManager(authenticationManager);
         return this;
@@ -79,10 +81,9 @@ public class TlBootstrap {
 
     public TlBootstrap start() {
         // 构建容器
-        containerBuilder.channelManager(new ChannelManager());
         TlBusinessProperties businessProperties = properties.getBusinessProperties();
 
-        ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().setNamePrefix("demo-pool-%d").build();
+        ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().setNamePrefix("tl-pool-%d").build();
         containerBuilder.executorService(new ThreadPoolExecutor(
             businessProperties.getCorePoolSize(),
             businessProperties.getMaxPoolSize(),

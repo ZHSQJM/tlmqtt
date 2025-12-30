@@ -40,19 +40,20 @@ public abstract class  AbstractTlMqttDecoder  {
         Object  sessionValue = ctx.channel().attr(AttributeKey.valueOf(Constant.MQTT_SESSION)).get();
 
         if(messageTypeEnum==MqttMessageType.CONNECT){
-            //todo 在一个网络连接上，客户端只能发送一次CONNECT报文。服务端必须将客户端发送的第二个CONNECT报文当作协议违规处理并断开客户端的连接 [MQTT-3.1.0-2]。有关错误处理的信息请查看4.13节。
+            //t在一个网络连接上，客户端只能发送一次CONNECT报文。服务端必须将客户端发送的第二个CONNECT报文当作协议违规处理并断开客户端的连接 [MQTT-3.1.0-2]。有关错误处理的信息请查看4.13节。
             if(sessionValue != null){
-                throw new TlProtocolErrorException(messageTypeEnum);
+               throw new TlProtocolErrorException(messageTypeEnum,MqttMessageType.CONNACK);
             }
+
             return build(buf,type, remainingLength,null);
         }else if(null == sessionValue){
-            //todo 如果sessionValue的值为空 说明ctx之前没有连接过
-            throw new TlMalformedPacketException(messageTypeEnum);
+            // 如果sessionValue的值为空 说明ctx之前没有连接过 无效报文 直接断开
+            throw new TlMalformedPacketException(messageTypeEnum,MqttMessageType.DISCONNECT);
         }
         TlMqttSession session = (TlMqttSession)sessionValue;
-        if(session.getMqttVersion() == MqttVersion.MQTT_5){
+        if(session.isVersion5()){
             if(buf.readableBytes() > maximumPacketSize){
-               throw new TlProtocolErrorException(MqttMessageType.DISCONNECT);
+               throw new TlProtocolErrorException(messageTypeEnum, MqttMessageType.DISCONNECT);
             }
         }
         return build(buf,type, remainingLength,session);

@@ -15,6 +15,6 @@ public class UnAcceptableProtocolVersionException extends TlMqttException {
 
 
     public UnAcceptableProtocolVersionException(){
-        super(MqttErrorCode.UNACCEPTABLE_PROTOCOL_VERSION, MqttMessageType.CONNECT);
+        super(MqttErrorCode.UNACCEPTABLE_PROTOCOL_VERSION,true, MqttMessageType.CONNECT,null,MqttMessageType.CONNACK);
     }
 }

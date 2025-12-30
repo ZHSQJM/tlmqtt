@@ -76,19 +76,19 @@ public interface SessionService {
     void addListener(SessionEventListener listener);
 
 
-    /**
-     * 取消删除会话
-     * @param clientId 客户端
-     * @return 删除结果
-     */
-    Mono<Void> cancelRemoveSession(String clientId);
-
-    /**
-     * 延迟删除会话
-     *
-     * @param clientId 客户端
-     * @param expirySeconds 延迟时间
-     * @return 延迟结果
-     */
-    Mono<Void> scheduleRemoval(String clientId, long expirySeconds);
+//    /**
+//     * 取消删除会话
+//     * @param clientId 客户端
+//     * @return 删除结果
+//     */
+//    Mono<Void> cancelRemoveSession(String clientId);
+//
+//    /**
+//     * 延迟删除会话
+//     *
+//     * @param clientId 客户端
+//     * @param expirySeconds 延迟时间
+//     * @return 延迟结果
+//     */
+//    Mono<Void> scheduleRemoval(String clientId, long expirySeconds);
 }

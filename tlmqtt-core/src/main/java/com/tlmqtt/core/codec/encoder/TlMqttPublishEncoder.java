@@ -61,7 +61,6 @@ public class TlMqttPublishEncoder extends AbstractTlMqttEncoder<TlMqttPublishReq
         Object content = req.getPayload().getContent();
         byte[] bytes = content.toString().getBytes();
         out.writeBytes(bytes);
-        log.debug("encode publish req[{}] finished",req);
     }
     private void writeProperties(TlMqttPublishVariableHead variableHead, ByteBuf out) {
         Boolean payloadFormatIndicator = variableHead.getPayloadFormatIndicator();

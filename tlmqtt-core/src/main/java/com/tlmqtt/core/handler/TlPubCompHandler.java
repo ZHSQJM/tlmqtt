@@ -1,15 +1,13 @@
 package com.tlmqtt.core.handler;
 
+import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.request.TlMqttPubCompReq;
-import com.tlmqtt.common.model.variable.TlMqttPubCompVariableHead;
 import com.tlmqtt.core.service.ForwardMessageService;
-import com.tlmqtt.core.manager.RetryManager;
 import com.tlmqtt.store.service.PubrelService;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.scheduler.Schedulers;
 
 /**
  * @author hszhou
@@ -22,11 +20,12 @@ public class TlPubCompHandler extends AbstractTlHandler<TlMqttPubCompReq> {
 
     private final ForwardMessageService forwardMessageService;
 
+
+
     public TlPubCompHandler(ForwardMessageService forwardMessageService,
-        RetryManager retryManager,
-        PubrelService pubrelService) {
+        PubrelService pubrelService ) {
         this.forwardMessageService = forwardMessageService;
-        super.setRetryManager(retryManager);
+
         super.setPubrelService(pubrelService);
     }
 
@@ -35,21 +34,11 @@ public class TlPubCompHandler extends AbstractTlHandler<TlMqttPubCompReq> {
         String clientId = session.getClientId();
         // 强制转换为 int 以适配 MessageIdManager 的 16 位逻辑
         int messageId = req.getVariableHead().getMessageId().intValue();
+        // 2. 取消调度并清理持久化数据
+        forwardMessageService.cancel(clientId, Constant.PUBREL, messageId)
 
-        log.debug("Received PUBCOMP from client: [{}], messageId: [{}]", clientId, messageId);
-
-        // 1. 立即停止 PUBREL 的重试定时器
-        retryManager.cancelPubrelRetry((long) messageId);
-
-        // 2. 核心：通过 handleAck 释放 ID、减小 In-Flight 计数、驱动队列
-        // 这里的 handleAck 逻辑与 QoS 1 的 PUBACK 处理逻辑一致，实现了资源的回收
-        forwardMessageService.handleAck(clientId, messageId);
-
-        // 3. 异步清理持久化的 PUBREL 记录
-        pubrelService
-            .clear(clientId, (long) messageId)
-            .subscribeOn(Schedulers.boundedElastic())
-            .doOnError(e -> log.error("Failed to clear PUBREL for client [{}], id [{}]", clientId, messageId, e))
+            // 3. 维护窗口和 ID 释放 (复用 ForwardMessageService 的 handleAck 逻辑)
+            .doOnSuccess(v -> forwardMessageService.handleAck(clientId,Constant.PUBREL, messageId))
             .subscribe();
     }
 }

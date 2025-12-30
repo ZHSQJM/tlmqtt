@@ -52,10 +52,10 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
 
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttSubscribeReq req, TlMqttSession session) {
-        String clientId = session.getClientId();
         int messageId = req.getVariableHead().getMessageId();
         List<TlTopic> topics = req.getPayload().getTopics();
 
+        String clientId = session.getClientId();
         List<TlTopic> authorizedTopics = new ArrayList<>();
         int[] reasonCodes = new int[topics.size()];
 
@@ -65,8 +65,10 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
             if (authorizationManager.checkSubscribePermission(session, topic.getName())) {
                 reasonCodes[i] = topic.getQos();
                 authorizedTopics.add(topic);
+                log.debug("客户端【{}】订阅了主题【{}】-OQS是【{}】",clientId,topic.getName(),topic.getQos());
             } else {
                 // MQTT 5.0 0x87 (Not Authorized)
+                log.debug("客户端【{}】无权鼎业主题【{}】-OQS是【{}】",clientId,topic.getName(),topic.getQos());
                 reasonCodes[i] = MqttErrorCode.UNAUTHORIZED.byteValue();
             }
         }
@@ -156,7 +158,9 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
     }
 
     private boolean isExpired(TlMqttPublishReq req) {
-        if (req.getVariableHead().getMessageExpiryInterval() == null) return false;
+        if (req.getVariableHead().getMessageExpiryInterval() == null) {
+            return false;
+        }
         long now = System.currentTimeMillis() / 1000;
         return (req.getAcceptTime() + req.getVariableHead().getMessageExpiryInterval()) < now;
     }

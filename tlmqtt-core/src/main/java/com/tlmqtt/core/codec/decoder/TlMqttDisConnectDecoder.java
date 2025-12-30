@@ -2,7 +2,6 @@ package com.tlmqtt.core.codec.decoder;
 
 import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
-import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.UserProperty;
@@ -61,14 +60,12 @@ public class TlMqttDisConnectDecoder  extends AbstractTlMqttDecoder{
                     case SESSION_EXPIRY_INTERVAL:
                         int sessionExpiryInterval = buf.readInt();
                         builder.sessionExpiryInterval(sessionExpiryInterval);
-                        log.info("sessionExpiryInterval【{}】",sessionExpiryInterval);
                         break;
                     case REASON_STRING:
                         int reasonStringLength = buf.readShort();
                         byte[] reasonStringByte = new byte[reasonStringLength];
                         buf.readBytes(reasonStringByte);
                         builder.reasonString(new String(reasonStringByte));
-                        log.info("reasonString【{}】",new String(reasonStringByte));
                         break;
                     case USER_PROPERTY:
                         int keyLength = buf.readShort();
@@ -79,14 +76,12 @@ public class TlMqttDisConnectDecoder  extends AbstractTlMqttDecoder{
                         buf.readBytes(value);
                         UserProperty userProperty = UserProperty.builder().key(new String(key)).value(new String(value))
                             .build();
-                        log.info("userProperty【{}】",userProperty);
                         userProperties.add(userProperty);
                     case SERVER_REFERENCE:
                         int serverReferenceLength = buf.readShort();
                         byte[] serverReference = new byte[serverReferenceLength];
                         buf.readBytes(serverReference);
                         builder.serverReference(new String(serverReference));
-                        log.info("serverReference【{}】",new String(serverReference));
                         break;
                     default:
                         log.error("未知属性");

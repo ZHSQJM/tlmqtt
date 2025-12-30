@@ -5,7 +5,6 @@ import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlTopic;
-import com.tlmqtt.common.model.payload.TlMqttUnSubscribePayload;
 import com.tlmqtt.common.model.request.TlMqttUnSubscribeReq;
 import com.tlmqtt.common.model.response.TlMqttUnSubAck;
 
@@ -37,7 +36,7 @@ public class TlUnSubscribeHandler extends AbstractTlHandler<TlMqttUnSubscribeReq
         int messageId = req.getVariableHead().getMessageId();
         List<TlTopic> topics = req.getPayload().getTopics();
 
-        log.debug("Handling UNSUBSCRIBE for client: [{}], topics: {}", clientId, topics);
+
 
         // 1. 执行取消订阅逻辑并收集结果（为了 MQTT 5.0 的原因码）
         Flux.fromIterable(topics)
@@ -50,6 +49,7 @@ public class TlUnSubscribeHandler extends AbstractTlHandler<TlMqttUnSubscribeReq
                             // 同步更新 Session 内存状态
                             session.getTopics().remove(topic.getName());
                         }
+                        log.debug("客户端【{}】取消订阅了主题【{}】 ,", clientId, topic.getName());
                     })
             )
             .collectList()
@@ -67,7 +67,7 @@ public class TlUnSubscribeHandler extends AbstractTlHandler<TlMqttUnSubscribeReq
                 TlMqttUnSubAck res = build(messageId, reasonCodes, mqttVersion);
                 ctx.writeAndFlush(res).addListener(future -> {
                     if (future.isSuccess()) {
-                        log.info("Client [{}] successfully unsubscribed from {} topics", clientId, topics.size());
+                       // log.debug("客户端【{}】取消订阅主题的长度【{}】 ,", clientId, topics.size());
                     }
                 });
             });

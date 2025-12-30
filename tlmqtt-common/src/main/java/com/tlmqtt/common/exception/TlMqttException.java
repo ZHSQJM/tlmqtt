@@ -45,29 +45,19 @@ public class TlMqttException extends DecoderException {
     private final MqttVersion version;
 
 
-    public TlMqttException(MqttErrorCode errCode,Boolean close, MqttMessageType acceptType, MqttMessageType replayType){
+    private Long messageId;
+
+
+
+    public TlMqttException(MqttErrorCode errCode,Boolean close, MqttMessageType acceptType,Long messageId, MqttMessageType replayType){
         this.errCode = errCode;
         this.close = close;
         this.acceptType = acceptType;
         this.replayType = replayType;
         this.version = MqttVersion.MQTT_5;
+        this.messageId = messageId;
     }
 
-    public TlMqttException(MqttErrorCode errCode, MqttMessageType acceptType, MqttMessageType replayType){
-        this.errCode = errCode;
-        this.close = true;
-        this.acceptType = acceptType ;
-        this.replayType = replayType;
-        this.version = MqttVersion.MQTT_5;
-    }
-
-    public TlMqttException(MqttErrorCode errCode, MqttMessageType replayType){
-        this.errCode = errCode;
-        this.close = true;
-        this.acceptType = null;
-        this.replayType = replayType;
-        this.version = MqttVersion.MQTT_5;
-    }
 
 
 }

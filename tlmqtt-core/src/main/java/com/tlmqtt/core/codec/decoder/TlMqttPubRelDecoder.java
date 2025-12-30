@@ -3,7 +3,6 @@ package com.tlmqtt.core.codec.decoder;
 
 import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
-import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.enums.PropertiesCode;
 import com.tlmqtt.common.enums.PubReasonCode;
 import com.tlmqtt.common.model.TlMqttSession;

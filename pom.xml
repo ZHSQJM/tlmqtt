@@ -19,6 +19,7 @@
         <module>tlmqtt-rule</module>
         <module>tlmqtt-bootstrap</module>
         <module>tlmqtt-authorization</module>
+        <module>tlmqtt-dashboard</module>
     </modules>
 
     <!--项目地址-->
@@ -54,7 +55,7 @@
     </licenses>
 
     <properties>
-        <netty.version>4.1.118.Final</netty.version>
+        <netty.version>4.1.125.Final</netty.version>
         <projectreactor.version>3.4.34</projectreactor.version>
         <hikaricp.version>4.0.3</hikaricp.version>
         <mysql.version>8.0.33</mysql.version>

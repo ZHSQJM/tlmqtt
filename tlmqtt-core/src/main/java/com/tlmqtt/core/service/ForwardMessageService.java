@@ -1,6 +1,7 @@
 package com.tlmqtt.core.service;
 
 import cn.hutool.core.util.StrUtil;
+import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.enums.MqttVersion;
@@ -8,14 +9,16 @@ import com.tlmqtt.common.exception.TlProtocolErrorException;
 import com.tlmqtt.common.model.TlMqttSession;
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
-import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
+import com.tlmqtt.common.model.request.AbstractTlMessage;
+import com.tlmqtt.common.model.request.TlMqttPubRelReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
-import com.tlmqtt.core.manager.ChannelManager;
-import com.tlmqtt.core.manager.RetryManager;
+import com.tlmqtt.core.alias.AliasService;
+import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.core.share.IShareSubscribeClientChoose;
-import com.tlmqtt.core.task.TlRetryTask;
+import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
+import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.ShareSubscribeService;
 import com.tlmqtt.store.service.SubscriptionService;
 import com.tlmqtt.store.service.session.SessionService;
@@ -24,14 +27,10 @@ import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author zhouhs
@@ -47,21 +46,29 @@ public class ForwardMessageService {
     private final SubscriptionService subscriptionService;
     private final SessionService sessionService;
     private final PublishService publishService;
-    private final ChannelManager channelManager;
-    private final RetryManager retryManager;
-
+    private final PubrelService pubrelService;
+    private final TlChannelService channelService;
+    private final TlSchedulerTaskService schedulerTaskService;
+    /**重试间隔秒*/
+    private final int retryInterval;
+    /**最大重试次数*/
+    private final int maxRetries;
     public ForwardMessageService(AliasService aliasService, ShareSubscribeService shareSubscribeService,
         IShareSubscribeClientChoose shareSubscribeClientChoose, SubscriptionService subscriptionService,
         SessionService sessionService, PublishService publishService,
-        ChannelManager channelManager, RetryManager retryManager) {
+        TlChannelService channelService,TlSchedulerTaskService schedulerTaskService,PubrelService pubrelService,int retryInterval, int maxRetries ) {
         this.aliasService = aliasService;
         this.shareSubscribeService = shareSubscribeService;
         this.shareSubscribeClientChoose = shareSubscribeClientChoose;
         this.subscriptionService = subscriptionService;
         this.sessionService = sessionService;
         this.publishService = publishService;
-        this.channelManager = channelManager;
-        this.retryManager = retryManager;
+        this.pubrelService = pubrelService;
+        this.channelService = channelService;
+        this.schedulerTaskService = schedulerTaskService;
+        this.retryInterval  = retryInterval;
+        this.maxRetries = maxRetries;
+
     }
 
     /**
@@ -88,7 +95,9 @@ public class ForwardMessageService {
         String finalTopic1 = topic;
         Flux<TlSubClient> shareSubs = Flux.defer(() -> {
             Map<String, List<TlSubClient>> groups = shareSubscribeService.getGroupMember(finalTopic1);
-            if (groups == null || groups.isEmpty()) return Flux.empty();
+            if (groups == null || groups.isEmpty()) {
+                return Flux.empty();
+            }
             return Flux.fromIterable(groups.values())
                 .map(list -> shareSubscribeClientChoose.choose(list, publisherId));
         });
@@ -127,7 +136,7 @@ public class ForwardMessageService {
                 TlMqttPublishReq targetReq = buildTargetReq(originalReq, realQos, session, subClient);
 
                 // 4. MQTT 5.0 报文长度检查
-                if (session.getMqttVersion() == MqttVersion.MQTT_5 && session.getMaximumPacketSize() != null) {
+                if (session.isVersion5() && session.getMaximumPacketSize() != null) {
                     if (calculateSize(targetReq) > session.getMaximumPacketSize()) {
                         log.warn("Packet too large for [{}], drop.", targetClientId);
                         return Mono.empty();
@@ -146,12 +155,12 @@ public class ForwardMessageService {
         MqttQoS qos = req.getFixedHead().getQos();
         String clientId = session.getClientId();
 
+        // QoS 0 处理
         if (qos == MqttQoS.AT_MOST_ONCE) {
-            sendToNetty(req, clientId);
-            return Mono.empty();
+            return doSend(req, clientId);
         }
 
-        // 检查 In-Flight 窗口
+        // QoS 1/2 流量控制
         int maxInFlight = session.getReceiveMaximum() != null ? session.getReceiveMaximum() : 65535;
         if (session.getInFlightCount().get() >= maxInFlight) {
             log.debug("Client [{}] In-Flight full, queuing message", clientId);
@@ -159,30 +168,30 @@ public class ForwardMessageService {
             return Mono.empty();
         }
 
-        // 占用窗口并存储待确认消息
+        // 占用窗口并启动重试流水线
         session.getInFlightCount().incrementAndGet();
-        return publishService.save(clientId, req.getVariableHead().getMessageId(), req)
-            .doOnSuccess(v -> sendToNetty(req, clientId))
-            .then();
+        long msgId = req.getVariableHead().getMessageId();
+        return publishService.save(clientId, msgId, req)
+            .then(scheduleWithRetry(Constant.PUBLISH, clientId, req, 1));
     }
 
     /**
      * 构建发送报文副本
      */
     public TlMqttPublishReq buildTargetReq(TlMqttPublishReq req, MqttQoS qos, TlMqttSession session, TlSubClient sub) {
-        TlMqttPublishVariableHead oldVHead = req.getVariableHead();
+        TlMqttPublishVariableHead oldHead = req.getVariableHead();
 
         // 分配 16 位消息 ID
         Long messageId = (qos != MqttQoS.AT_MOST_ONCE) ? (long) session.getMessageIdManager().getNextId() : 0L;
 
-        TlMqttPublishVariableHead newVHead = TlMqttPublishVariableHead.builder()
-            .topic(oldVHead.getTopic())
+        TlMqttPublishVariableHead newHead = TlMqttPublishVariableHead.builder()
+            .topic(oldHead.getTopic())
             .messageId(messageId)
-            .payloadFormatIndicator(oldVHead.getPayloadFormatIndicator())
-            .messageExpiryInterval(oldVHead.getMessageExpiryInterval())
-            .responseTopic(oldVHead.getResponseTopic())
-            .correlationData(oldVHead.getCorrelationData())
-            .contentType(oldVHead.getContentType())
+            .payloadFormatIndicator(oldHead.getPayloadFormatIndicator())
+            .messageExpiryInterval(oldHead.getMessageExpiryInterval())
+            .responseTopic(oldHead.getResponseTopic())
+            .correlationData(oldHead.getCorrelationData())
+            .contentType(oldHead.getContentType())
             .subscriptionIdentifier(sub.getSubscriptionIdentifier())
             .build();
 
@@ -195,41 +204,141 @@ public class ForwardMessageService {
             .dup(false)
             .build();
 
-        TlMqttPublishReq targetReq = TlMqttPublishReq.build(newFixedHead, newVHead, req.getPayload(), session.getMqttVersion());
+        TlMqttPublishReq targetReq = TlMqttPublishReq.build(newFixedHead, newHead, req.getPayload(), session.getMqttVersion());
         targetReq.setAcceptTime(req.getAcceptTime());
         return targetReq;
     }
 
-    /**
-     * 确认回调 (由 PubAckHandler/PubCompHandler 调用)
-     */
-    public void handleAck(String clientId, int messageId) {
-        sessionService.find(clientId).subscribe(session -> {
-            // 1. 释放 ID 和 窗口
-            session.getMessageIdManager().releaseId(messageId);
-            session.getInFlightCount().decrementAndGet();
 
-            // 2. 触发队列中的下一条消息
-            TlMqttPublishReq next = session.getMessageQueue().poll();
-            if (next != null) {
-                this.processWithTrafficControl(session, next).subscribe();
+    /**
+     * 2. 优化：合并 PUBLISH 和 PUBREL 的重试逻辑
+     * 使用泛型或 Object 抽象，减少代码重复
+     */
+    public Mono<Void> scheduleWithRetry(String type, String clientId, AbstractTlMessage message, int count) {
+
+        if (null == message) {
+            return Mono.empty();
+        }
+
+        // 1. 统一提取消息 ID
+        long messageId = getMessageId(message);
+        if (messageId == -1) {
+            log.warn("Unknown message type for retry: {}", message.getClass().getName());
+            return Mono.empty();
+        }
+
+        // 2. 生成唯一的调度 Key (例如: clientId:PUBLISH:1001)
+        String retryKey = buildScheduleKey(clientId, type, messageId);
+
+        // 3. 检查重试次数限制
+        if (count > maxRetries) {
+            log.warn("Task [{}] reached max retries ({}), dropping message.", retryKey, maxRetries);
+            // 这里可以根据业务需求增加持久化清理逻辑
+            return Mono.empty();
+        }
+
+        // 4. 执行发送逻辑
+        return Mono.defer(() -> {
+            // 只有 PUBLISH 报文在重发(count > 1)时需要设置 DUP 标志
+            if (count > 1 && message instanceof TlMqttPublishReq) {
+                message.getFixedHead().setDup(true);
+            }
+
+            log.debug("Executing retry attempt {} for key: {}", count, retryKey);
+            // 这里会执行所有类型的消息发送，包括 TlMqttPublishReq 和 TlMqttPubRelReq
+            return doSend(message, clientId);
+        }).then(
+            // 5. 关键修正：递归调用时传入 type 而不是上一次生成的 retryKey
+            schedulerTaskService.schedule(
+                retryKey,
+                scheduleWithRetry(type, clientId, message, count + 1),
+                retryInterval,
+                TimeUnit.SECONDS
+            )
+        );
+    }
+
+    /**
+     * 3. 优化：QoS 2 流程停止方法封装
+     */
+    public Mono<Void> cancel(String clientId, String type,long messageId) {
+        String retryKey =  buildScheduleKey(clientId,type,messageId);
+        return schedulerTaskService.cancel(retryKey);
+    }
+
+    /**
+     * 4. 优化：Netty 发送动作增加安全性检查
+     */
+    private Mono<Void> doSend(Object msg, String clientId) {
+        return Mono.create(sink -> {
+            Channel channel = channelService.getChannel(clientId);
+            if (channel != null && channel.isActive()) {
+                // 注意：ByteBuf 的引用计数在重试场景下非常危险
+                // 如果 msg 包含 ByteBuf，Netty 发送后会自动释放。
+                // 建议重试时使用 retain() 或者发送不释放的副本
+                channel.writeAndFlush(msg).addListener(f -> {
+                    if (f.isSuccess()) {
+                        sink.success();
+                    } else {
+                        sink.error(f.cause());
+                    }
+                });
+            } else {
+                sink.error(new RuntimeException("Channel inactive for client: " + clientId));
             }
         });
     }
+    /**
+     * 统一确认回调入口
+     * @param clientId 客户端ID
+     * @param type 类型 (Constant.PUBLISH 或 Constant.PUBREL)
+     * @param messageId 消息ID
+     */
+    public void handleAck(String clientId, String type, int messageId) {
+        // 1. 无论什么类型，先停止重试定时器
+        cancel(clientId, type, messageId)
+            .doOnSuccess(v -> log.debug("Stopped retry for client: [{}], type: [{}], id: [{}]", clientId, type, messageId))
+            .subscribe();
 
-    private void sendToNetty(TlMqttPublishReq req, String clientId) {
-        Channel channel = channelManager.getChannel(clientId);
-        if (channel != null && channel.isActive()) {
-            channel.writeAndFlush(req).addListener(f -> {
-                if (f.isSuccess() && req.getFixedHead().getQos().value() > 0) {
-                    // 注册重试
-                    retryManager.schedulePublishRetry(req.getVariableHead().getMessageId(),
-                        new TlRetryTask(req.getVariableHead().getMessageId(), req, channel));
-                }
-            });
+        // 2. 根据业务类型执行后续清理
+        if (Constant.PUBLISH.equals(type)) {
+            // QoS 1 流程：清理持久化消息 -> 释放窗口 -> 触发队列
+            publishService.clear(clientId, (long) messageId)
+                .then(processNextInQueue(clientId, messageId))
+                .subscribe();
+        } else if (Constant.PUBREL.equals(type)) {
+            // QoS 2 流程：清理 PUBREL 持久化 -> 释放窗口 -> 触发队列
+            // 注意：此时 PUBLISH 已经在收到 PUBREC 时被清理过了
+            pubrelService.clear(clientId, (long) messageId)
+                .then(processNextInQueue(clientId, messageId))
+                .subscribe();
         }
     }
 
+    /**
+     * 通用的窗口回收与队列触发逻辑
+     */
+    private Mono<Void> processNextInQueue(String clientId, int messageId) {
+        return sessionService.find(clientId)
+            .flatMap(session -> {
+                // 1. 释放 ID 资源
+                session.getMessageIdManager().releaseId(messageId);
+                // 2. 减小 In-Flight 计数并尝试处理积压队列
+                if (session.getInFlightCount().get() > 0) {
+                    session.getInFlightCount().decrementAndGet();
+                }
+
+                // 3. 触发队列中的下一条消息
+                TlMqttPublishReq next = session.getMessageQueue().poll();
+                if (next != null) {
+                    log.debug("Polling next message from queue for client: [{}]", clientId);
+                    // 递归回 processWithTrafficControl 逻辑
+                    return this.processWithTrafficControl(session, next);
+                }
+                return Mono.empty();
+            })
+            .then();
+    }
     private String handleTopicAlias(String clientId, Integer alias, String topic) {
 
         if (StrUtil.isNotEmpty(topic)) {
@@ -237,7 +346,9 @@ public class ForwardMessageService {
             return topic;
         } else {
             String cached = aliasService.get(clientId, alias);
-            if (cached == null) throw new TlProtocolErrorException(MqttMessageType.PUBLISH);
+            if (cached == null) {
+                throw new TlProtocolErrorException(MqttMessageType.PUBLISH,MqttMessageType.DISCONNECT);
+            }
             return cached;
         }
     }
@@ -245,5 +356,23 @@ public class ForwardMessageService {
     private int calculateSize(TlMqttPublishReq req) {
         // 简化的长度计算逻辑，实际需根据编码后的字节数组长度判定
         return req.getFixedHead().getLength();
+    }
+
+
+
+    public String buildScheduleKey(String clientId, String key, long msgId) {
+        return clientId + ":" + key + ":" + msgId;
+    }
+
+    /**
+     * 辅助方法：从不同类型的消息中提取 ID
+     */
+    private long getMessageId(AbstractTlMessage message) {
+        if (message instanceof TlMqttPublishReq) {
+            return ((TlMqttPublishReq) message).getVariableHead().getMessageId();
+        } else if (message instanceof TlMqttPubRelReq) {
+            return ((TlMqttPubRelReq) message).getVariableHead().getMessageId();
+        }
+        return -1;
     }
 }

@@ -1,6 +1,6 @@
 tlmqtt:
   sessionProperties:
-    timeout: 5 #session会话超时时间 如果过了这个时间还没连接 那么就不保持会话
+    timeout: 60 #session会话超时时间 如果过了这个时间还没连接 那么就不保持会话
     delay: 5 #ack消息确定 5s后没有收到确定就重发
     maxRetry: 3 #qos1和qos2的消息重试次数
   portProperties:

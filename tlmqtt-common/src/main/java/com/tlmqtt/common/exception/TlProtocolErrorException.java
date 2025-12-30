@@ -16,12 +16,16 @@ public class TlProtocolErrorException extends TlMqttException {
 
 
 
-    public TlProtocolErrorException( MqttMessageType replayTpe) {
-        super(MqttErrorCode.PROTOCOL_ERROR, replayTpe);
+    public TlProtocolErrorException(MqttMessageType acceptType,MqttMessageType replayTpe) {
+        super(MqttErrorCode.PROTOCOL_ERROR, true,acceptType,null,replayTpe);
     }
 
 
     public TlProtocolErrorException(MqttErrorCode errorCode, MqttMessageType replayTpe) {
-        super(errorCode, replayTpe);
+        super(errorCode, true,MqttMessageType.CONNECT,null,replayTpe);
+    }
+
+    public TlProtocolErrorException(MqttErrorCode errorCode, MqttMessageType acceptType,MqttMessageType replayTpe) {
+        super(errorCode, true,acceptType,null,replayTpe);
     }
 }

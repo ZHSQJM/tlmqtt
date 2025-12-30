@@ -3,9 +3,9 @@ package com.tlmqtt.bootstrap;
 import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.common.config.MqttConfiguration;
-import com.tlmqtt.common.properties.TlAuthProperties;
 import com.tlmqtt.common.properties.TlMqttServerProperties;
 import com.tlmqtt.common.properties.TlSessionProperties;
+import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.core.handler.TlConnectHandler;
 import com.tlmqtt.core.handler.TlDisconnectHandler;
 import com.tlmqtt.core.handler.TlExceptionHandler;
@@ -17,11 +17,10 @@ import com.tlmqtt.core.handler.TlPubRelHandler;
 import com.tlmqtt.core.handler.TlPublishHandler;
 import com.tlmqtt.core.handler.TlSubscribeHandler;
 import com.tlmqtt.core.handler.TlUnSubscribeHandler;
-import com.tlmqtt.core.manager.ChannelManager;
-import com.tlmqtt.core.manager.RetryManager;
-import com.tlmqtt.core.service.AliasService;
+import com.tlmqtt.core.alias.AliasService;
 import com.tlmqtt.core.service.ForwardMessageService;
 import com.tlmqtt.core.share.IShareSubscribeClientChoose;
+import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
 import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
@@ -51,12 +50,13 @@ public class MqttComponentContainer {
     private final ShareSubscribeService shareSubscribeService;
     private final AliasService aliasService;
     private final IShareSubscribeClientChoose shareChoose;
+    private final TlSchedulerTaskService schedulerTaskService;
     private final ExecutorService executorService;
-    private final ChannelManager channelManager;
-    private final RetryManager retryManager;
+    private final TlChannelService channelService;
     private final AuthenticationManager authenticationManager;
     private final AuthorizationManager authorizationManager;
     private final MqttConfiguration mqttConfiguration;
+
 
 
     private TlConnectHandler connectHandler;
@@ -72,21 +72,21 @@ public class MqttComponentContainer {
     private TlExceptionHandler exceptionHandler;
 
     public void initHandlers() {
+        TlSessionProperties sessionProperties = properties.getSessionProperties();
 
-
-        ForwardMessageService forwardService = new ForwardMessageService(
-            aliasService, shareSubscribeService, shareChoose,
-            subscriptionService, sessionService, publishService, channelManager, retryManager);
+        ForwardMessageService forwardService = new ForwardMessageService(aliasService, shareSubscribeService, shareChoose,
+            subscriptionService, sessionService, publishService, channelService, schedulerTaskService,pubrelService, sessionProperties.getDelay(), sessionProperties.getMaxRetry());
 
         // 实例化 Handler
-        this.exceptionHandler = new TlExceptionHandler(publishService, channelManager, sessionService,mqttConfiguration);
-        this.connectHandler = new TlConnectHandler(sessionService, publishService, pubrelService, retainService, channelManager, authenticationManager, retryManager,mqttConfiguration);
+        this.exceptionHandler = new TlExceptionHandler(publishService, channelService, sessionService,mqttConfiguration,subscriptionService,forwardService,schedulerTaskService,sessionProperties.getTimeout());
+        this.connectHandler = new TlConnectHandler(sessionService, publishService, pubrelService, retainService,
+            channelService, authenticationManager,mqttConfiguration,schedulerTaskService,forwardService);
         this.disconnectHandler = new TlDisconnectHandler();
         this.heartBeatHandler = new TlHeartBeatHandler();
-        this.pubAckHandler = new TlPubAckHandler(publishService, retryManager, forwardService);
-        this.pubCompHandler = new TlPubCompHandler(forwardService, retryManager, pubrelService);
+        this.pubAckHandler = new TlPubAckHandler(publishService, forwardService);
+        this.pubCompHandler = new TlPubCompHandler(forwardService, pubrelService);
         this.publishHandler = new TlPublishHandler(retainService, authorizationManager, forwardService, publishService);
-        this.pubRecHandler = new TlPubRecHandler(publishService, pubrelService, retryManager);
+        this.pubRecHandler = new TlPubRecHandler(publishService, pubrelService, forwardService);
         this.pubRelHandler = new TlPubRelHandler(forwardService, publishService);
         this.subscribeHandler = new TlSubscribeHandler(forwardService, authorizationManager, shareSubscribeService, sessionService, retainService, publishService, subscriptionService);
         this.unSubscribeHandler = new TlUnSubscribeHandler(subscriptionService);

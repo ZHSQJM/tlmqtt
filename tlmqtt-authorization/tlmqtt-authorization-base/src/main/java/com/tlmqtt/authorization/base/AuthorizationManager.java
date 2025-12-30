@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.ServiceLoader;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -17,6 +18,8 @@ import java.util.stream.Collectors;
 public class AuthorizationManager {
 
     private final List<TlAuthorizationProvider> providers;
+
+    private final ConcurrentHashMap<String,TlAuthorizationProvider> PROVIDERS_MAP = new ConcurrentHashMap<>();
 
     public AuthorizationManager() {
         // 动态加载 Classpath 下所有的 TlAuthorizationProvider 实现
@@ -29,6 +32,7 @@ public class AuthorizationManager {
         List<TlAuthorizationProvider> list = new ArrayList<>();
         for (TlAuthorizationProvider provider : loader) {
             list.add(provider);
+            PROVIDERS_MAP.put(provider.name(),provider);
         }
         // 按 order 排序，先校验高优先级的
         return list.stream()
@@ -65,8 +69,7 @@ public class AuthorizationManager {
 
         for (TlAuthorizationProvider provider : providers) {
             if (!provider.checkPublishPermission(clientId, username, ip, topic)) {
-                log.warn("ACL Deny [Publish]: Client={}, Topic={}, Provider={}",
-                    clientId, topic, provider.getClass().getSimpleName());
+                log.warn("ACL Deny [Publish]: Client={}, Topic={}, Provider={}", clientId, topic, provider.getClass().getSimpleName());
                 return false;
             }
         }
@@ -80,5 +83,10 @@ public class AuthorizationManager {
             session.getIp(),
             topic
         );
+    }
+
+    public List<String> list() {
+        //获取PROVIDERS_MAP里面的key的集合
+        return new ArrayList<>(PROVIDERS_MAP.keySet());
     }
 }

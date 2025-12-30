@@ -3,7 +3,6 @@ package com.tlmqtt.store.service.impl;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.tlmqtt.common.model.request.TlMqttPubRelReq;
-import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.store.service.PubrelService;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
@@ -32,7 +31,7 @@ public class DefaultPubrelServiceImpl implements PubrelService {
     @Override
     public Mono<TlMqttPubRelReq> save(String clientId, Long messageId, TlMqttPubRelReq req) {
         return Mono.fromSupplier(() -> {
-            Map<Long, TlMqttPubRelReq> messageMap = pubrelCache.get(clientId, k -> new ConcurrentHashMap<>());
+            Map<Long, TlMqttPubRelReq> messageMap = pubrelCache.get(clientId, k -> new ConcurrentHashMap<>(10));
             if (messageMap != null) {
                 messageMap.put(messageId, req);
             }
@@ -81,8 +80,8 @@ public class DefaultPubrelServiceImpl implements PubrelService {
     @Override
     public Mono<Void> onSessionCleared(String clientId) {
         return Mono.fromRunnable(() -> {
-            log.info("Observer: [PubrelService] cleaning data for clientId: [{}]", clientId);
             pubrelCache.invalidate(clientId);
+            log.debug("客户端【{}】清除rel消息",clientId);
         }).then();
     }
 }

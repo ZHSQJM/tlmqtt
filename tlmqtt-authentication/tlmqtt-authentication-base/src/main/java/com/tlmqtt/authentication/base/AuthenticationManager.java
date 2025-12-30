@@ -76,4 +76,9 @@ public class AuthenticationManager extends AbstractTlAuthentication {
             current = current.getNextAuthentication();
         }
     }
+
+    public List<String> list() {
+        //获取PROVIDERS_MAP里面的key的集合
+        return new ArrayList<>(PROVIDERS_MAP.keySet());
+    }
 }

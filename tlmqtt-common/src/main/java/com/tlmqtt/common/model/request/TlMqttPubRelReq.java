@@ -20,9 +20,9 @@ public class TlMqttPubRelReq extends AbstractTlMessage {
 
     private TlMqttPubRelVariableHead variableHead;
 
-    public static TlMqttPubRelReq build(Long messageId){
+    public static TlMqttPubRelReq build(Long messageId,byte reason){
 
-        TlMqttPubRelVariableHead variableHead= TlMqttPubRelVariableHead.builder().messageId(messageId).build();
+        TlMqttPubRelVariableHead variableHead= TlMqttPubRelVariableHead.builder().messageId(messageId).reasonCode(reason).build();
         TlMqttFixedHead fixedHead= TlMqttFixedHead.build(MqttMessageType.PUBREL, MqttQoS.AT_LEAST_ONCE, false);
         return TlMqttPubRelReq.builder()
             .fixedHead(fixedHead)

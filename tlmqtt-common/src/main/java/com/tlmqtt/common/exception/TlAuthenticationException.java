@@ -13,7 +13,7 @@ import io.netty.handler.codec.DecoderException;
 public class TlAuthenticationException extends TlMqttException {
 
 
-    public TlAuthenticationException(MqttMessageType replayTpe){
-        super(MqttErrorCode.UNAUTHORIZED,replayTpe);
+    public TlAuthenticationException(boolean close,MqttMessageType acceptType,MqttMessageType replayType){
+        super(MqttErrorCode.UNAUTHORIZED,close,acceptType,null,replayType);
     }
 }

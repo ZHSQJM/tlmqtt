@@ -32,7 +32,7 @@ public class Constant {
      */
     public static final int MESSAGE_BIT = 4;
     public static final String TOPIC_SPLITTER = "#";
-    public static final String TOPIC_WILDCARD = "\\+";
+    public static final String TOPIC_WILDCARD = "+";
     public static final String TOPIC_SPLITTER_SPLITTER = "\\/";
     public  static final String COLON = "\\:";
     public static final String ASTERISK = "*";
@@ -56,5 +56,11 @@ public class Constant {
     public static final String USER = "user";
 
     /**优雅停机后的时间*/
-    public static final long TIMEOUT = 10; ;
+    public static final long TIMEOUT = 10;
+
+    public static final String WILL = "will";
+    public static final String PUBLISH = "publish";
+    public static final String PUBREL = "pubrel";
+
+    ;
 }

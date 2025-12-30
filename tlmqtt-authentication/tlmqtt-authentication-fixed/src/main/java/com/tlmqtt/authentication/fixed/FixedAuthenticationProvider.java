@@ -18,7 +18,7 @@ public class FixedAuthenticationProvider implements TlAuthenticationProvider {
 
     @Override
     public int order() {
-        return 30; 
+        return 1;
     }
 
     @Override

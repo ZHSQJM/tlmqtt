@@ -4,7 +4,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.store.service.PublishService;
-import com.tlmqtt.store.service.session.listener.SessionEventListener;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -45,7 +44,7 @@ public class DefaultPublishServiceImpl implements PublishService {
     public Mono<TlMqttPublishReq> save(String clientId, Long messageId, TlMqttPublishReq req) {
         return Mono.fromSupplier(() -> {
             // 获取该客户端的消息 Map，如果不存在则创建
-            Map<Long, TlMqttPublishReq> messageMap = unackedCache.get(clientId, k -> new ConcurrentHashMap<>());
+            Map<Long, TlMqttPublishReq> messageMap = unackedCache.get(clientId, k -> new ConcurrentHashMap<>(10));
             if (messageMap != null) {
                 messageMap.put(messageId, req);
             }
@@ -91,6 +90,7 @@ public class DefaultPublishServiceImpl implements PublishService {
     @Override
     public Mono<Boolean> saveWill(String clientId, TlMqttPublishReq req) {
         return Mono.fromSupplier(() -> {
+            log.debug("客户端【{}】保存遗嘱消息",clientId);
             willCache.put(clientId, req);
             return true;
         });
@@ -104,6 +104,7 @@ public class DefaultPublishServiceImpl implements PublishService {
     @Override
     public Mono<Boolean> clearWill(String clientId) {
         return Mono.fromSupplier(() -> {
+            log.debug("客户端【{}】清除遗嘱消息",clientId);
             boolean existed = willCache.getIfPresent(clientId) != null;
             willCache.invalidate(clientId);
             return existed;
@@ -116,11 +117,12 @@ public class DefaultPublishServiceImpl implements PublishService {
     @Override
     public Mono<Void> onSessionCleared(String clientId) {
         return Mono.fromRunnable(() -> {
-            log.info("Observer: [PublishService] cleaning data for clientId: [{}]", clientId);
+            //log.info("Observer: [PublishService] cleaning data for clientId: [{}]", clientId);
             // 1. 清理未确认消息
             unackedCache.invalidate(clientId);
             // 2. 清理遗嘱消息
             willCache.invalidate(clientId);
+            log.debug("客户端【{}】清除publish与will消息",clientId);
         }).then();
     }
 }

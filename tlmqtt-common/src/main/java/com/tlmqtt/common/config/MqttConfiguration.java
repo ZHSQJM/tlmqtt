@@ -3,11 +3,8 @@ package com.tlmqtt.common.config;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
-
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
@@ -122,6 +119,7 @@ public class MqttConfiguration  {
 
     public void setList(String key, String value, boolean isAdd) {
         List<String> list = LIST_CACHE.get(key, k -> new CopyOnWriteArrayList<>());
+        assert list != null;
         if (isAdd) {
             list.add(value);
         } else {

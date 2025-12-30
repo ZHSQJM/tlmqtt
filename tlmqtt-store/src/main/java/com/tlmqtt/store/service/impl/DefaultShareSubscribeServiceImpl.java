@@ -5,14 +5,11 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.store.service.ShareSubscribeService;
-import io.netty.channel.Channel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
-
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
@@ -22,10 +19,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
  **/
 public class DefaultShareSubscribeServiceImpl implements ShareSubscribeService {
 
-    // 主题 -> 该主题下的所有共享组名
+    private static final Logger log = LoggerFactory.getLogger(DefaultShareSubscribeServiceImpl.class);
+
+    /**主题 -> 该主题下的所有共享组名*/
     private final Cache<String, List<String>> TOPIC_GROUP = Caffeine.newBuilder().build();
 
-    // 组名 -> 组内的成员列表
+    /**组名 -> 组内的成员列表*/
     private final Cache<String, List<TlSubClient>> GROUP_MEMBER = Caffeine.newBuilder().build();
 
     @Override
@@ -36,6 +35,7 @@ public class DefaultShareSubscribeServiceImpl implements ShareSubscribeService {
 
             // 1. 维护主题与组的关系
             List<String> groups = TOPIC_GROUP.get(topic, k -> new CopyOnWriteArrayList<>());
+            assert groups != null;
             if (!groups.contains(group)) {
                 groups.add(group);
             }
@@ -43,6 +43,7 @@ public class DefaultShareSubscribeServiceImpl implements ShareSubscribeService {
             // 2. 维护组与成员的关系 (使用 CopyOnWriteArrayList 保证并发安全)
             List<TlSubClient> members = GROUP_MEMBER.get(group, k -> new CopyOnWriteArrayList<>());
             // 避免重复添加同一个客户端
+            assert members != null;
             members.removeIf(m -> m.getClientId().equals(client.getClientId()));
             members.add(client);
 
@@ -86,7 +87,7 @@ public class DefaultShareSubscribeServiceImpl implements ShareSubscribeService {
             return null;
         }
 
-        HashMap<String, List<TlSubClient>> result = new HashMap<>();
+        HashMap<String, List<TlSubClient>> result = new HashMap<>(10);
         for (String groupName : groupNames) {
             List<TlSubClient> members = GROUP_MEMBER.getIfPresent(groupName);
             if (members != null && !members.isEmpty()) {
@@ -96,21 +97,23 @@ public class DefaultShareSubscribeServiceImpl implements ShareSubscribeService {
         return result.isEmpty() ? null : result;
     }
 
+
     /**
      * 实现观察者接口：Session销毁时自动清理该客户端在所有组中的订阅
-     */
+     * @author zhouhs
+     * @param: clientId
+     * @return: reactor.core.publisher.Mono<java.lang.Void>
+     **/
+
     @Override
     public Mono<Void> onSessionCleared(String clientId) {
         return Mono.fromRunnable(() -> {
             // 遍历所有组，移除该客户端
             GROUP_MEMBER.asMap().forEach((group, members) -> {
-                if (members.removeIf(m -> m.getClientId().equals(clientId))) {
-                    if (members.isEmpty()) {
-                        // 如果移除后组空了，这里可以进一步清理，但为了性能通常建议在下次心跳或反注册时清理
-                        // 或者简单的全部反查一遍
-                    }
-                }
+                members.removeIf(m -> m.getClientId().equals(clientId));// 如果移除后组空了，这里可以进一步清理，但为了性能通常建议在下次心跳或反注册时清理
+                // 或者简单的全部反查一遍
             });
+            log.debug("客户端【{}】清除订阅的共享订阅主题",clientId);
         }).then();
     }
 }

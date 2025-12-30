@@ -1,4 +1,4 @@
-package com.tlmqtt.core.service;
+package com.tlmqtt.core.alias;
 
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -23,19 +23,19 @@ public class DefaultAliasServiceImpl implements AliasService {
             .maximumSize(10000)
             .expireAfterAccess(30, TimeUnit.MINUTES)
             .removalListener((clientId, aliasMap, cause) -> {
-                // 可选：记录日志或统计信息
-                if (aliasMap != null) {
-
-                }
             })
             .build();
 
-
-    // 线程安全的put方法
+    /**
+     * 添加别名
+     * @param clientId 客户端
+     * @param alias 别名
+     * @param topic 主题
+     */
     @Override
-    public boolean put(String clientId, Integer alias, String topic) {
+    public void put(String clientId, Integer alias, String topic) {
         if (clientId == null || alias == null || topic == null) {
-            return false;
+            return;
         }
 
         try {
@@ -43,11 +43,10 @@ public class DefaultAliasServiceImpl implements AliasService {
                 clientId,
                 id -> new ConcurrentHashMap<>(16, 0.75f, 4)
             );
+            assert aliasMap != null;
             aliasMap.put(alias, topic);
-            return true;
         } catch (Exception e) {
             // 记录日志
-            return false;
         }
     }
 
@@ -57,7 +56,12 @@ public class DefaultAliasServiceImpl implements AliasService {
         return clientAliases.get(alias);
     }
 
-    // 批量获取
+
+    /**
+     * 获取客户端的别名
+     * @param clientId 客户端
+     * @return 别名
+     */
     public Map<Integer, String> getClientAliases(String clientId) {
         ConcurrentHashMap<Integer, String> aliasMap = CLIENT_ALIAS_MAP.getIfPresent(clientId);
         return aliasMap != null ?
@@ -65,14 +69,4 @@ public class DefaultAliasServiceImpl implements AliasService {
             Collections.emptyMap();
     }
 
-    // 统计信息
-    public Map<String, Object> getStats() {
-        Map<String, Object> stats = new HashMap<>();
-        Map<String, ConcurrentHashMap<Integer, String>> all = CLIENT_ALIAS_MAP.asMap();
-        stats.put("clientCount", all.size());
-        stats.put("totalAliases", all.values().stream()
-            .mapToInt(Map::size)
-            .sum());
-        return stats;
-    }
 }

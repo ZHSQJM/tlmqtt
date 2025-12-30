@@ -5,9 +5,14 @@ import com.tlmqtt.common.model.request.AbstractTlMessage;
 import com.tlmqtt.core.service.PublishInterceptor;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
-
 /**
  * 日志记录PublishInterceptor实现示例
+ * @author zhouhs
+ * @version 0.1.0
+ * @since 0.1.0
+ **/
+/**
+ *
  */
 @Slf4j
 public class LoggingPublishInterceptor<T extends AbstractTlMessage> implements PublishInterceptor<T> {

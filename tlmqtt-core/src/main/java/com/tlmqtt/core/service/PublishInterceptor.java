@@ -11,7 +11,7 @@ import io.netty.channel.ChannelHandlerContext;
  * @author zhouhs
  * @since 0.1.0
  **/
-public interface PublishInterceptor<T extends AbstractTlMessage> {
+public interface PublishInterceptor<TlMqttPublishReq> {
     
     /**
      * 拦截器顺序
@@ -28,5 +28,5 @@ public interface PublishInterceptor<T extends AbstractTlMessage> {
      * @param session 会话
      * @return 处理后的消息，如果返回null则表示终止处理
      */
-    T intercept(ChannelHandlerContext ctx, T req, TlMqttSession session);
+    TlMqttPublishReq intercept(ChannelHandlerContext ctx, TlMqttPublishReq req, TlMqttSession session);
 }

@@ -25,7 +25,7 @@ public class DefaultChannelServiceImpl implements TlChannelService{
         .expireAfterWrite(24, TimeUnit.HOURS)
         .removalListener((String clientId, Channel channel, RemovalCause cause) -> {
             if (channel != null && channel.isActive()) {
-                log.info("Caffeine 移除连接 [{}], 原因: {}, 执行关闭", clientId, cause);
+                log.debug("Caffeine 移除连接 [{}], 原因: {}, 执行关闭", clientId, cause);
                 channel.close();
             }
         })
@@ -39,7 +39,7 @@ public class DefaultChannelServiceImpl implements TlChannelService{
         // Caffeine 的 put 操作会触发 removalListener（如果旧值存在且被替换）
         // 这意味着旧连接的 close() 逻辑会被 removalListener 自动处理，保持代码简洁
         clientCache.put(clientId, newChannel);
-       // log.info("客户端 [{}] 绑定新通道 [{}], 当前活跃连接数: {}", clientId, newChannel, clientCache.estimatedSize());
+       // log.debug("客户端 [{}] 绑定新通道 [{}], 当前活跃连接数: {}", clientId, newChannel, clientCache.estimatedSize());
     }
 
     /**

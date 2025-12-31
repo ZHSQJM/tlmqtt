@@ -78,7 +78,7 @@ public class DefaultSubscriptionServiceImpl implements SubscriptionService {
     @Override
     public Mono<Void> onSessionCleared(String clientId) {
         return Mono.fromRunnable(() -> {
-            //log.info("Observer:[SubscriptionService] cleaning data for clientId[{}]", clientId);
+            //log.debug("Observer:[SubscriptionService] cleaning data for clientId[{}]", clientId);
             Set<String> topics = clientSubscriptionCache.getIfPresent(clientId);
             if (topics != null) {
                 // 利用反向索引进行精准删除，而不是全树扫描

@@ -117,7 +117,7 @@ public class DefaultPublishServiceImpl implements PublishService {
     @Override
     public Mono<Void> onSessionCleared(String clientId) {
         return Mono.fromRunnable(() -> {
-            //log.info("Observer: [PublishService] cleaning data for clientId: [{}]", clientId);
+            //log.debug("Observer: [PublishService] cleaning data for clientId: [{}]", clientId);
             // 1. 清理未确认消息
             unackedCache.invalidate(clientId);
             // 2. 清理遗嘱消息

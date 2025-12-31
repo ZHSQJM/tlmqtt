@@ -47,27 +47,27 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         configuration.addListener(property -> {
             if (property == MqttConfiguration.Property.MAXIMUM_QOS) {
                 int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_QOS.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.maximumQos = newValue;
             }
             if (property == MqttConfiguration.Property.RETAIN_AVAILABLE) {
                 boolean newValue = configuration.getBoolean(MqttConfiguration.Property.RETAIN_AVAILABLE.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.retainAvailable = newValue;
             }
             if (property == MqttConfiguration.Property.INVALID_TOPIC_NAMES) {
                 List<String> newValue = configuration.getList(MqttConfiguration.Property.INVALID_TOPIC_NAMES.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.invalidTopicNames = newValue;
             }
             if (property == MqttConfiguration.Property.REFUSE_CLIENTS) {
                 List<String>  newValue = configuration.getList(MqttConfiguration.Property.REFUSE_CLIENTS.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.refuseClients = newValue;
             }
             if (property == MqttConfiguration.Property.MAXIMUM_PACKET_SIZE) {
                 int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_PACKET_SIZE.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.maximumPacketSize = newValue;
             }
         });

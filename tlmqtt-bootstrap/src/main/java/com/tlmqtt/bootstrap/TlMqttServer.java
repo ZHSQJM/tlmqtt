@@ -1,6 +1,5 @@
 package com.tlmqtt.bootstrap;
 
-import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.properties.TlChannelProperties;
 import com.tlmqtt.common.properties.TlMqttServerProperties;
 import com.tlmqtt.core.codec.MqttWebSocketCodec;
@@ -80,11 +79,11 @@ public  class  TlMqttServer  {
         this.container = container;
         this.container.initHandlers();
 
-        TlChannelProperties cp = properties.getChannelProperties();
+        TlChannelProperties cp = properties.getChannel();
         this.trafficShaper = new DynamicTrafficShaper(workerGroup, cp.getWriteLimit(), cp.getReadLimit(), cp.getCheckInterval(), cp.getMaxTime());
 
-        if (properties.getSslProperties().isEnabled()) {
-            this.sslContext = SslContextUtil.buildServerSslContext(properties.getSslProperties());
+        if (properties.getSsl().isEnabled()) {
+            this.sslContext = SslContextUtil.buildServerSslContext(properties.getSsl());
         }
 
         this.shutdownHook = new ShutDownGracefully(bossGroup, workerGroup, container.getExecutorService());
@@ -108,7 +107,7 @@ public  class  TlMqttServer  {
             .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
             .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
             .childOption(ChannelOption.WRITE_BUFFER_WATER_MARK,
-                new WriteBufferWaterMark(properties.getChannelProperties().getLowWaterMark(), properties.getChannelProperties().getHighWaterMark()))
+                new WriteBufferWaterMark(properties.getChannel().getLowWaterMark(), properties.getChannel().getHighWaterMark()))
             .childOption(ChannelOption.TCP_NODELAY, true)
             .childOption(ChannelOption.SO_KEEPALIVE, true)
             .childHandler(initializer);
@@ -117,7 +116,7 @@ public  class  TlMqttServer  {
     private void bind(ServerBootstrap b, int port, String name) {
         try {
             ChannelFuture f = b.bind(port).sync();
-            log.info("{} Server started on port: {}", name, port);
+            log.debug("{} Server started on port: {}", name, port);
             shutdownHook.registerShutdownHook(f.channel());
         } catch (Exception e) {
             log.error("{} Server bind failed on port: {}", name, port, e);

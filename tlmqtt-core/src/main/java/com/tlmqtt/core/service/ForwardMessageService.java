@@ -142,9 +142,14 @@ public class ForwardMessageService {
                         return Mono.empty();
                     }
                 }
+                if (realQos == MqttQoS.AT_MOST_ONCE) {
+                    // QoS 0 绕过所有 In-Flight 和重试逻辑，直接发送，减少 Reactor 链条长度
+                    return doSend(targetReq, targetClientId);
+                } else {
+                    // QoS 1/2 进入复杂的流量控制和重试逻辑       // 5. 流量控制（In-Flight 检查）
+                    return processWithTrafficControl(session, targetReq);
+                }
 
-                // 5. 流量控制（In-Flight 检查）
-                return processWithTrafficControl(session, targetReq);
             });
     }
 
@@ -152,13 +157,7 @@ public class ForwardMessageService {
      * 流量控制核心：QoS 0 直接发，QoS 1/2 检查窗口
      */
     private Mono<Void> processWithTrafficControl(TlMqttSession session, TlMqttPublishReq req) {
-        MqttQoS qos = req.getFixedHead().getQos();
         String clientId = session.getClientId();
-
-        // QoS 0 处理
-        if (qos == MqttQoS.AT_MOST_ONCE) {
-            return doSend(req, clientId);
-        }
 
         // QoS 1/2 流量控制
         int maxInFlight = session.getReceiveMaximum() != null ? session.getReceiveMaximum() : 65535;
@@ -215,7 +214,6 @@ public class ForwardMessageService {
      * 使用泛型或 Object 抽象，减少代码重复
      */
     public Mono<Void> scheduleWithRetry(String type, String clientId, AbstractTlMessage message, int count) {
-
         if (null == message) {
             return Mono.empty();
         }
@@ -243,15 +241,13 @@ public class ForwardMessageService {
             if (count > 1 && message instanceof TlMqttPublishReq) {
                 message.getFixedHead().setDup(true);
             }
-
-            log.debug("Executing retry attempt {} for key: {}", count, retryKey);
             // 这里会执行所有类型的消息发送，包括 TlMqttPublishReq 和 TlMqttPubRelReq
             return doSend(message, clientId);
         }).then(
             // 5. 关键修正：递归调用时传入 type 而不是上一次生成的 retryKey
             schedulerTaskService.schedule(
                 retryKey,
-                scheduleWithRetry(type, clientId, message, count + 1),
+                Mono.defer(() -> scheduleWithRetry(type, clientId, message, count + 1)),
                 retryInterval,
                 TimeUnit.SECONDS
             )
@@ -276,6 +272,12 @@ public class ForwardMessageService {
                 // 注意：ByteBuf 的引用计数在重试场景下非常危险
                 // 如果 msg 包含 ByteBuf，Netty 发送后会自动释放。
                 // 建议重试时使用 retain() 或者发送不释放的副本
+                if (msg instanceof TlMqttPublishReq ) {
+                    // 增加引用计数，确保 Netty 发送完一次后，内存不被彻底回收，供下一次重试使用
+                    TlMqttPublishReq publishReq = (TlMqttPublishReq) msg;
+                    ReferenceCountUtil.retain(publishReq.getPayload().getContent());
+                }
+
                 channel.writeAndFlush(msg).addListener(f -> {
                     if (f.isSuccess()) {
                         sink.success();

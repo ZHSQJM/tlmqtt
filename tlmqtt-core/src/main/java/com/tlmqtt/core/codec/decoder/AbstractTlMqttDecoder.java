@@ -31,7 +31,7 @@ public abstract class  AbstractTlMqttDecoder  {
         configuration.addListener(property -> {
             if (property == MqttConfiguration.Property.MAXIMUM_PACKET_SIZE) {
                 int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_PACKET_SIZE.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.maximumPacketSize = newValue;
             }
         });

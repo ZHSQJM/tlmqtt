@@ -24,7 +24,7 @@ public class NoneAuthenticationService extends AbstractTlAuthentication {
     }
     @Override
     public boolean authenticate(String username, String password) {
-        log.info("none认证器认证成功");
+        log.debug("none认证器认证成功");
         return true;
     }
 

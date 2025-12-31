@@ -19,9 +19,10 @@ mqtt 测试
 
 
 //建立5000个连接
-docker run -it emqx/emqtt-bench:latest conn -h 172.28.32.1 -p 18883 -c 5000 -V 4 -u mqtt -P mqtt -i 10
+docker run -it emqx/emqtt-bench:latest conn -h 172.20.10.9 -p 18883 -c 5000 -V 4 -u admin -P admin -i 10
+docker run -it --network host emqx/emqtt-bench:latest conn -h 172.20.10.9 -p 18883 -c 5000 -V 4 -u admin -P admin -i 10
 
 建立 5000 个客户端连接，每 10ms 建立一个连接，每个连接均订阅 testtopic/# 主题，QoS 为 2
-docker run -it emqx/emqtt-bench:latest sub -h 172.28.32.1 -p 18883 -c 5000 -i 10 -t  testtopic/#  -q 2 -V 4 -u mqtt -P mqtt
+docker run -it --network host emqx/emqtt-bench:latest sub -h 192.168.116.1 -p 18883 -c 5000 -i 10 -t  testtopic/#  -q 2 -V 4 -u admin -P admin
 建立 100 个客户端连接，每 10ms 建立一个连接，每个连接 10ms 发布一次消息，每个连接均向 testtopic/${clientid} 主题发布消息，单条消息尺寸为 256 Bytes，消息 QoS 为 2
-docker run -it emqx/emqtt-bench:latest pub -h 172.28.32.1 -p 18883 -c 5000 -i 10 -I 10 -t testtopic/%i -s 256  -q 2 -V 4 -u mqtt -P mqtt
+docker run -it --network host emqx/emqtt-bench:latest pub -h 192.168.116.1 -p 18883 -c 5000 -i 10 -I 10 -t testtopic/%i -s 2  -q 2 -V 4 -u admin -P admin

@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class TlSslProperties {
 
-    private boolean enabled;
+    private boolean enabled = false;
 
     private String certPath;
 

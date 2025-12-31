@@ -24,7 +24,7 @@ public class AuthorizationManager {
     public AuthorizationManager() {
         // 动态加载 Classpath 下所有的 TlAuthorizationProvider 实现
         this.providers = loadProviders();
-        log.info("Loaded {} ACL Authorization providers", providers.size());
+        log.debug("Loaded {} ACL Authorization providers", providers.size());
     }
 
     private List<TlAuthorizationProvider> loadProviders() {

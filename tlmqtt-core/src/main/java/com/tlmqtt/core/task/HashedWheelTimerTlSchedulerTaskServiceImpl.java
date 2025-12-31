@@ -5,9 +5,11 @@ import io.netty.util.Timeout;
 import io.netty.util.Timer;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -23,6 +25,13 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
     private final Timer timer = new HashedWheelTimer();
 
     private final Map<String, Timeout> tasks = new ConcurrentHashMap<>();
+
+    private final ExecutorService executorService;
+
+    public HashedWheelTimerTlSchedulerTaskServiceImpl(ExecutorService executorService) {
+        this.executorService = executorService;
+        timer.newTimeout(this::cleanUpInternal, 10, TimeUnit.MINUTES);
+    }
 
 
     @Override
@@ -53,7 +62,8 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
                         }
 
                         // 2. 执行业务逻辑
-                        task.subscribe(
+                        task.subscribeOn(Schedulers.parallel())
+                            .subscribe(
                             unused -> log.debug("任务 [{}] 执行成功", key),
                             error -> log.error("任务 [{}] 执行失败", key, error)
                         );
@@ -70,7 +80,6 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
     @Override
     public Mono<Void> cancel(String key) {
         return Mono.defer(() -> {
-            log.debug("尝试取消任务 Key: [{}]", key);
 
             // 使用原子操作移除
             Timeout timeout = tasks.remove(key);
@@ -79,12 +88,11 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
                 return Mono.empty();
             }
 
-            log.debug("任务 [{}] 存在，当前状态: cancelled={}, expired={}",
-                key, timeout.isCancelled(), timeout.isExpired());
+            log.debug("任务 [{}] 存在，当前状态: cancelled={}, expired={}", key, timeout.isCancelled(), timeout.isExpired());
 
             if (!timeout.isCancelled()) {
                 timeout.cancel();
-                log.info("任务 [{}] 已成功调用 cancel()", key);
+                log.debug("任务 [{}] 已成功调用 cancel()", key);
             }
 
             return Mono.empty();
@@ -96,5 +104,10 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
 
         return tasks;
     }
-
+    private void cleanUpInternal(Timeout timeout) {
+        tasks.entrySet().removeIf(entry ->
+            entry.getValue().isExpired() || entry.getValue().isCancelled());
+        // 递归调用，实现定时清理
+        timer.newTimeout(this::cleanUpInternal, 10, TimeUnit.MINUTES);
+    }
 }

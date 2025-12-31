@@ -11,16 +11,16 @@ import lombok.Data;
 public class TlPortProperties {
 
     /** mqtt端口 */
-    private int mqtt;
+    private int mqtt = 1883;
 
     /** ssl端口 */
-    private int sslMqtt;
+    private int sslMqtt = 8883;
 
     /** websocket端口 */
-    private int websocket;
+    private int websocket = 8083;
 
     /** ssl websocket端口 */
-    private int sslWebsocket;
+    private int sslWebsocket = 8084;
 
 
 

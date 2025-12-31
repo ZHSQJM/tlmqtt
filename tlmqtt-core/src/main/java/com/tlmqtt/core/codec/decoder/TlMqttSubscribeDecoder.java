@@ -43,17 +43,17 @@ public class TlMqttSubscribeDecoder extends AbstractTlMqttDecoder {
         configuration.addListener(property -> {
             if (property == MqttConfiguration.Property.SUBSCRIPTION_IDENTIFIERS_AVAILABLE) {
                 boolean newValue = configuration.getBoolean(MqttConfiguration.Property.SUBSCRIPTION_IDENTIFIERS_AVAILABLE.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.subscriptionIdentifiersAvailable = newValue;
             }
             if (property == MqttConfiguration.Property.WILDCARD_SUBSCRIPTION_AVAILABLE) {
                 boolean newValue = configuration.getBoolean(MqttConfiguration.Property.WILDCARD_SUBSCRIPTION_AVAILABLE.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.wildcardSubscriptionAvailable = newValue;
             }
             if (property == MqttConfiguration.Property.SHARED_SUBSCRIPTION_AVAILABLE) {
                boolean newValue = configuration.getBoolean(MqttConfiguration.Property.SHARED_SUBSCRIPTION_AVAILABLE.getKey());
-                log.info("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
                 this.sharedSubscriptionAvailable = newValue;
             }
 

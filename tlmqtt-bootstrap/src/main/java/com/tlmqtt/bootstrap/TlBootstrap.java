@@ -83,20 +83,16 @@ public class TlBootstrap {
         return this;
     }
 
+    public TlBootstrap executorService(ThreadPoolExecutor executorService) {
+        containerBuilder.executorService(executorService);
+        return this;
+    }
     public TlBootstrap socket() { this.enableSocket = true; return this; }
     public TlBootstrap websocket() { this.enableWebSocket = true; return this; }
 
     public TlBootstrap start() {
-        // 构建容器
-        TlBusinessProperties businessProperties = properties.getBusinessProperties();
 
-        ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().setNamePrefix("tl-pool-%d").build();
-        containerBuilder.executorService(new ThreadPoolExecutor(
-            businessProperties.getCorePoolSize(),
-            businessProperties.getMaxPoolSize(),
-            businessProperties.getKeepAliveSeconds(),
-            java.util.concurrent.TimeUnit.SECONDS,
-            new java.util.concurrent.LinkedBlockingQueue<>(businessProperties.getQueueCapacity()),namedThreadFactory));
+
 
         MqttComponentContainer container = containerBuilder.build();
 
@@ -105,10 +101,10 @@ public class TlBootstrap {
         this.tlServer.setup(container);
 
         if (enableSocket) {
-            CompletableFuture.runAsync(() -> tlServer.startSocket(properties.getPortProperties().getMqtt()));
+            CompletableFuture.runAsync(() -> tlServer.startSocket(properties.getPort().getMqtt()));
         }
         if (enableWebSocket) {
-            CompletableFuture.runAsync(() -> tlServer.startWebsocket(properties.getPortProperties().getWebsocket()));
+            CompletableFuture.runAsync(() -> tlServer.startWebsocket(properties.getPort().getWebsocket()));
         }
         return this;
     }

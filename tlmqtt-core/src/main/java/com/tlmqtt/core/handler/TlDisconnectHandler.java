@@ -22,7 +22,7 @@ public class TlDisconnectHandler extends AbstractTlHandler<TlMqttDisconnectReq> 
     public void handle(ChannelHandlerContext ctx, TlMqttDisconnectReq req, TlMqttSession session) {
         Channel channel = ctx.channel();
         String clientId = session.getClientId();
-        log.info("Handling 【DISCONNECT】 event from client:【{}】", clientId);
+        log.debug("Handling 【DISCONNECT】 event from client:【{}】", clientId);
         //断开标志位设置为true 这样就不发生遗嘱消息了
         channel.attr(AttributeKey.valueOf(Constant.DISCONNECT)).set(true);
         channel.close();

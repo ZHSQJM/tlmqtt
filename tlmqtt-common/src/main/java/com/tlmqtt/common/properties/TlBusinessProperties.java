@@ -13,18 +13,18 @@ public class TlBusinessProperties {
     /**
      * 核心线程数
      */
-    private int corePoolSize;
+    private int corePoolSize = Runtime.getRuntime().availableProcessors();
     /**
      * 最大线程数
      */
-    private int  maxPoolSize;
+    private int  maxPoolSize = corePoolSize * 2;
     /**
      * 队列大小
      */
-    private int  queueCapacity;
+    private int  queueCapacity = 1000;
 
     /**
      * 线程存活时间
      */
-    private int  keepAliveSeconds;
+    private int  keepAliveSeconds = 60;
 }

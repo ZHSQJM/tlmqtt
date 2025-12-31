@@ -24,7 +24,7 @@
 //    @Override
 //    public T intercept(ChannelHandlerContext ctx, T req, TlMqttSession session) {
 //        String clientId = session != null ? session.getClientId() : "unknown";
-//        log.info("Publish message intercepted - ClientId: {}", clientId);
+//        log.debug("Publish message intercepted - ClientId: {}", clientId);
 //        // 不修改消息，直接返回原始消息
 //        return req;
 //    }

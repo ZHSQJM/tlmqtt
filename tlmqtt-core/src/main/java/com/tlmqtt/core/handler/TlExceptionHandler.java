@@ -59,7 +59,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
         String clientId = session.getClientId();
         // 1. 判定是否为“冲突剔除”。如果是，不触发遗嘱和清理逻辑
         if (channelService.getChannel(clientId) != channel) {
-            log.info("Channel for client: [{}] has been replaced, skip cleanup", clientId);
+            log.debug("Channel for client: [{}] has been replaced, skip cleanup", clientId);
             return;
         }
 
@@ -92,9 +92,9 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
         // 构造完整的清理任务（包含消息、订阅、Session状态）
         Mono<Void> expiryTask = sessionService.clearAll(clientId)
-            .doOnSuccess(v -> log.info("清除客户端[{}]的任务执行完毕", clientId))
+            .doOnSuccess(v -> log.debug("清除客户端[{}]的任务执行完毕", clientId))
             .then();
-        log.info("清除客户端[{}]的任务在【{}】秒后执行", clientId, expiryInterval);
+        log.debug("清除客户端[{}]的任务在【{}】秒后执行", clientId, expiryInterval);
         return schedulerTaskService.schedule(
             expiryKey,
             expiryTask,
@@ -130,7 +130,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
         // 如果是正常断开 (发送了 DISCONNECT 报文)，则取消遗嘱
         if (isNormalDisconnect(session.getCtx().channel())) {
-            log.info("客户端【{}】正常断开，无需发送遗嘱下线,清除遗嘱消息",clientId);
+            log.debug("客户端【{}】正常断开，无需发送遗嘱下线,清除遗嘱消息",clientId);
             return publishService.clearWill(clientId).then();
         }
 
@@ -157,7 +157,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
             return executePublishToSubscribers(req).thenReturn(true);
         } else {
-            log.info("遗嘱消息[{}]的任务在【{}】秒后执行", clientId, willDelay);
+            log.debug("遗嘱消息[{}]的任务在【{}】秒后执行", clientId, willDelay);
             // 延迟发送：存入调度器，Key 使用 clientId:WILL
             return schedulerTaskService.schedule(clientId + Constant.WILL,
                     executePublishToSubscribers(req),

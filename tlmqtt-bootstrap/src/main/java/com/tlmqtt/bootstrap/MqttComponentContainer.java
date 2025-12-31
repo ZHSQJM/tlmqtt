@@ -74,7 +74,7 @@ public class MqttComponentContainer {
     private TlExceptionHandler exceptionHandler;
 
     public void initHandlers() {
-        TlSessionProperties sessionProperties = properties.getSessionProperties();
+        TlSessionProperties sessionProperties = properties.getSession();
 
         ForwardMessageService forwardService = new ForwardMessageService(aliasService, shareSubscribeService, shareChoose,
             subscriptionService, sessionService, publishService, channelService, schedulerTaskService,pubrelService, sessionProperties.getDelay(), sessionProperties.getMaxRetry());

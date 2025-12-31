@@ -42,7 +42,7 @@ public class ShutDownGracefully {
             return;
         }
 
-        log.info("Stopping TL-MQTT server gracefully...");
+        log.debug("Stopping TL-MQTT server gracefully...");
         try {
             // 1. 关闭所有 Server Channels
             allChannels.close().awaitUninterruptibly(5, TimeUnit.SECONDS);
@@ -56,7 +56,7 @@ public class ShutDownGracefully {
             if (!executorService.awaitTermination(Constant.TIMEOUT, TimeUnit.SECONDS)) {
                 executorService.shutdownNow();
             }
-            log.info("TL-MQTT server stopped.");
+            log.debug("TL-MQTT server stopped.");
         } catch (Exception e) {
             log.error("Error during shutdown", e);
         }

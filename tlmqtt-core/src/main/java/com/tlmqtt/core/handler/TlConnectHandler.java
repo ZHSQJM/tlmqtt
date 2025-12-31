@@ -192,7 +192,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
             .then(sessionService.save(session))
             .then(handleWillMessage(req))
             .then(handleRepublish(session, cleanSessionFromReq(req)))
-            .doOnSuccess(v -> log.info("客户端 [{}] 连接成功", session.getClientId()));
+            .doOnSuccess(v -> log.debug("客户端 [{}] 连接成功", session.getClientId()));
     }
 
     //offlineMessageService.triggerRedelivery(session, ctx.channel());

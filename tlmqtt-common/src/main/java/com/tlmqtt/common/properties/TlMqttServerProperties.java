@@ -10,15 +10,10 @@ import lombok.Data;
 @Data
 public class TlMqttServerProperties {
 
-    private TlAuthProperties authProperties;
-
-    private TlPortProperties portProperties;
-
-    private TlSslProperties sslProperties;
-
-    private TlSessionProperties sessionProperties;
-
-    private TlChannelProperties channelProperties;
-
-    private TlBusinessProperties businessProperties;
+    private TlAuthProperties auth = new TlAuthProperties();
+    private TlPortProperties port = new TlPortProperties();
+    private TlSslProperties ssl = new TlSslProperties();
+    private TlSessionProperties session = new TlSessionProperties();
+    private TlChannelProperties channel = new TlChannelProperties();
+    private TlBusinessProperties business = new TlBusinessProperties();
 }

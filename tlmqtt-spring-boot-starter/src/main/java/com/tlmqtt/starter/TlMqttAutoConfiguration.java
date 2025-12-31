@@ -1,11 +1,13 @@
 package com.tlmqtt.starter;
 
+import cn.hutool.core.thread.ThreadFactoryBuilder;
 import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.bootstrap.TlBootstrap;
 import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.common.properties.TlAuthProperties;
+import com.tlmqtt.common.properties.TlBusinessProperties;
 import com.tlmqtt.common.properties.TlSessionProperties;
 import com.tlmqtt.core.alias.AliasService;
 import com.tlmqtt.core.alias.DefaultAliasServiceImpl;
@@ -36,6 +38,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * @author zhouhs
@@ -64,7 +68,8 @@ public class TlMqttAutoConfiguration {
         @Autowired TlChannelService channelService,
         @Autowired AuthenticationManager authenticationManager,
         @Autowired AuthorizationManager authorizationManager,
-        @Autowired MqttConfiguration mqttConfiguration) {
+        @Autowired MqttConfiguration mqttConfiguration,
+        @Autowired ThreadPoolExecutor executor) {
 
         TlBootstrap bootstrap = new TlBootstrap();
         sessionService.addListener(publishService);
@@ -88,18 +93,19 @@ public class TlMqttAutoConfiguration {
                  .authenticationManager(authenticationManager)
                  .authorizationManager(authorizationManager)
                  .mqttConfiguration(mqttConfiguration)
-           .interceptors(interceptors)
+           .executorService(executor)
+                 .interceptors(interceptors)
                  .start();
     }
 
     @Bean
     public TlSessionProperties sessionProperties(@Autowired TlMqttProperties mqttProperties){
-        return mqttProperties.getSessionProperties();
+        return mqttProperties.getSession();
     }
 
     @Bean
     public TlAuthProperties authProperties(@Autowired TlMqttProperties mqttProperties){
-        return mqttProperties.getAuthProperties();
+        return mqttProperties.getAuth();
     }
 
     @ConditionalOnMissingBean(SessionService.class)
@@ -153,8 +159,8 @@ public class TlMqttAutoConfiguration {
 
     @ConditionalOnMissingBean(TlSchedulerTaskService.class)
     @Bean
-    public TlSchedulerTaskService schedulerTaskService(){
-        return new HashedWheelTimerTlSchedulerTaskServiceImpl();
+    public TlSchedulerTaskService schedulerTaskService(@Autowired ThreadPoolExecutor executor){
+        return new HashedWheelTimerTlSchedulerTaskServiceImpl(executor);
     }
 
     @ConditionalOnMissingBean(TlChannelService.class)
@@ -173,6 +179,19 @@ public class TlMqttAutoConfiguration {
         return new AuthorizationManager();
     }
 
+    @Bean
+    public ThreadPoolExecutor  executor(@Autowired TlMqttProperties properties){
+        // 构建容器
+        TlBusinessProperties businessProperties = properties.getBusiness();
+
+        ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().setNamePrefix("tl-pool-%d").build();
+      return   new ThreadPoolExecutor(
+            businessProperties.getCorePoolSize(),
+            businessProperties.getMaxPoolSize(),
+            businessProperties.getKeepAliveSeconds(),
+            java.util.concurrent.TimeUnit.SECONDS,
+            new java.util.concurrent.LinkedBlockingQueue<>(businessProperties.getQueueCapacity()),namedThreadFactory);
+    }
 
     @Bean
     public MqttConfiguration mqttConfiguration(){

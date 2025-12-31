@@ -29,17 +29,16 @@ public class AuthenticationManager extends AbstractTlAuthentication {
     public AuthenticationManager(boolean authEnabled,List<TlAuthUser> users) {
         // 1. 初始化头部（None认证器，负责处理 "不开启认证" 的情况）
         this.head = new NoneAuthenticationService(() -> authEnabled);
-
         // 2. 利用 SPI 加载所有认证处理器
         List<AbstractTlAuthentication> providers = loadProviders();
-        log.debug("Loaded {} AuthenticationManager providers", providers.size());
+        log.debug("【tlmqtt】Loaded 【{}】 AuthenticationManager providers", providers.size());
         // 3. 构建认证链
         AbstractTlAuthentication current = head;
         for (AbstractTlAuthentication provider : providers) {
             users.forEach(provider::add);
             current.setNextAuthentication(provider);
             current = provider;
-            log.debug("Loaded Authentication Provider: {}", provider.getClass().getSimpleName());
+            log.debug("【tlmqtt】 Loaded Authentication Provider: 【{}】", provider.getClass().getSimpleName());
         }
     }
 

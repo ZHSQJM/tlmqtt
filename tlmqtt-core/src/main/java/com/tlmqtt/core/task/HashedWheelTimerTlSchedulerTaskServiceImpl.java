@@ -9,7 +9,6 @@ import reactor.core.scheduler.Schedulers;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,10 +25,8 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
 
     private final Map<String, Timeout> tasks = new ConcurrentHashMap<>();
 
-    private final ExecutorService executorService;
 
-    public HashedWheelTimerTlSchedulerTaskServiceImpl(ExecutorService executorService) {
-        this.executorService = executorService;
+    public HashedWheelTimerTlSchedulerTaskServiceImpl() {
         timer.newTimeout(this::cleanUpInternal, 10, TimeUnit.MINUTES);
     }
 

@@ -24,9 +24,10 @@ public class FixedTlAuthentication extends AbstractTlAuthentication {
      **/
     @Override
     public void add(Object object) {
-
         if( object instanceof TlAuthUser){
-            this.users.add((TlAuthUser) object);
+            TlAuthUser user = (TlAuthUser) object;
+            log.debug("【tlmqtt】 Add Fixed User 【{}】",user);
+            this.users.add(user);
         }
     }
 
@@ -38,13 +39,16 @@ public class FixedTlAuthentication extends AbstractTlAuthentication {
     @Override
     public boolean authenticate(String username, String password) {
         if(users.isEmpty()){
+            log.debug("【tlmqtt】 FixedTlAuthentication users is empty");
             return false;
         }
         for (TlAuthUser user : users) {
             if (user.getUsername().equals(username) && user.getPassword().equals(password)) {
+                log.debug("【tlmqtt】 FixedTlAuthentication  authentication success! username = 【{}】",user.getUsername());
                 return true;
             }
         }
+        log.debug("【tlmqtt】 FixedTlAuthentication  authentication fail!");
         return false;
     }
 

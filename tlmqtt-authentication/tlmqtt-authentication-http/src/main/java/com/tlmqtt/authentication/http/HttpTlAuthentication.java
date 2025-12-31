@@ -50,6 +50,7 @@ public class HttpTlAuthentication extends AbstractTlAuthentication {
 
         // 2. 构造 JSON 请求体
         for (HttpEntityInfo entity : httpEntityInfos) {
+            log.debug("【tlmqtt】HttpTlAuthentication http 【{}】", entity);
             HashMap<String, String> params = entity.getParams();
             HashMap<String, String> requestParams = new HashMap<>(16);
             if (params == null) {

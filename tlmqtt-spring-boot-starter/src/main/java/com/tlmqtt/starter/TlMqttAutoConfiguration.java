@@ -159,8 +159,8 @@ public class TlMqttAutoConfiguration {
 
     @ConditionalOnMissingBean(TlSchedulerTaskService.class)
     @Bean
-    public TlSchedulerTaskService schedulerTaskService(@Autowired ThreadPoolExecutor executor){
-        return new HashedWheelTimerTlSchedulerTaskServiceImpl(executor);
+    public TlSchedulerTaskService schedulerTaskService(){
+        return new HashedWheelTimerTlSchedulerTaskServiceImpl();
     }
 
     @ConditionalOnMissingBean(TlChannelService.class)

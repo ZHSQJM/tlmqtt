@@ -1,9 +1,8 @@
 package com.tlmqtt.store.service;
 
-import com.tlmqtt.common.model.TlMqttSession;
+
 import com.tlmqtt.common.model.entity.TlSubClient;
 import com.tlmqtt.store.service.session.listener.SessionEventListener;
-import io.netty.channel.Channel;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;

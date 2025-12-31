@@ -24,12 +24,12 @@ public class NoneAuthenticationService extends AbstractTlAuthentication {
     }
     @Override
     public boolean authenticate(String username, String password) {
-        log.debug("none认证器认证成功");
         return true;
     }
 
     @Override
     public boolean enabled() {
+        log.debug("【tlmqtt】NoneAuthenticationService enabled:【{}】",enabled);
         return !enabled;
     }
 

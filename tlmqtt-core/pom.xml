@@ -6,11 +6,11 @@
     <parent>
         <groupId>io.github.zhsqjm</groupId>
         <artifactId>tl-mqtt</artifactId>
-        <version>1.1.0</version>
+        <version>1.2.0</version>
     </parent>
 
     <artifactId>tlmqtt-core</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <name>tlmqtt-core</name>
     <packaging>jar</packaging>
     <properties>
@@ -53,7 +53,7 @@
         <dependency>
             <groupId>io.github.zhsqjm</groupId>
             <artifactId>tlmqtt-store</artifactId>
-            <version>1.1.0</version>
+            <version>1.2.0</version>
         </dependency>
 
         <dependency>
@@ -69,13 +69,13 @@
         <dependency>
             <groupId>io.github.zhsqjm</groupId>
             <artifactId>tlmqtt-authentication-base</artifactId>
-            <version>1.1.0</version>
+            <version>1.2.0</version>
         </dependency>
 
         <dependency>
             <groupId>io.github.zhsqjm</groupId>
             <artifactId>tlmqtt-authorization-base</artifactId>
-            <version>1.1.0</version>
+            <version>1.2.0</version>
         </dependency>
     </dependencies>
 

@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.github.zhsqjm</groupId>
         <artifactId>tlmqtt-authorization</artifactId>
-        <version>1.1.0</version>
+        <version>1.2.0</version>
     </parent>
     <artifactId>tlmqtt-authorization-base</artifactId>
     <name>tlmqtt-authorization-base</name>
@@ -14,7 +14,7 @@
         <dependency>
             <groupId>io.github.zhsqjm</groupId>
             <artifactId>tlmqtt-authorization-file</artifactId>
-            <version>1.1.0</version>
+            <version>1.2.0</version>
         </dependency>
     </dependencies>
 </project>

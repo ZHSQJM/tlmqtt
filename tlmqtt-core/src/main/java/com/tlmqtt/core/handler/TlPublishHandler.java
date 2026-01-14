@@ -53,18 +53,19 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
     public void handle(ChannelHandlerContext ctx, TlMqttPublishReq req,
         TlMqttSession session) {
         String clientId = session.getClientId();
+
         MqttVersion mqttVersion = session.getMqttVersion();
         TlMqttFixedHead fixedHead = req.getFixedHead();
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
-
+        Long messageId = variableHead.getMessageId();
+        log.debug("【TLMQTT】Handling 【PUBACK】 event from client:【{}】, messageId: [{}]", clientId, messageId);
         MqttQoS messageQos = fixedHead.getQos();
         String topic = variableHead.getTopic();
         boolean retain = fixedHead.isRetain();
         // 1. ACL 发布权限校验
         if (!authorizationManager.checkPublishPermission(clientId, session.getUsername(), session.getIp(), topic)) {
-            log.error("ACL Deny: Client [{}] has no permission to publish to [{}]", clientId, topic);
+            log.warn("【TLMQTT】ACL Deny: Client [{}] has no permission to publish to [{}]", clientId, topic);
             if (session.isVersion5()&& messageQos.value() > 0) {
-                Long messageId = variableHead.getMessageId();
                 ctx.fireExceptionCaught(new TlMqttException(MqttErrorCode.UNAUTHORIZED, false, MqttMessageType.PUBLISH,messageId,
                     messageQos == MqttQoS.AT_LEAST_ONCE ? MqttMessageType.PUBACK : MqttMessageType.PUBREL));
             }
@@ -73,14 +74,13 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
 
         // 3. 保留消息 (Retain) 处理
         if (retain) {
+            log.debug("【TLMQTT】save Retain message from client:【{}】, topic: [{}]", clientId, topic);
             storeRetain(topic, req).subscribe();
         }
-
-        Long messageId = variableHead.getMessageId();
-
         // 4. 根据 QoS 分流处理核心逻辑
         switch (messageQos) {
             case AT_MOST_ONCE:
+                log.debug("【TLMQTT】Publish message from client:【{}】, topic: [{}]", clientId, topic);
                 forwardMessageService.publish(req, clientId, mqttVersion);
                 break;
 
@@ -98,7 +98,7 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
                 break;
 
             default:
-                log.warn("Unknown QoS level: [{}] from client [{}]", messageQos, clientId);
+                log.warn("【TLMQTT】Unknown QoS level: [{}] from client [{}]", messageQos, clientId);
         }
     }
     /**
@@ -106,9 +106,9 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
      */
     private void handleQoS2Inbound (ChannelHandlerContext ctx, TlMqttPublishReq req, String clientId, Long
     messageId, MqttVersion version){
+        log.debug("【TLMQTT】Handling QoS 2 inbound message from client:【{}】, messageId: [{}]", clientId, messageId);
         // 关键：增加引用计数，防止 Netty 在异步存储完成前回收内存
         ReferenceCountUtil.retain(req);
-
         publishService.save(clientId, messageId, req)
             .subscribeOn(Schedulers.boundedElastic())
             .doFinally(signal -> {
@@ -118,7 +118,7 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
                 // 存储成功，回复 PUBREC
                 sendRec(messageId, ctx.channel(), version);
             }, e -> {
-                log.error("Failed to persist QoS 2 inbound message for [{}], id [{}]", clientId, messageId, e);
+                log.error("【TLMQTT】Failed to persist QoS 2 inbound message for [{}], id [{}]", clientId, messageId, e);
                 // 如果存储失败，通常不回 REC，客户端会因超时重发 PUBLISH
             });
     }
@@ -130,7 +130,7 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
             Object content = req.getPayload() != null ? req.getPayload().getContent() : null;
             // MQTT 规范：Payload 为空代表删除该主题的保留消息
             if (content == null || ("".equals(content))) {
-                log.debug("Clearing retain message for topic: [{}]", topic);
+                log.debug("【TLMQTT】Clearing retain message for topic: [{}]", topic);
                 return retainService.clear(topic);
             } else {
                 req.setAcceptTime(System.currentTimeMillis() / 1000);
@@ -141,7 +141,11 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
 
     private void sendAck(Long messageId, Channel channel, MqttVersion mqttVersion) {
         TlMqttPubAck res = TlMqttPubAck.build(messageId, PubReasonCode.SUCCESS.getCode(), null, null, mqttVersion);
-        channel.writeAndFlush(res);
+        channel.writeAndFlush(res).addListener(future -> {
+            if(future.isSuccess()){
+                log.debug("【TLMQTT】Sent PUBACK to client:【{}】, messageId: [{}]", channel.id(), messageId);
+            }
+        });
     }
 
     private void sendRec(Long messageId, Channel channel, MqttVersion mqttVersion) {

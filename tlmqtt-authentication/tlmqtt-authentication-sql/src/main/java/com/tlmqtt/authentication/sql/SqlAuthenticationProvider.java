@@ -1,19 +1,18 @@
 package com.tlmqtt.authentication.sql;
 
 import com.tlmqtt.common.authentication.AbstractTlAuthentication;
+import com.tlmqtt.common.authentication.AuthenticationType;
 import com.tlmqtt.common.authentication.TlAuthenticationProvider;
 
 import java.util.ArrayList;
 
 /**
  * @author zhouhs
- * @version 0.1.0
- * @since 0.1.0
  **/
 public class SqlAuthenticationProvider implements TlAuthenticationProvider {
     @Override
     public AbstractTlAuthentication create() {
-        return new SqlTlAuthentication(new ArrayList<>());
+        return new SqlTlAuthentication();
     }
 
     @Override
@@ -22,7 +21,8 @@ public class SqlAuthenticationProvider implements TlAuthenticationProvider {
     }
 
     @Override
-    public String name() {
-        return "SQL";
+    public AuthenticationType name() {
+        return AuthenticationType.SQL;
     }
+
 }

@@ -4,12 +4,8 @@ import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttVersion;
 import io.netty.handler.codec.DecoderException;
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-
-import java.nio.channels.Channel;
-
 /**
  * @author zhouhs
  * @version 0.1.0

@@ -53,9 +53,9 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttSubscribeReq req, TlMqttSession session) {
         int messageId = req.getVariableHead().getMessageId();
-        List<TlTopic> topics = req.getPayload().getTopics();
-
         String clientId = session.getClientId();
+        log.debug("【TLMQTT】Handling 【SUBSCRIBE】 event from client:【{}】,【{}】", clientId,messageId);
+        List<TlTopic> topics = req.getPayload().getTopics();
         List<TlTopic> authorizedTopics = new ArrayList<>();
         int[] reasonCodes = new int[topics.size()];
 
@@ -65,10 +65,10 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
             if (authorizationManager.checkSubscribePermission(session, topic.getName())) {
                 reasonCodes[i] = topic.getQos();
                 authorizedTopics.add(topic);
-                log.debug("客户端【{}】订阅了主题【{}】-OQS是【{}】",clientId,topic.getName(),topic.getQos());
+                log.debug("【TLMQTT】client 【{}】 subscribe topic 【{}】-qos 【{}】",clientId,topic.getName(),topic.getQos());
             } else {
                 // MQTT 5.0 0x87 (Not Authorized)
-                log.debug("客户端【{}】无权鼎业主题【{}】-OQS是【{}】",clientId,topic.getName(),topic.getQos());
+                log.debug("【TLMQTT】client 【{}】 has no authorized subscribe topic 【{}】-qos 【{}】",clientId,topic.getName(),topic.getQos());
                 reasonCodes[i] = MqttErrorCode.UNAUTHORIZED.byteValue();
             }
         }
@@ -104,7 +104,7 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
                 return subMono.thenMany(handleRetainMessages(session, topic, client, ctx));
             })
             .subscribeOn(Schedulers.boundedElastic())
-            .doOnError(e -> log.error("Subscription process error for client [{}]", clientId, e))
+            .doOnError(e -> log.error("【TLMQTT】Subscription process error for client [{}]", clientId, e))
             .subscribe();
     }
 

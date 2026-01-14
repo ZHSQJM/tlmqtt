@@ -1,8 +1,12 @@
 package com.tlmqtt.authentication.base;
 
 
+import cn.hutool.core.collection.CollUtil;
 import com.tlmqtt.common.authentication.AbstractTlAuthentication;
+import com.tlmqtt.common.authentication.AbstractAuthenticationService;
+import com.tlmqtt.common.authentication.AuthenticationType;
 import com.tlmqtt.common.authentication.TlAuthenticationProvider;
+import com.tlmqtt.common.authentication.TlAuthenticationSubject;
 import com.tlmqtt.common.model.entity.TlAuthUser;
 import lombok.extern.slf4j.Slf4j;
 
@@ -16,68 +20,123 @@ import java.util.stream.Collectors;
 
 /**
  * 认证链 只要有任何一个认证通过即可
- *
  * @author  hszhou
  */
 @Slf4j
-public class AuthenticationManager extends AbstractTlAuthentication {
-
-    private final Map<String, TlAuthenticationProvider> PROVIDERS_MAP = new HashMap<>();
+public class AuthenticationManager  {
 
     private final AbstractTlAuthentication head;
+    /**用于快速查找某个类型的认证器实例*/
+    private final Map<AuthenticationType, AbstractTlAuthentication> PROCESSOR_MAP = new HashMap<>();
 
-    public AuthenticationManager(boolean authEnabled,List<TlAuthUser> users) {
-        // 1. 初始化头部（None认证器，负责处理 "不开启认证" 的情况）
+    public AuthenticationManager(boolean authEnabled,List<TlAuthUser> users, AbstractAuthenticationService authService) {
+        // 1. 初始化空头（处理全局开关）
         this.head = new NoneAuthenticationService(() -> authEnabled);
-        // 2. 利用 SPI 加载所有认证处理器
-        List<AbstractTlAuthentication> providers = loadProviders();
-        log.debug("【tlmqtt】Loaded 【{}】 AuthenticationManager providers", providers.size());
-        // 3. 构建认证链
+        // 2. SPI 加载并构建链
+        loadAndBuildChain();
+        // 3. 核心：将 Service 中的数据同步到对应的处理器中
+        syncDataFromService(authService,users);
+    }
+
+
+    private void loadAndBuildChain() {
+        List<TlAuthenticationProvider> providers = new ArrayList<>();
+        ServiceLoader.load(TlAuthenticationProvider.class).forEach(providers::add);
+
+        // 按 order 排序
+        List<TlAuthenticationProvider> sortedProviders = providers.stream()
+            .sorted(Comparator.comparingInt(TlAuthenticationProvider::order))
+            .collect(Collectors.toList());
+
         AbstractTlAuthentication current = head;
-        for (AbstractTlAuthentication provider : providers) {
-            users.forEach(provider::add);
-            current.setNextAuthentication(provider);
-            current = provider;
-            log.debug("【tlmqtt】 Loaded Authentication Provider: 【{}】", provider.getClass().getSimpleName());
+        for (TlAuthenticationProvider provider : sortedProviders) {
+            AbstractTlAuthentication instance = provider.create();
+            // 建立 Type -> Instance 的映射，方便后续动态添加数据
+            PROCESSOR_MAP.put(provider.name(), instance);
+            current.setNext(instance);
+            current = instance;
         }
     }
 
-    private List<AbstractTlAuthentication> loadProviders() {
-        ServiceLoader<TlAuthenticationProvider> loader = ServiceLoader.load(TlAuthenticationProvider.class);
-        List<TlAuthenticationProvider> providerList = new ArrayList<>();
-        loader.forEach(providerList::add);
-
-        loader.forEach(provider -> {
-            PROVIDERS_MAP.put(provider.name(), provider);
-            providerList.add( provider);
+    private void syncDataFromService(AbstractAuthenticationService authService,List<TlAuthUser> users) {
+        // 初始化加载 Service 里的数据
+        Map<AuthenticationType, List<TlAuthenticationSubject>> data = authService.init();
+        data.forEach((type, subjects) -> {
+            AbstractTlAuthentication processor = PROCESSOR_MAP.get(type);
+            if (processor != null) {
+                subjects.forEach(processor::add);
+            }
         });
-        // 按 order 排序并实例化
-        return providerList.stream()
-            .sorted(Comparator.comparingInt(TlAuthenticationProvider::order))
-            .map(TlAuthenticationProvider::create)
-            .collect(Collectors.toList());
+
+        if(CollUtil.isNotEmpty(users)){
+            AbstractTlAuthentication abstractTlAuthentication = PROCESSOR_MAP.get(AuthenticationType.FIXED);
+            if(abstractTlAuthentication != null){
+                users.forEach(abstractTlAuthentication::add);
+            }
+
+        }
+
     }
 
-    @Override
+    /**
+     * 认证
+     * @author zhouhs
+     * @param: username
+     * @param: password
+     * @return: boolean
+     **/
+
+
     public boolean authenticate(String username, String password) {
-        // 直接从链头开始执行
         return head.execute(username, password);
     }
 
-    @Override
-    public boolean enabled() { return true; }
+    /**
+     * 获取支持的认证方式
+     * @author zhouhs
+     * @return: java.util.List<com.tlmqtt.common.authentication.AuthenticationType>
+     **/
 
-    @Override
-    public void add(Object object) {
-        AbstractTlAuthentication current = head;
-        while (current != null) {
-            current.add(object);
-            current = current.getNextAuthentication();
+    public List<AuthenticationType> getSupportTypes(){
+        return new ArrayList<>(PROCESSOR_MAP.keySet());
+    }
+
+
+    /**
+     * 添加认证方法
+     * @author zhouhs
+     * @param: subject
+     **/
+
+    public void addSubject(TlAuthenticationSubject subject){
+        AuthenticationType authenticationType = subject.getAuthenticationType();
+        AbstractTlAuthentication processor = PROCESSOR_MAP.get(authenticationType);
+        if (processor != null) {
+            processor.add(subject);
         }
     }
 
-    public List<String> list() {
-        //获取PROVIDERS_MAP里面的key的集合
-        return new ArrayList<>(PROVIDERS_MAP.keySet());
+    /**
+     * 移除认证方式
+     * @author zhouhs
+     * @param: subject
+     **/
+
+    public void removeSubject(TlAuthenticationSubject subject){
+        AuthenticationType authenticationType = subject.getAuthenticationType();
+        AbstractTlAuthentication processor = PROCESSOR_MAP.get(authenticationType);
+        if (processor != null) {
+            processor.remove(subject);
+        }
+    }
+
+
+    public List<? extends TlAuthenticationSubject> getSubjectsByType(AuthenticationType authenticationType){
+
+        AbstractTlAuthentication processor = PROCESSOR_MAP.get(authenticationType);
+        if (processor != null) {
+           return processor.list();
+        }
+        return new ArrayList<>();
     }
 }

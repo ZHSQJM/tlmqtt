@@ -20,17 +20,18 @@ import java.util.concurrent.TimeUnit;
 public class DefaultSubscriptionServiceImpl implements SubscriptionService {
 
 
-    private final TlTopicTrie trie;
+    private final TlTopicTrie trie = new TlTopicTrie();
     private final SessionService sessionService;
 
     /**反向索引：记录每个客户端订阅了哪些主题，用于快速清理  Key: clientId, Value: Set of Topics*/
     private final Cache<String, Set<String>> clientSubscriptionCache = Caffeine.newBuilder()
         .expireAfterAccess(24, TimeUnit.HOURS)
+      //  .removalListener((clientId, sets, cause) -> {
+        //})
         .build();
 
     public DefaultSubscriptionServiceImpl(SessionService sessionService) {
         this.sessionService = sessionService;
-        this.trie = new TlTopicTrie();
     }
 
     @Override
@@ -40,6 +41,7 @@ public class DefaultSubscriptionServiceImpl implements SubscriptionService {
                 trie.insert(clientSub.getTopic(), clientSub);
                 // 2. 更新反向索引
                 Set<String> topics = clientSubscriptionCache.get(clientSub.getClientId(), k -> ConcurrentHashMap.newKeySet());
+                assert topics != null;
                 topics.add(clientSub.getTopic());
                 return clientSub;
             })
@@ -53,7 +55,6 @@ public class DefaultSubscriptionServiceImpl implements SubscriptionService {
                 TlSubClient subClient = new TlSubClient();
                 subClient.setClientId(clientId);
                 subClient.setTopic(topic);
-
                 // 1. 从 Trie 树移除
                 trie.remove(topic, subClient);
                 // 2. 从反向索引移除
@@ -87,8 +88,9 @@ public class DefaultSubscriptionServiceImpl implements SubscriptionService {
                     subClient.setClientId(clientId);
                     trie.remove(topic, subClient);
                 });
+
                 clientSubscriptionCache.invalidate(clientId);
-                log.debug("清除订阅客户端【{}】订阅的主题",clientId);
+                log.debug("【TLMQTT】clear client【{}】subscribe topics",clientId);
             }
         }).then();
     }

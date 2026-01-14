@@ -6,7 +6,6 @@ import com.github.benmanes.caffeine.cache.RemovalCause;
 import io.netty.channel.Channel;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author zhouhs
@@ -22,10 +21,10 @@ public class DefaultChannelServiceImpl implements TlChannelService{
      */
     private final Cache<String, Channel> clientCache = Caffeine.newBuilder()
         // 兜底：如果24小时没重连或活动，强制清理
-        .expireAfterWrite(24, TimeUnit.HOURS)
+      //  .expireAfterWrite(24, TimeUnit.HOURS)
         .removalListener((String clientId, Channel channel, RemovalCause cause) -> {
             if (channel != null && channel.isActive()) {
-                log.debug("Caffeine 移除连接 [{}], 原因: {}, 执行关闭", clientId, cause);
+              //  log.debug("Caffeine 移除连接 [{}], 原因: {}, 执行关闭", clientId, cause);
                 channel.close();
             }
         })

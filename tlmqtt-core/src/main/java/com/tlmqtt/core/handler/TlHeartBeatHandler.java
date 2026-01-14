@@ -22,8 +22,10 @@ public class TlHeartBeatHandler extends AbstractTlHandler<TlMqttHeartBeatReq> {
 
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttHeartBeatReq msg, TlMqttSession session) {
+        String clientId = session.getClientId();
+        log.debug("【TLMQTT】Handling 【PINGRESP】 event from client:【{}】", clientId);
         Channel channel = ctx.channel();
-        TlMqttFixedHead fixedHead = TlMqttFixedHead.build(MqttMessageType.PINGRESP);
+        TlMqttFixedHead fixedHead = TlMqttFixedHead.build(MqttMessageType.PINGREQ);
         TlMqttHeartBeatAck res = TlMqttHeartBeatAck.builder().fixedHead(fixedHead).build();
         channel.writeAndFlush(res);
     }

@@ -7,7 +7,6 @@ import com.tlmqtt.common.model.entity.UserProperty;
 import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.variable.TlMqttPubCompVariableHead;
 import lombok.*;
-import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 
 import java.nio.charset.StandardCharsets;

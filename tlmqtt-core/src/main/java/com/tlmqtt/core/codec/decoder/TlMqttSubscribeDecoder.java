@@ -43,17 +43,17 @@ public class TlMqttSubscribeDecoder extends AbstractTlMqttDecoder {
         configuration.addListener(property -> {
             if (property == MqttConfiguration.Property.SUBSCRIPTION_IDENTIFIERS_AVAILABLE) {
                 boolean newValue = configuration.getBoolean(MqttConfiguration.Property.SUBSCRIPTION_IDENTIFIERS_AVAILABLE.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】 Codec subscriptionIdentifiersAvailable hot-updated to: {}", newValue);
                 this.subscriptionIdentifiersAvailable = newValue;
             }
             if (property == MqttConfiguration.Property.WILDCARD_SUBSCRIPTION_AVAILABLE) {
                 boolean newValue = configuration.getBoolean(MqttConfiguration.Property.WILDCARD_SUBSCRIPTION_AVAILABLE.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec wildcardSubscriptionAvailable hot-updated to: {}", newValue);
                 this.wildcardSubscriptionAvailable = newValue;
             }
             if (property == MqttConfiguration.Property.SHARED_SUBSCRIPTION_AVAILABLE) {
                boolean newValue = configuration.getBoolean(MqttConfiguration.Property.SHARED_SUBSCRIPTION_AVAILABLE.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec sharedSubscriptionAvailable hot-updated to: {}", newValue);
                 this.sharedSubscriptionAvailable = newValue;
             }
 
@@ -115,7 +115,6 @@ public class TlMqttSubscribeDecoder extends AbstractTlMqttDecoder {
                             .build();
                         userProperties.add(build);
                     default:
-                        log.error("未知属性");
                         break;
                 }
             }

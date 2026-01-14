@@ -34,10 +34,8 @@ public class TlUnSubscribeHandler extends AbstractTlHandler<TlMqttUnSubscribeReq
         String clientId = session.getClientId();
         MqttVersion mqttVersion = session.getMqttVersion();
         int messageId = req.getVariableHead().getMessageId();
+        log.debug("【TLMQTT】Handling 【UNSUBSCRIBE】 event from client:【{}】,【{}】", clientId,messageId);
         List<TlTopic> topics = req.getPayload().getTopics();
-
-
-
         // 1. 执行取消订阅逻辑并收集结果（为了 MQTT 5.0 的原因码）
         Flux.fromIterable(topics)
             .flatMap(topic ->
@@ -49,7 +47,7 @@ public class TlUnSubscribeHandler extends AbstractTlHandler<TlMqttUnSubscribeReq
                             // 同步更新 Session 内存状态
                             session.getTopics().remove(topic.getName());
                         }
-                        log.debug("客户端【{}】取消订阅了主题【{}】 ,", clientId, topic.getName());
+                        log.debug("【TLMQTT】client【{}】cancel subscribe topic【{}】 ,", clientId, topic.getName());
                     })
             )
             .collectList()

@@ -23,7 +23,6 @@ import com.tlmqtt.core.service.ForwardMessageService;
 import com.tlmqtt.core.share.IShareSubscribeClientChoose;
 import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
-import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
 import com.tlmqtt.store.service.ShareSubscribeService;
 import com.tlmqtt.store.service.SubscriptionService;
@@ -46,7 +45,6 @@ public class MqttComponentContainer {
     private final TlMqttServerProperties properties;
     private final SessionService sessionService;
     private final PublishService publishService;
-    private final PubrelService pubrelService;
     private final RetainService retainService;
     private final SubscriptionService subscriptionService;
     private final ShareSubscribeService shareSubscribeService;
@@ -77,18 +75,18 @@ public class MqttComponentContainer {
         TlSessionProperties sessionProperties = properties.getSession();
 
         ForwardMessageService forwardService = new ForwardMessageService(aliasService, shareSubscribeService, shareChoose,
-            subscriptionService, sessionService, publishService, channelService, schedulerTaskService,pubrelService, sessionProperties.getDelay(), sessionProperties.getMaxRetry());
+            subscriptionService, sessionService, publishService, channelService, schedulerTaskService, sessionProperties.getDelay(), sessionProperties.getMaxRetry());
 
         // 实例化 Handler
         this.exceptionHandler = new TlExceptionHandler(publishService, channelService, sessionService,mqttConfiguration,subscriptionService,forwardService,schedulerTaskService,sessionProperties.getTimeout());
-        this.connectHandler = new TlConnectHandler(sessionService, publishService, pubrelService, retainService,
+        this.connectHandler = new TlConnectHandler(sessionService, publishService, retainService,
             channelService, authenticationManager,mqttConfiguration,schedulerTaskService,forwardService);
         this.disconnectHandler = new TlDisconnectHandler();
         this.heartBeatHandler = new TlHeartBeatHandler();
         this.pubAckHandler = new TlPubAckHandler(publishService, forwardService);
-        this.pubCompHandler = new TlPubCompHandler(forwardService, pubrelService);
+        this.pubCompHandler = new TlPubCompHandler(forwardService);
         this.publishHandler = new TlPublishHandler(retainService, authorizationManager, forwardService, publishService,interceptors);
-        this.pubRecHandler = new TlPubRecHandler(publishService, pubrelService, forwardService);
+        this.pubRecHandler = new TlPubRecHandler(publishService, forwardService);
         this.pubRelHandler = new TlPubRelHandler(forwardService, publishService);
         this.subscribeHandler = new TlSubscribeHandler(forwardService, authorizationManager, shareSubscribeService, sessionService, retainService, publishService, subscriptionService);
         this.unSubscribeHandler = new TlUnSubscribeHandler(subscriptionService);

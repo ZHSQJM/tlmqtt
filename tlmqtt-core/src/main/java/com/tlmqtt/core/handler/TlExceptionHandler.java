@@ -36,8 +36,6 @@ import java.util.concurrent.TimeUnit;
 @ChannelHandler.Sharable
 public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
-
-
     private final PublishService publishService;
     private final TlChannelService channelService;
     private final SessionService sessionService;
@@ -59,7 +57,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
         String clientId = session.getClientId();
         // 1. 判定是否为“冲突剔除”。如果是，不触发遗嘱和清理逻辑
         if (channelService.getChannel(clientId) != channel) {
-            log.debug("Channel for client: [{}] has been replaced, skip cleanup", clientId);
+            log.debug("【TLMQTT】Channel for client: [{}] has been replaced, skip cleanup", clientId);
             return;
         }
 
@@ -72,7 +70,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
             })
             .subscribe(
                 null,
-                e -> log.error("Error during channel inactive cleanup for [{}]: {}", clientId, e.getMessage())
+                e -> log.error("【TLMQTT】Error during channel inactive cleanup for [{}]: {}", clientId, e.getMessage())
             );
     }
 
@@ -83,7 +81,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
         // 1. 如果是 CleanSession (3.1.1) 或 ExpiryInterval == 0 (5.0) -> 立即清理
         if (shouldClearImmediately(session)) {
 
-            log.debug("Immediately clearing session for client [{}]", clientId);
+            log.debug("【TLMQTT】Immediately clearing session for client [{}]", clientId);
             return sessionService.clearAll(clientId).then();
         }
 
@@ -92,9 +90,9 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
         // 构造完整的清理任务（包含消息、订阅、Session状态）
         Mono<Void> expiryTask = sessionService.clearAll(clientId)
-            .doOnSuccess(v -> log.debug("清除客户端[{}]的任务执行完毕", clientId))
+            .doOnSuccess(v -> log.debug("【TLMQTT】 clean client【{}】session task over", clientId))
             .then();
-        log.debug("清除客户端[{}]的任务在【{}】秒后执行", clientId, expiryInterval);
+        log.debug("【TLMQTT】clean client[{}] taks after【{}】second execute", clientId, expiryInterval);
         return schedulerTaskService.schedule(
             expiryKey,
             expiryTask,
@@ -130,7 +128,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
         // 如果是正常断开 (发送了 DISCONNECT 报文)，则取消遗嘱
         if (isNormalDisconnect(session.getCtx().channel())) {
-            log.debug("客户端【{}】正常断开，无需发送遗嘱下线,清除遗嘱消息",clientId);
+            log.debug("【TLMQTT】Client: [{}] is disconnected normally, skip will message", clientId);
             return publishService.clearWill(clientId).then();
         }
 
@@ -151,13 +149,13 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
     public Mono<Boolean> handleWillPublish(String clientId, TlMqttPublishReq req) {
         Integer willDelay = req.getVariableHead().getWillDelayInterval();
-
+        log.debug("【TLMQTT】handle Will message for client: [{}]", clientId);
         // 逻辑判定：是否需要延迟
         if (willDelay == null || willDelay <= 0) {
 
             return executePublishToSubscribers(req).thenReturn(true);
         } else {
-            log.debug("遗嘱消息[{}]的任务在【{}】秒后执行", clientId, willDelay);
+            log.debug("【TLMQTT】Will message for client: [{}] is delayed 【{}】", clientId,willDelay);
             // 延迟发送：存入调度器，Key 使用 clientId:WILL
             return schedulerTaskService.schedule(clientId + Constant.WILL,
                     executePublishToSubscribers(req),
@@ -188,7 +186,8 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
                             originalReq, realQos, session, subClient
                         );
                         // 立刻发送
-                        log.debug("发送遗嘱消息到客户端【{}】",clientId);
+                        log.debug("【TLMQTT】Will message for client: [{}], topic: [{}], qos: [{}], payload: [{}]",
+                            clientId, topic, realQos, targetReq.getPayload());
                         return Mono.create(sink -> channel.writeAndFlush(targetReq).addListener(f -> {
                             if (f.isSuccess()) {
                                 sink.success();
@@ -214,10 +213,8 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
 
     private void handleException(ChannelHandlerContext ctx, Throwable cause) {
 
-     //   log.error("Exception caught: ", cause);
-        // 释放可能存在的 ByteBuf 引用
+        log.error("Exception caught: ", cause);
         if (!(cause instanceof TlMqttException)) {
-          //  log.error("Unhandled System Exception: ", cause);
             ctx.close();
             return;
         }

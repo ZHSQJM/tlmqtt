@@ -18,7 +18,6 @@ import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.core.share.IShareSubscribeClientChoose;
 import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
-import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.ShareSubscribeService;
 import com.tlmqtt.store.service.SubscriptionService;
 import com.tlmqtt.store.service.session.SessionService;
@@ -46,7 +45,6 @@ public class ForwardMessageService {
     private final SubscriptionService subscriptionService;
     private final SessionService sessionService;
     private final PublishService publishService;
-    private final PubrelService pubrelService;
     private final TlChannelService channelService;
     private final TlSchedulerTaskService schedulerTaskService;
     /**重试间隔秒*/
@@ -56,14 +54,13 @@ public class ForwardMessageService {
     public ForwardMessageService(AliasService aliasService, ShareSubscribeService shareSubscribeService,
         IShareSubscribeClientChoose shareSubscribeClientChoose, SubscriptionService subscriptionService,
         SessionService sessionService, PublishService publishService,
-        TlChannelService channelService,TlSchedulerTaskService schedulerTaskService,PubrelService pubrelService,int retryInterval, int maxRetries ) {
+        TlChannelService channelService,TlSchedulerTaskService schedulerTaskService,int retryInterval, int maxRetries ) {
         this.aliasService = aliasService;
         this.shareSubscribeService = shareSubscribeService;
         this.shareSubscribeClientChoose = shareSubscribeClientChoose;
         this.subscriptionService = subscriptionService;
         this.sessionService = sessionService;
         this.publishService = publishService;
-        this.pubrelService = pubrelService;
         this.channelService = channelService;
         this.schedulerTaskService = schedulerTaskService;
         this.retryInterval  = retryInterval;
@@ -138,7 +135,7 @@ public class ForwardMessageService {
                 // 4. MQTT 5.0 报文长度检查
                 if (session.isVersion5() && session.getMaximumPacketSize() != null) {
                     if (calculateSize(targetReq) > session.getMaximumPacketSize()) {
-                        log.warn("Packet too large for [{}], drop.", targetClientId);
+                        log.warn("【TLMQTT】Packet too large for [{}], drop.", targetClientId);
                         return Mono.empty();
                     }
                 }
@@ -162,7 +159,7 @@ public class ForwardMessageService {
         // QoS 1/2 流量控制
         int maxInFlight = session.getReceiveMaximum() != null ? session.getReceiveMaximum() : 65535;
         if (session.getInFlightCount().get() >= maxInFlight) {
-            log.debug("Client [{}] In-Flight full, queuing message", clientId);
+            log.debug("【TLMQTT】Client [{}] In-Flight full, queuing message", clientId);
             session.getMessageQueue().offer(req);
             return Mono.empty();
         }
@@ -221,7 +218,7 @@ public class ForwardMessageService {
         // 1. 统一提取消息 ID
         long messageId = getMessageId(message);
         if (messageId == -1) {
-            log.warn("Unknown message type for retry: {}", message.getClass().getName());
+            log.warn("【TLMQTT】Unknown message type for retry: {}", message.getClass().getName());
             return Mono.empty();
         }
 
@@ -230,7 +227,7 @@ public class ForwardMessageService {
 
         // 3. 检查重试次数限制
         if (count > maxRetries) {
-            log.warn("Task [{}] reached max retries ({}), dropping message.", retryKey, maxRetries);
+            log.warn("【TLMQTT】Task [{}] reached max retries ({}), dropping message.", retryKey, maxRetries);
             // 这里可以根据业务需求增加持久化清理逻辑
             return Mono.empty();
         }
@@ -286,7 +283,7 @@ public class ForwardMessageService {
                     }
                 });
             } else {
-                sink.error(new RuntimeException("Channel inactive for client: " + clientId));
+                sink.error(new RuntimeException("【TLMQTT】Channel inactive for client: " + clientId));
             }
         });
     }
@@ -299,7 +296,7 @@ public class ForwardMessageService {
     public void handleAck(String clientId, String type, int messageId) {
         // 1. 无论什么类型，先停止重试定时器
         cancel(clientId, type, messageId)
-            .doOnSuccess(v -> log.debug("Stopped retry for client: [{}], type: [{}], id: [{}]", clientId, type, messageId))
+            .doOnSuccess(v -> log.debug("【TLMQTT】Stopped retry for client: [{}], type: [{}], id: [{}]", clientId, type, messageId))
             .subscribe();
 
         // 2. 根据业务类型执行后续清理
@@ -311,7 +308,7 @@ public class ForwardMessageService {
         } else if (Constant.PUBREL.equals(type)) {
             // QoS 2 流程：清理 PUBREL 持久化 -> 释放窗口 -> 触发队列
             // 注意：此时 PUBLISH 已经在收到 PUBREC 时被清理过了
-            pubrelService.clear(clientId, (long) messageId)
+            publishService.clearPubrel(clientId, (long) messageId)
                 .then(processNextInQueue(clientId, messageId))
                 .subscribe();
         }
@@ -333,7 +330,7 @@ public class ForwardMessageService {
                 // 3. 触发队列中的下一条消息
                 TlMqttPublishReq next = session.getMessageQueue().poll();
                 if (next != null) {
-                    log.debug("Polling next message from queue for client: [{}]", clientId);
+                    log.debug("【TLMQTT】Polling next message from queue for client: [{}]", clientId);
                     // 递归回 processWithTrafficControl 逻辑
                     return this.processWithTrafficControl(session, next);
                 }

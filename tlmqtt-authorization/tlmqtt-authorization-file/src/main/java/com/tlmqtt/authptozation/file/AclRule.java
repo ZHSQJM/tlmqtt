@@ -13,9 +13,6 @@ import java.util.Set;
 @Data
 public class AclRule {
 
-
-
-
     private SubjectType subjectType;
     /**如 ["admin", "watson"]*/
     private Set<String> subjects;

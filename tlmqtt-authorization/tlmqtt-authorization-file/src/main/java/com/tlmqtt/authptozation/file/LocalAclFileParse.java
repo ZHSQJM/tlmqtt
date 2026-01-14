@@ -27,6 +27,7 @@ public class LocalAclFileParse {
      * @return List<AclRule>
      **/
     List<AclRule> loadRulesWithPriority(String filePath) {
+        log.debug("【TLMQTT】 load acl file: {}", filePath);
         List<String> lines = readLines(filePath);
         List<AclRule> rules = new ArrayList<>();
         // 文件行号即隐式优先级
@@ -34,6 +35,7 @@ public class LocalAclFileParse {
         for (String line : lines) {
             // 解析规则文本
             AclRule rule = parseRule(line);
+            log.debug("【TLMQTT】parse acl rule: {}", rule);
             rule.setPriority(implicitPriority++);
             rules.add(rule);
         }

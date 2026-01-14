@@ -1,15 +1,18 @@
 package com.tlmqtt.authentication.base;
 
 import com.tlmqtt.common.authentication.AbstractTlAuthentication;
+import com.tlmqtt.common.authentication.AuthenticationType;
+import com.tlmqtt.common.authentication.TlAuthenticationSubject;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
  * 是否开启认证 如果不开启 那么就无需认证  认证链上的第一个
- *
  * @author  hszhou
  */
 @RequiredArgsConstructor
@@ -22,6 +25,12 @@ public class NoneAuthenticationService extends AbstractTlAuthentication {
     public NoneAuthenticationService(Supplier<Boolean> supplier){
         this.enabled =supplier.get();
     }
+
+    @Override
+    public AuthenticationType getSupportType() {
+        return AuthenticationType.NONE;
+    }
+
     @Override
     public boolean authenticate(String username, String password) {
         return true;
@@ -29,14 +38,23 @@ public class NoneAuthenticationService extends AbstractTlAuthentication {
 
     @Override
     public boolean enabled() {
-        log.debug("【tlmqtt】NoneAuthenticationService enabled:【{}】",enabled);
+        log.debug("【TLMQTT】NoneAuthenticationService enabled:【{}】",enabled);
         return !enabled;
     }
 
     @Override
-    public void add(Object object) {
+    public void add(TlAuthenticationSubject object) {
 
     }
 
+    @Override
+    public void remove(TlAuthenticationSubject object) {
+
+    }
+
+    @Override
+    public List<? extends TlAuthenticationSubject> list() {
+        return Collections.emptyList();
+    }
 
 }

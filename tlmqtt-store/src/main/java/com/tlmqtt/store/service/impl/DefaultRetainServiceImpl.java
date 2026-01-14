@@ -3,6 +3,7 @@ package com.tlmqtt.store.service.impl;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.store.service.RetainService;
 import io.netty.util.ReferenceCountUtil;
@@ -26,7 +27,7 @@ public class DefaultRetainServiceImpl implements RetainService {
      * Value: TlMqttPublishReq
      */
     private final Cache<String, TlMqttPublishReq> retainCache = Caffeine.newBuilder()
-        .maximumSize(50000)
+        .maximumSize(10000000)
         .build();
 
     @Override
@@ -38,7 +39,7 @@ public class DefaultRetainServiceImpl implements RetainService {
 
             if (content == null || (content instanceof String && "".equals(content))) {
                 retainCache.invalidate(topic);
-                log.debug("主题【{}】清除保留消息", topic);
+                log.debug("【TLMQTT】topic【{}】clean retain message", topic);
             } else {
                 // 存入缓存前，建议对 Req 进行深拷贝，防止原始 Req 被 Netty 释放后导致缓存失效
                 // 这里假设你的 req.copy() 实现了深拷贝
@@ -53,7 +54,7 @@ public class DefaultRetainServiceImpl implements RetainService {
                 }
 
                 retainCache.put(topic, cacheReq);
-                log.debug("主题[{}]存储保留消息", topic);
+                log.debug("【TLMQTT】topic【{}】save retain message", topic);
             }
             return true;
         });
@@ -66,7 +67,7 @@ public class DefaultRetainServiceImpl implements RetainService {
             Stream<TlMqttPublishReq> stream;
 
             // 1. 判断是否包含通配符
-            if (!filter.contains("+") && !filter.contains("#")) {
+            if (!filter.contains(Constant.TOPIC_WILDCARD) && !filter.contains(Constant.TOPIC_SPLITTER)) {
                 // 精确匹配：直接从缓存取，性能最高
                 TlMqttPublishReq exactMatch = retainCache.getIfPresent(filter);
                 stream = (exactMatch != null) ? Stream.of(exactMatch) : Stream.empty();
@@ -101,7 +102,9 @@ public class DefaultRetainServiceImpl implements RetainService {
      * @param topic 存储的具体主题 (不含通配符)
      */
     private boolean matchesMqttTopic(String filter, String topic) {
-        if (filter.equals(topic)) return true;
+        if (filter.equals(topic)) {
+            return true;
+        }
 
         String[] filterParts = filter.split("/");
         String[] topicParts = topic.split("/");
@@ -110,7 +113,7 @@ public class DefaultRetainServiceImpl implements RetainService {
             String f = filterParts[i];
 
             // # 匹配后续所有层级
-            if (f.equals("#")) {
+            if (f.equals(Constant.TOPIC_SPLITTER)) {
                 return true;
             }
 
@@ -120,7 +123,7 @@ public class DefaultRetainServiceImpl implements RetainService {
             }
 
             // + 匹配单层，否则必须完全相等
-            if (!f.equals("+") && !f.equals(topicParts[i])) {
+            if (!f.equals(Constant.TOPIC_WILDCARD) && !f.equals(topicParts[i])) {
                 return false;
             }
         }

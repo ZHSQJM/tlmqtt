@@ -1,11 +1,9 @@
 package com.tlmqtt.common.model.request;
 
 import com.tlmqtt.common.enums.MqttMessageType;
-import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.payload.TlMqttSubscribePayload;
 import com.tlmqtt.common.model.variable.TlMqttSubscribeVariableHead;
 import lombok.*;
-import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 
 /**

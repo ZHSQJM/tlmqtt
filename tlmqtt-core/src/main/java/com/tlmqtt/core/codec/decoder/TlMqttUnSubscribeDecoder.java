@@ -70,7 +70,6 @@ public class TlMqttUnSubscribeDecoder extends AbstractTlMqttDecoder {
                     UserProperty build = UserProperty.builder().key(new String(key)).value(new String(value)).build();
                     userProperties.add(build);
                 }
-                log.error("未知属性");
             }
             builder.userProperties(userProperties);
         }

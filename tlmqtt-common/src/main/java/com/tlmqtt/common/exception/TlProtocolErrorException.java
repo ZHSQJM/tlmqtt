@@ -2,8 +2,6 @@ package com.tlmqtt.common.exception;
 
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
-import io.netty.handler.codec.DecoderException;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**

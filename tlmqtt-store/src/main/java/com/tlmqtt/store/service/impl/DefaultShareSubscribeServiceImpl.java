@@ -113,7 +113,7 @@ public class DefaultShareSubscribeServiceImpl implements ShareSubscribeService {
                 members.removeIf(m -> m.getClientId().equals(clientId));// 如果移除后组空了，这里可以进一步清理，但为了性能通常建议在下次心跳或反注册时清理
                 // 或者简单的全部反查一遍
             });
-            log.debug("客户端【{}】清除订阅的共享订阅主题",clientId);
+            log.debug("【TLMQTT】client【{}】clear share subscribe",clientId);
         }).then();
     }
 }

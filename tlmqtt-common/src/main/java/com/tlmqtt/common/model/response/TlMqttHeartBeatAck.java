@@ -3,7 +3,6 @@ package com.tlmqtt.common.model.response;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.request.AbstractTlMessage;
 import lombok.*;
-import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 
 /**

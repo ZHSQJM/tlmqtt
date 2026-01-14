@@ -24,7 +24,7 @@ public class DefaultSessionServiceImpl implements SessionService {
 
 
     private final Cache<String, TlMqttSession> sessionCache = Caffeine.newBuilder()
-        .maximumSize(100_000)
+        .maximumSize(10000000)
         .build();
 
 
@@ -70,6 +70,7 @@ public class DefaultSessionServiceImpl implements SessionService {
             return existed;
         }).flatMap(existed -> {
             if (existed) {
+                log.debug("【TLMQTT】Cleared all stored data for client: [{}]", clientId);
                 return notifyObservers(clientId).thenReturn(true);
             }
             return Mono.just(false);

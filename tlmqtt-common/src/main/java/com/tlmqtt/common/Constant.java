@@ -3,9 +3,6 @@ package com.tlmqtt.common;
 import com.tlmqtt.common.model.TlMqttSession;
 import io.netty.util.AttributeKey;
 
-import java.util.Arrays;
-import java.util.List;
-
 /**
  * @author hszhou
  */
@@ -15,27 +12,47 @@ public class Constant {
      * 协议名称
      */
     public static final String PROTOCOL_NAME = "MQTT";
-
-
-
     /**
      * 保存到通道中的断开连接是否发送了disconnect报文
      */
     public static final String DISCONNECT = "disconnect_flag";
+
+    /**
+     * 保存到通道中的session
+     */
     public static final String MQTT_SESSION = "session";
+
+    /**
+     * DISCONNECT_KEY
+     */
     public static final AttributeKey<Boolean> DISCONNECT_KEY = AttributeKey.valueOf(Constant.DISCONNECT);
+    /**
+     * SESSION_KEY
+     */
     public static final AttributeKey<TlMqttSession> SESSION_KEY = AttributeKey.valueOf(Constant.MQTT_SESSION);
-
-
     /**
      * 消息位移的位数
      */
     public static final int MESSAGE_BIT = 4;
+    /**
+     * 订阅的分隔符
+     */
     public static final String TOPIC_SPLITTER = "#";
+    /**
+     * 订阅通配符
+     */
     public static final String TOPIC_WILDCARD = "+";
+    /**
+     * 订阅的分隔符
+     */
     public static final String TOPIC_SPLITTER_SPLITTER = "\\/";
+    /**
+     * 订阅的分隔符
+     */
     public  static final String COLON = "\\:";
+    /**通配符*/
     public static final String ASTERISK = "*";
+    /**通配符*/
     public static final String COMMA = "\\,";
     public static final String VERTICAL_LINE ="\\|";
 
@@ -57,10 +74,9 @@ public class Constant {
 
     /**优雅停机后的时间*/
     public static final long TIMEOUT = 10;
-
+    
     public static final String WILL = "will";
     public static final String PUBLISH = "publish";
     public static final String PUBREL = "pubrel";
 
-    ;
 }

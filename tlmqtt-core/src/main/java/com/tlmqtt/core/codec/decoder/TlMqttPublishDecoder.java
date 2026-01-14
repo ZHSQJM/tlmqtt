@@ -44,22 +44,22 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
         configuration.addListener(property -> {
             if (property == MqttConfiguration.Property.MAXIMUM_QOS) {
                 int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_QOS.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec maximumQos hot-updated to: {}", newValue);
                 this.maximumQos = newValue;
             }
             if (property == MqttConfiguration.Property.RETAIN_AVAILABLE) {
                 boolean newValue = configuration.getBoolean(MqttConfiguration.Property.RETAIN_AVAILABLE.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec retainAvailable hot-updated to: {}", newValue);
                 this.retainAvailable = newValue;
             }
             if (property == MqttConfiguration.Property.INVALID_TOPIC_NAMES) {
                 List<String> newValue = configuration.getList(MqttConfiguration.Property.INVALID_TOPIC_NAMES.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec invalidTopicNames hot-updated to: {}", newValue);
                 this.invalidTopicNames = newValue;
             }
             if (property == MqttConfiguration.Property.TOPIC_ALIAS_MAXIMUM) {
                 int  newValue = configuration.getInt(MqttConfiguration.Property.TOPIC_ALIAS_MAXIMUM.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec topicAliasMaximum hot-updated to: {}", newValue);
                 this.topicAliasMaximum = newValue;
             }
         });
@@ -207,7 +207,6 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
                         builder.subscriptionIdentifier(subscriptionIdentifier);
                         break;
                     case CONTENT_TYPE:
-                        log.debug("==内容类型【{}】",propertyIdentifier);
                         //内容类型
                         int contentTypeLength = buf.readShort();
                         byte[] contentTypeByte = new byte[contentTypeLength];
@@ -216,7 +215,6 @@ public class TlMqttPublishDecoder extends AbstractTlMqttDecoder{
                         builder.contentType(contentType);
                         break;
                     default:
-                        log.debug("未知属性【{}】",propertyIdentifier);
                         break;
 
                 }

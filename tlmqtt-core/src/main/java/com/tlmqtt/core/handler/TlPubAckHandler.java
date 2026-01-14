@@ -26,12 +26,12 @@ public class TlPubAckHandler extends AbstractTlHandler<TlMqttPubAckReq> {
 
     @Override
     public void handle(ChannelHandlerContext ctx, TlMqttPubAckReq req, TlMqttSession session) {
+
         String clientId = session.getClientId();
+
         // MQTT 协议中 MessageId 为 16位无符号整型
         int messageId = req.getVariableHead().getMessageId().intValue();
-
-        log.debug("Received PUBACK from client: [{}], messageId: [{}]", clientId, messageId);
-
+        log.debug("【TLMQTT】Handling 【PUBACK】 event from client:【{}】, messageId: [{}]", clientId, messageId);
         // 1. 核心：通知 ForwardMessageService 完成确认
         // 该方法内部会：1.取消定时任务, 2. 释放 ID  3. 减小 In-Flight 计数  4. 触发队列中的下一条消息  // 2. 异步清理持久化的离线消息
         forwardMessageService.handleAck(clientId, Constant.PUBLISH,messageId);

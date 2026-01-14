@@ -32,15 +32,14 @@ public class TlPubRelHandler extends AbstractTlHandler<TlMqttPubRelReq> {
         String clientId = session.getClientId();
         MqttVersion mqttVersion = session.getMqttVersion();
         long messageId = req.getVariableHead().getMessageId();
-
-        log.debug("Received PUBREL from client: [{}], messageId: [{}]", clientId, messageId);
+        log.debug("【TLMQTT】Handling 【PUBREL】 event from client:【{}】,【{}】", clientId,messageId);
 
         // 1. 获取并移除暂存的消息 (防止重复转发)
         // 这个 publishReq 是在之前的 TlPublishHandler (QoS 2) 中存入 pubrelService 的
         publishService.find(clientId, messageId)
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap(publishReq -> {
-                log.debug("Client [{}] QoS 2 message [{}] ready to forward", clientId, messageId);
+                log.debug("【TLMQTT】Client [{}] QoS 2 message [{}] ready to forward", clientId, messageId);
 
                 // 2. 触发分发流程：将这条消息发给所有订阅了该 Topic 的人
                 // 注意：这里转发的是 publishReq（包含原始 Topic, Payload 等）
@@ -57,10 +56,10 @@ public class TlPubRelHandler extends AbstractTlHandler<TlMqttPubRelReq> {
             })
             .subscribe(isForwarded -> {
                 if (Boolean.TRUE.equals(isForwarded)) {
-                    log.debug("QoS 2 workflow finished for client [{}], id [{}]", clientId, messageId);
+                    log.debug("【TLMQTT】QoS 2 workflow finished for client [{}], id [{}]", clientId, messageId);
                 } else {
                     // 这种情况通常发生在客户端重发了 PUBREL，而服务端之前已经转发过且删除了记录
-                    log.warn("PUBREL received for client [{}] but no pending message found for id [{}]. (Duplicate?)", clientId, messageId);
+                    log.warn("【TLMQTT】PUBREL received for client [{}] but no pending message found for id [{}]. (Duplicate?)", clientId, messageId);
                 }
             });
     }

@@ -4,6 +4,8 @@ import cn.hutool.core.thread.ThreadFactoryBuilder;
 import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.bootstrap.TlBootstrap;
+import com.tlmqtt.common.authentication.AbstractAuthenticationService;
+import com.tlmqtt.common.authentication.DefaultAuthenticationService;
 import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.common.properties.TlAuthProperties;
@@ -18,12 +20,10 @@ import com.tlmqtt.core.share.RandomSubscribeClientChoose;
 import com.tlmqtt.core.task.HashedWheelTimerTlSchedulerTaskServiceImpl;
 import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
-import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
 import com.tlmqtt.store.service.ShareSubscribeService;
 import com.tlmqtt.store.service.SubscriptionService;
 import com.tlmqtt.store.service.impl.DefaultPublishServiceImpl;
-import com.tlmqtt.store.service.impl.DefaultPubrelServiceImpl;
 import com.tlmqtt.store.service.impl.DefaultRetainServiceImpl;
 import com.tlmqtt.store.service.impl.DefaultShareSubscribeServiceImpl;
 import com.tlmqtt.store.service.impl.DefaultSubscriptionServiceImpl;
@@ -58,7 +58,6 @@ public class TlMqttAutoConfiguration {
     public TlBootstrap bootstrap(@Autowired TlMqttProperties mqttProperties,
         @Autowired SessionService sessionService,
         @Autowired PublishService publishService,
-        @Autowired PubrelService pubrelService,
         @Autowired RetainService retainService,
         @Autowired SubscriptionService subscriptionService,
         @Autowired IShareSubscribeClientChoose shareSubscribeClientChoose,
@@ -73,7 +72,6 @@ public class TlMqttAutoConfiguration {
 
         TlBootstrap bootstrap = new TlBootstrap();
         sessionService.addListener(publishService);
-        sessionService.addListener(pubrelService);
         sessionService.addListener(retainService);
         sessionService.addListener(subscriptionService);
         sessionService.addListener(shareSubscribeService);
@@ -82,7 +80,6 @@ public class TlMqttAutoConfiguration {
                  .websocket()
                  .sessionService(sessionService)
                  .publishService(publishService)
-                 .pubrelService(pubrelService)
                  .retainService(retainService)
                  .subscriptionService(subscriptionService)
                  .shareSubscribeClientChoose(shareSubscribeClientChoose)
@@ -120,11 +117,6 @@ public class TlMqttAutoConfiguration {
         return new DefaultPublishServiceImpl();
     }
 
-    @ConditionalOnMissingBean(PubrelService.class)
-    @Bean
-    public PubrelService pubrelService(){
-        return new DefaultPubrelServiceImpl();
-    }
 
     @ConditionalOnMissingBean(RetainService.class)
     @Bean
@@ -169,9 +161,15 @@ public class TlMqttAutoConfiguration {
         return new DefaultChannelServiceImpl();
     }
 
+
+    @ConditionalOnMissingBean(AbstractAuthenticationService.class)
     @Bean
-    public AuthenticationManager authenticationManager(@Autowired TlAuthProperties authProperties){
-        return new AuthenticationManager(authProperties.isEnabled(), authProperties.getUser());
+    public AbstractAuthenticationService defaultAuthenticationService(){
+        return new DefaultAuthenticationService();
+    }
+    @Bean
+    public AuthenticationManager authenticationManager(@Autowired TlAuthProperties authProperties,@Autowired AbstractAuthenticationService abstractAuthenticationService){
+        return new AuthenticationManager(authProperties.isEnabled(), authProperties.getUser(),abstractAuthenticationService);
     }
 
     @Bean

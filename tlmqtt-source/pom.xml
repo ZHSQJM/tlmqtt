@@ -19,6 +19,7 @@
         <module>tlmqtt-source-clickhouse</module>
         <module>tlmqtt-source-influxdb</module>
         <module>tlmqtt-source-http</module>
+        <module>tlmqtt-source-base</module>
     </modules>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

@@ -1,5 +1,6 @@
 package com.tlmqtt.store.service;
 
+import com.tlmqtt.common.model.request.TlMqttPubRelReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.store.service.session.listener.SessionEventListener;
 import reactor.core.publisher.Flux;
@@ -32,13 +33,7 @@ public interface PublishService extends SessionEventListener {
      */
     Mono<TlMqttPublishReq> clear(String clientId, Long messageId);
 
-    /**
-     * 清除订阅者的所有消息 当订阅者断开连接的时候 需要清除所有消息
-     *
-     * @param clientId 订阅者id
-     * @return 是否清除成功
-     */
-    Mono<Boolean> clearAll(String clientId);
+
 
     /**
      * 查找某个订阅者的某个消息
@@ -82,5 +77,43 @@ public interface PublishService extends SessionEventListener {
      **/
     Mono<Boolean> clearWill(String clientId);
 
+
+    /**
+     * 保存订阅者的某个rel的消息
+     * 当broker向订阅者推送rel的消息时，需要将这个消息保存起来防止没收到comp的消息时重发
+     *
+     * @param clientId  订阅者的客户端ID
+     * @param messageId 消息ID
+     * @param req       具体的消息
+     * @return 是否保存成功
+     */
+    Mono<TlMqttPubRelReq> savePubrel(String clientId, Long messageId, TlMqttPubRelReq req);
+
+    /**
+     * 清除订阅者的某个rel的消息
+     *
+     * @param clientId  订阅者的客户端ID
+     * @param messageId 消息
+     * @return 是否保存成功
+     */
+    Mono<TlMqttPubRelReq> clearPubrel(String clientId, Long messageId);
+
+
+    /**
+     * 查找订阅者的某个rel消息
+     *
+     * @param clientId  订阅者的客户端ID
+     * @param messageId 消息id
+     * @return 具体的消息
+     */
+    Mono<TlMqttPubRelReq> findPubrel(String clientId, Long messageId);
+
+    /**
+     * 查找订阅者的所有rel消息
+     *
+     * @param clientId 客户端的ID
+     * @return 消息列表
+     */
+    Flux<TlMqttPubRelReq> findAllPubrel(String clientId);
 
 }

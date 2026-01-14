@@ -12,7 +12,6 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-//@ToString
 @Accessors(chain = true)
 @Builder
 public class TlMqttPublishVariableHead {

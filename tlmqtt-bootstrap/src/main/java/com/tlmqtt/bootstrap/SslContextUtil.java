@@ -4,6 +4,7 @@ import com.tlmqtt.common.properties.*;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.InputStream;
@@ -14,6 +15,7 @@ import java.nio.file.Files;
  * @version 0.1.0
  * @since 0.1.0
  **/
+@Slf4j
 public class SslContextUtil {
 
     private SslContextUtil() {}
@@ -29,10 +31,11 @@ public class SslContextUtil {
         }
         // 校验证书路径
         if (sslProperties.getCertPath() == null || sslProperties.getCertPath().isEmpty()) {
-            throw new IllegalArgumentException("SSL证书路径不能为空");
+            throw new IllegalArgumentException("【TLMQTT】 SSL cert path is null");
+
         }
         if (sslProperties.getPrivatePath() == null || sslProperties.getPrivatePath().isEmpty()) {
-            throw new IllegalArgumentException("SSL私钥路径不能为空");
+            throw new IllegalArgumentException("【TLMQTT】 SSL private path is null");
         }
 
         File certFile = new File(sslProperties.getCertPath());
@@ -44,7 +47,7 @@ public class SslContextUtil {
                 .sslProvider(SslProvider.JDK)
                 .build();
         } catch (Exception e) {
-            throw new RuntimeException("构建SSL上下文失败", e);
+            throw new RuntimeException("【TLMQTT】 SSL fail", e);
         }
     }
 }

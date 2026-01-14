@@ -3,7 +3,6 @@ package com.tlmqtt.core.codec.decoder;
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
-import com.tlmqtt.common.enums.MqttVersion;
 import com.tlmqtt.common.exception.TlMalformedPacketException;
 import com.tlmqtt.common.exception.TlProtocolErrorException;
 import com.tlmqtt.common.model.TlMqttSession;
@@ -18,20 +17,17 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public abstract class  AbstractTlMqttDecoder  {
-
-
-
     /**
      * 最大包大小
      */
-    private int maximumPacketSize = 0;
+    private int maximumPacketSize;
 
     public AbstractTlMqttDecoder(MqttConfiguration configuration) {
        this.maximumPacketSize = configuration.getInt(MqttConfiguration.MAXIMUM_PACKET_SIZE);
         configuration.addListener(property -> {
             if (property == MqttConfiguration.Property.MAXIMUM_PACKET_SIZE) {
                 int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_PACKET_SIZE.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec maxPacketSize hot-updated to: {}", newValue);
                 this.maximumPacketSize = newValue;
             }
         });

@@ -3,8 +3,9 @@ package com.tlmqtt.common.model.request;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.payload.TlMqttConnectPayload;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
-import lombok.*;
-import lombok.experimental.Accessors;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 /**

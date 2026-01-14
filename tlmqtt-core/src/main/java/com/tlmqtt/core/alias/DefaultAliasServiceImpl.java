@@ -8,7 +8,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author zhouhs
@@ -21,7 +20,7 @@ public class DefaultAliasServiceImpl implements AliasService {
     private static final Cache<String, ConcurrentHashMap<Integer, String>> CLIENT_ALIAS_MAP =
         Caffeine.newBuilder()
             .maximumSize(10000)
-            .expireAfterAccess(30, TimeUnit.MINUTES)
+            //.expireAfterAccess(30, TimeUnit.MINUTES)
             .removalListener((clientId, aliasMap, cause) -> {
             })
             .build();

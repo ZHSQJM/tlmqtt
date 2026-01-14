@@ -47,27 +47,27 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         configuration.addListener(property -> {
             if (property == MqttConfiguration.Property.MAXIMUM_QOS) {
                 int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_QOS.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec maximumQos hot-updated to: {}", newValue);
                 this.maximumQos = newValue;
             }
             if (property == MqttConfiguration.Property.RETAIN_AVAILABLE) {
                 boolean newValue = configuration.getBoolean(MqttConfiguration.Property.RETAIN_AVAILABLE.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec retainAvailable hot-updated to: {}", newValue);
                 this.retainAvailable = newValue;
             }
             if (property == MqttConfiguration.Property.INVALID_TOPIC_NAMES) {
                 List<String> newValue = configuration.getList(MqttConfiguration.Property.INVALID_TOPIC_NAMES.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec invalidTopicNames hot-updated to: {}", newValue);
                 this.invalidTopicNames = newValue;
             }
             if (property == MqttConfiguration.Property.REFUSE_CLIENTS) {
                 List<String>  newValue = configuration.getList(MqttConfiguration.Property.REFUSE_CLIENTS.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec refuseClients hot-updated to: {}", newValue);
                 this.refuseClients = newValue;
             }
             if (property == MqttConfiguration.Property.MAXIMUM_PACKET_SIZE) {
                 int newValue = configuration.getInt(MqttConfiguration.Property.MAXIMUM_PACKET_SIZE.getKey());
-                log.debug("Codec maxPacketSize hot-updated to: {}", newValue);
+                log.debug("【TLMQTT】Codec maxPacketSize hot-updated to: {}", newValue);
                 this.maximumPacketSize = newValue;
             }
         });
@@ -149,7 +149,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         builder.usernameFlag(usernameFlag > 0);
         short keepAlive = buf.readShort();
         builder.keepAlive(keepAlive);
-        log.trace("Parse【CONNECT】message :protocol=【{}】,version=【{}】,reserved=【{}】,cleanSession=【{}】,willFlag=【{}】,willQos=【{}】,willRetain=【{}】,usernameFlag=【{}】,keepAlive=【{}】",
+        log.trace("【TLMQTT】Parse【CONNECT】message :protocol=【{}】,version=【{}】,reserved=【{}】,cleanSession=【{}】,willFlag=【{}】,willQos=【{}】,willRetain=【{}】,usernameFlag=【{}】,keepAlive=【{}】",
             protocolName, version, reserved, clearSession, willFlag, willQos, willRetain, usernameFlag, keepAlive);
         TlMqttConnectVariableHead variableHead = builder.build();
         if(version== MqttVersion.MQTT_5.getLevel()){

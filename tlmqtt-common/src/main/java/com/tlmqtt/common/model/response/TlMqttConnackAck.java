@@ -9,7 +9,6 @@ import com.tlmqtt.common.model.fix.TlMqttFixedHead;
 import com.tlmqtt.common.model.request.AbstractTlMessage;
 import com.tlmqtt.common.model.variable.TlMqttConnackVariableHead;
 import lombok.*;
-import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 

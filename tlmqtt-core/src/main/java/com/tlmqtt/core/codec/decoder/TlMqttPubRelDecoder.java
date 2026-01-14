@@ -88,7 +88,6 @@ public class TlMqttPubRelDecoder extends AbstractTlMqttDecoder{
                         builder.userPropertyList(userProperties);
                         break;
                     default:
-                        log.error("未知属性");
                         break;
                 }
             }

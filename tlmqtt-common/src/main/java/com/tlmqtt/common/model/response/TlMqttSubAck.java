@@ -7,7 +7,6 @@ import com.tlmqtt.common.model.payload.TlMqttSubAckPayload;
 import com.tlmqtt.common.model.request.AbstractTlMessage;
 import com.tlmqtt.common.model.variable.TlMqttSubAckVariableHead;
 import lombok.*;
-import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 
 import java.util.List;

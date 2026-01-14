@@ -2,7 +2,6 @@ package com.tlmqtt.core.codec;
 
 
 import com.tlmqtt.common.Constant;
-import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.request.AbstractTlMessage;
 import com.tlmqtt.core.codec.decoder.*;
@@ -70,7 +69,7 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
 
         // 4. 安全检查：防止恶意超大包导致内存溢出
         if (remainingLength > MAX_PAYLOAD_SIZE) {
-            log.error("MQTT packet remaining length too large: {}", remainingLength);
+            log.error("【TLMQTT】MQTT packet remaining length too large: {}", remainingLength);
             ctx.close(); // 协议违规，直接断开连接
             return;
         }
@@ -84,7 +83,7 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
         // 6. 获取对应的解码器
         AbstractTlMqttDecoder decoder = decoders[messageType];
         if (decoder == null) {
-            log.error("No decoder found for message type: {}", messageType);
+            log.error("【TLMQTT】No decoder found for message type: {}", messageType);
             in.skipBytes(remainingLength);
             return;
         }
@@ -102,7 +101,7 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
                 out.add(req);
             }
         } catch (Exception e) {
-            log.error("Decode error for message type {}: ", messageType, e);
+            log.error("【TLMQTT】Decode error for message type {}: ", messageType, e);
             // 异常时跳过该包数据
             // 注意：readSlice 已经移动了 index，这里无需手动 skip
             throw e;
@@ -115,7 +114,6 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
     private int decodeRemainingLength(ByteBuf in) {
         int multiplier = 1;
         int value = 0;
-        int bytesRead = 0;
         byte encodedByte;
 
         do {
@@ -124,11 +122,12 @@ public class TlMqttMessageCodec extends ByteToMessageDecoder {
             }
             encodedByte = in.readByte();
             value += (encodedByte & 0x7F) * multiplier;
-            if (multiplier > 128 * 128 * 128) { // 超过 4 字节上限
+            // 超过 4 字节上限
+            if (multiplier > 128 * 128 * 128) {
                 return -1;
             }
-            multiplier <<= 7; // 等价于 multiplier *= 128，但效率更高
-            bytesRead++;
+            //等价于 multiplier *= 128，但效率更高
+            multiplier <<= 7;
         } while ((encodedByte & 0x80) != 0);
 
         return value;

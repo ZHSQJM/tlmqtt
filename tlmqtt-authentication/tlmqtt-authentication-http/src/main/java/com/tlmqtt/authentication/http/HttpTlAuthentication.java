@@ -1,27 +1,36 @@
 package com.tlmqtt.authentication.http;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
 import com.google.gson.Gson;
 import com.tlmqtt.common.authentication.AbstractTlAuthentication;
+import com.tlmqtt.common.authentication.AuthenticationType;
+import com.tlmqtt.common.authentication.TlAuthenticationSubject;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 
 import org.apache.http.entity.ContentType;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicNameValuePair;
 
 /**
@@ -32,143 +41,138 @@ import org.apache.http.message.BasicNameValuePair;
 @Slf4j
 public class HttpTlAuthentication extends AbstractTlAuthentication {
 
-    private final Gson gson;
 
-    private final List<HttpEntityInfo> httpEntityInfos;
+    private final Gson gson = new Gson();
 
+    /**
+     * 保持与 SqlTlAuthentication 一致：使用 Map 缓存配置
+     * Key 为配置对象本身或其唯一标识，Value 为该配置对应的元数据
+     */
+    private final Map<HttpEntityInfo, String> activeConfigs = new ConcurrentHashMap<>();
+
+    /**
+     * 全局复用的 HttpClient（连接池化）
+     */
+    private final CloseableHttpClient httpClient;
     public static final String USERNAME = "username";
 
     public static final String PASSWORD = "password";
 
-    public HttpTlAuthentication(List<HttpEntityInfo> list) {
-        this.gson = new Gson();
-        this.httpEntityInfos = list;
+
+    public HttpTlAuthentication() {
+        // 初始化高性能连接池
+        PoolingHttpClientConnectionManager cm = new PoolingHttpClientConnectionManager();
+        // 针对 MQTT 高并发场景
+        cm.setMaxTotal(500);
+        cm.setDefaultMaxPerRoute(50);
+
+        RequestConfig requestConfig = RequestConfig.custom()
+            // 建立连接超时
+            .setConnectTimeout(2000)
+            // 响应数据超时
+            .setSocketTimeout(3000)
+            .setConnectionRequestTimeout(1000)
+            .build();
+
+        this.httpClient = HttpClients.custom()
+            .setConnectionManager(cm)
+            .setDefaultRequestConfig(requestConfig)
+            .build();
+    }
+
+    @Override
+    public AuthenticationType getSupportType() {
+        return AuthenticationType.HTTP;
     }
 
     @Override
     public boolean authenticate(String username, String password) {
-
-        // 2. 构造 JSON 请求体
-        for (HttpEntityInfo entity : httpEntityInfos) {
-            log.debug("【tlmqtt】HttpTlAuthentication http 【{}】", entity);
-            HashMap<String, String> params = entity.getParams();
-            HashMap<String, String> requestParams = new HashMap<>(16);
-            if (params == null) {
-                params = new HashMap<>(16);
-            }
-            requestParams.put(params.getOrDefault(USERNAME, USERNAME), username);
-            requestParams.put(params.getOrDefault(PASSWORD, PASSWORD), password);
-            // 根据方法类型分发请求
-            int statusCode;
-            String methodName = entity.getMethod();
-            if (HttpGet.METHOD_NAME.equals(methodName)) {
-                statusCode = doGet(requestParams, entity.getUrl());
-            } else if (HttpPost.METHOD_NAME.equals(methodName)) {
-                // 获取 Content-Type 头部值
-                String contentType = entity.getHeaders().getOrDefault(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
-                if (contentType.contains(ContentType.APPLICATION_JSON.getMimeType())) {
-                    statusCode = doPost(requestParams, entity.getUrl());
-                } else if (contentType.contains(ContentType.APPLICATION_FORM_URLENCODED.getMimeType())) {
-                    statusCode = doPostForm(requestParams, entity.getUrl());
-                } else {
-                    statusCode = -1;
+        // 遍历所有已添加的 HTTP 认证源
+        for (HttpEntityInfo entity : activeConfigs.keySet()) {
+            try {
+                if (doAuthenticate(entity, username, password)) {
+                    return true;
                 }
-            } else {
-                statusCode = -1;
-            }
-            if (statusCode == HttpStatus.SC_OK) {
-                return true;
+            } catch (Exception e) {
+                log.error("【TLMQTT】HttpTlAuthentication request error for URL: {}", entity.getUrl(), e);
             }
         }
-        log.debug("authentication http is error");
         return false;
+    }
+    private boolean doAuthenticate(HttpEntityInfo entity, String username, String password) throws Exception {
+        Map<String, String> params = entity.getParams() == null ? new HashMap<>(16) : entity.getParams();
+        String userKey = params.getOrDefault(USERNAME, USERNAME);
+        String passKey = params.getOrDefault(PASSWORD, PASSWORD);
+
+        Map<String, String> bodyMap = new HashMap<>(16);
+        bodyMap.put(userKey, username);
+        bodyMap.put(passKey, password);
+
+        HttpRequestBase request;
+        String method = entity.getMethod();
+
+        if (HttpGet.METHOD_NAME.equalsIgnoreCase(method)) {
+            URIBuilder builder = new URIBuilder(entity.getUrl());
+            bodyMap.forEach(builder::addParameter);
+            request = new HttpGet(builder.build());
+        } else if (HttpPost.METHOD_NAME.equalsIgnoreCase(method)) {
+            HttpPost post = new HttpPost(entity.getUrl());
+            String contentType = entity.getHeaders().getOrDefault(HttpHeaders.CONTENT_TYPE, ContentType.APPLICATION_JSON.getMimeType());
+
+            if (contentType.contains(ContentType.APPLICATION_FORM_URLENCODED.getMimeType())) {
+                List<NameValuePair> form = new ArrayList<>();
+                bodyMap.forEach((k, v) -> form.add(new BasicNameValuePair(k, v)));
+                post.setEntity(new UrlEncodedFormEntity(form, StandardCharsets.UTF_8));
+            } else {
+                post.setEntity(new StringEntity(gson.toJson(bodyMap), ContentType.APPLICATION_JSON));
+            }
+            request = post;
+        } else {
+            return false;
+        }
+
+        // 注入自定义 Header
+        if (CollUtil.isNotEmpty(entity.getHeaders())) {
+            entity.getHeaders().forEach(request::setHeader);
+        }
+
+        try (CloseableHttpResponse response = httpClient.execute(request)) {
+            int code = response.getStatusLine().getStatusCode();
+            return code == HttpStatus.SC_OK;
+        }
+    }
+
+    @Override
+    public void add(TlAuthenticationSubject object) {
+        if (object instanceof HttpEntityInfo) {
+            HttpEntityInfo info = (HttpEntityInfo) object;
+            if (StrUtil.isNotBlank(info.getUrl())) {
+                // 保持一致：如果不存在则添加，避免重复配置
+                activeConfigs.putIfAbsent(info, info.getUrl());
+                log.info("【TLMQTT】Added HTTP Auth Source: {}", info.getUrl());
+            }
+        }
+    }
+
+    @Override
+    public void remove(TlAuthenticationSubject object) {
+        if (object instanceof HttpEntityInfo) {
+            HttpEntityInfo info = (HttpEntityInfo) object;
+            if (StrUtil.isNotBlank(info.getUrl())) {
+
+                activeConfigs.remove(info, info.getUrl());
+                log.info("【TLMQTT】Delete HTTP Auth Source: {}", info.getUrl());
+            }
+        }
+    }
+
+    @Override
+    public List<? extends TlAuthenticationSubject> list() {
+        return new ArrayList<>(activeConfigs.keySet());
     }
 
     @Override
     public boolean enabled() {
-        return true;
-    }
-
-    @Override
-    public void add(Object object) {
-        if (object instanceof HttpEntityInfo) {
-            this.httpEntityInfos.add((HttpEntityInfo) object);
-        }
-    }
-
-    /**
-     * 发送 POST 请求
-     *
-     * @param params 请求参数
-     * @param url 请求地址
-     * @return 响应状态码
-     */
-    private int doPost(HashMap<String, String> params, String url) {
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            // 创建带参数的 GET 请求
-            String jsonBody = gson.toJson(params);
-            StringEntity entity = new StringEntity(jsonBody, ContentType.APPLICATION_JSON);
-            HttpPost request = new HttpPost(url);
-            request.setEntity(entity);
-            try (CloseableHttpResponse response = client.execute(request)) {
-                return response.getStatusLine().getStatusCode();
-            }
-        }
-        catch (Exception e) {
-            log.error("authentication http 【{}】 is error", url, e);
-            return -1;
-        }
-    }
-
-    /**
-     * 发送 POST FROM 请求
-     *
-     * @param params 请求参数
-     * @param url 请求地址
-     * @return 响应状态码
-     */
-    private int doPostForm(HashMap<String, String> params, String url) {
-
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            // 创建带参数的 GET 请求
-            HttpPost request = new HttpPost(url);
-            // 添加表单参数
-            List<NameValuePair> paramsRequest = new ArrayList<>();
-            params.forEach((key, value) -> paramsRequest.add(new BasicNameValuePair(key, value)));
-            request.setEntity(new UrlEncodedFormEntity(paramsRequest, StandardCharsets.UTF_8));
-            try (CloseableHttpResponse response = client.execute(request)) {
-                return response.getStatusLine().getStatusCode();
-            }
-        }
-        catch (Exception e) {
-            log.error("authentication http 【{}】 is error", url, e);
-            return -1;
-        }
-    }
-
-    /**
-     * GET请求
-     *
-     * @param params 请求参数
-     * @param url 请求地址
-     * @return 响应状态码
-     */
-    private int doGet(HashMap<String, String> params, String url) {
-        try (CloseableHttpClient client = HttpClients.createDefault()) {
-            URIBuilder uriBuilder = new URIBuilder(url);
-            // 添加参数
-            params.forEach(uriBuilder::addParameter);
-            // 构建最终的 URI
-            URI uri = uriBuilder.build();
-            // 创建带参数的 GET 请求
-            HttpGet request = new HttpGet(uri);
-            try (CloseableHttpResponse response = client.execute(request)) {
-                return response.getStatusLine().getStatusCode();
-            }
-        }
-        catch (Exception e) {
-            log.error("authentication http 【{}】 is error", url, e);
-            return -1;
-        }
+        return !activeConfigs.isEmpty();
     }
 }

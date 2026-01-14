@@ -1,42 +1,54 @@
-# tlmqtt
-`tlmqtt是一款基于Java开发的轻量级高并发MQTT Broker，采用Netty和Project Reactor实现异步通信，完整支持MQTT 3.1.1协议，包括QoS消息分级、主题通配符、消息持久化等核心功能。项目提供认证（文件/数据库/HTTP）、数据桥接（Kafka/MySQL）和存储（内存/Redis）等可扩展组件，支持MQTT和WebSocket双协议接入。具备生产级特性如SSL加密、会话恢复及高并发处理能力，适用于物联网和实时通信场景。开发者可自定义认证逻辑和存储方案`
 
-## 功能
-+ MQTT3.1.1协议自主解析
-+ 完整的qos 0,1,2的消息支持
-+ 遗嘱消息, 保留消息及消息分发重试
-+ SSL方式连接(可选择是否开启)
-+ websocket双协议支持
-+ 主题过滤
-+ 消息的持久化
-+ 基于文件，数据库，http接口认证
-+ 基于文件的acl订阅/发布权限控制
-+ 数据转发功能，目前支持kafka，mysql
+<h1 align="center">TLMQTT</h1>
+<p align="center">
+  <a href="https://github.com/quickmsg/smqttx/blob/release/ignite/README.md">
+    <img alt="apache" src="https://img.shields.io/badge/license-Apache%202-blue"/>
+  </a>
+  <a href="https://projectreactor.io/docs/netty/release/reference/index.html">
+    <img alt="netty" src="https://img.shields.io/badge/netty-4.2.8.Final-green"/>
+  </a>
+  <a href="https://projectreactor.io/docs/core/release/reference/">
+    <img alt="project-reactor" src="https://img.shields.io/badge/projectreactor-3.4.34-yellow"/>
+  </a>
+  <a href="https://projectreactor.io/docs/core/release/reference/">
+    <img alt="caffeine" src="https://img.shields.io/badge/caffeine-3.2.0-yellow"/>
+  </a>
+  <a href="https://projectreactor.io/docs/netty/release/reference/index.html">
+    <img alt="ignite" src="https://img.shields.io/badge/mqtt-3.1.1-green"/>
+    <img alt="ignite" src="https://img.shields.io/badge/mqtt-5.0-blue"/>  
+</a>
+</p>
+
+`tlmqtt是一款基于Java开发的轻量级高性能的嵌入式MQTT Broker,用于快速将任何SpringBoot应用搭建成MQTT服务`.
+## 核心功能
+### 协议支持
+- **标准MQTT协议** -完整支持MQTT3.1.1 & 5.0协议
+- **WebSocket协议** - 支持基于WebSocket的MQTT通信
+- **SSL/TLS** - 支持TLS单向与双向加密
+### 服务质量
+- **QOS0** - 无需确认消息
+- **QOS1** - 至少一次消息确认
+- **QOS2** - 至少一次消息确认
+###  功能
+- **会话持久化** - 会话持久化，断开连接后，会话仍然存在，下次连接时，会恢复会话状态
+- **Topic过滤** - 支持通配符匹配
+- **保留消息，遗嘱消息**
+- **自定义拦截器**
+- **共享订阅**
+- **认证** - 基于本地配置/HTTP/SQL的认证
+- **授权** - 基于文件的权限控制
 
 ## 快速开始
-
-``` 
+### **开发环境** SpringBoot >=2.7.4 Java >=1.8
+```xml 
   <dependency>
         <groupId>io.github.zhsqjm</groupId>
         <artifactId>tlmqtt-core</artifactId>
         <version>1.1.0</version>
   </dependency>
 ```
-```plain
-TlBootstrap bootstrap = new TlBootstrap();
-bootstrap
-.socket();//开启mqtt协议 默认端口1883
-.websocket()//开启websocket协议 默认端口8083
-.start();
-```
-
-## 后续功能
-+ 系统订阅
-+ mqtt5.0协议支持
-+ 页面展示
-+ 集群
-
-### 配置文件说明(common的resources目录下)
+### 配置文件
+在`application.yml`中可选择添加配置
 ```yaml
 session:
   timeout: 5 #session会话超时时间 如果过了这个时间还没连接 那么就不保持会话
@@ -56,8 +68,10 @@ auth:
   user: #开启认证后fix的认证信息
     - username: watson
       password: 12345
+      id: 1
     - username: zhouhs
       password: 12345
+      id: 2
 # 通道设置
 channel:
   writeLimit: 104857600 # 全局出站带宽限制：100MB/s
@@ -72,14 +86,33 @@ business:
   max: 32 # 业务线程数
   queue: 10000 #任务队列
   keepAlive: 60 # 非核心线程数的存活时间
-
-
 ```
+### 应用启动
+在springBoot启动类上添加`@EnableTlMqtt`
+```java
+@SpringBootApplication
+@EnableTlMqtt
+public class MqttApplication {
+    
+}
+```
+启动成功后，即可通过mqtt协议进行通信。
+
+## 后续功能
++ 系统订阅
++ 页面展示
++ 集群
+
 
 ### 基础功能
-#### 1. 会话的持久化
-对于cleansession为0的会话，在```CONNECT```时，会查询上次是否已经存在了该会话，如果存在，那么就会恢复上次会话的状态,如果不存在，那么就创建一个新的会话
-
+#### 1. 数据持久化
+对于连接的会话以及保留消息的数据持久化，tlmqtt默认使用内存进行数据持久化。如果需要自定义数据的持久化方式，tlmqtt提供了不同数据的接口，用户只需要
+实现该接口就可以实现自己的数据持久化方式。
+SessionService -会话的持久化方式
+PublishService - qos1与qos2的消息持久化方式
+RetainService - 保留消息的持久化方式
+ShareSubscribeService - 共享订阅的持久化方式
+SubscriptionService - 订阅的持久化方式
 #### 2. 通配符匹配
 在订阅主题时，可以使用通配符来订阅多个主题。有两种通配符：
 
@@ -89,63 +122,21 @@ business:
 
 #### 3 认证
 目前支持文件,http接口以及mysql数据库认证,可同时启用,只要任何一种认证通过即可
-
 ##### 3.1 开启或关闭认证。默认开启认证
-```java
-bootstrap.setAuth(false);
-```
+
 
 ##### 3.2 基于文件的认证
-+ 声明式
-
 ```yaml
 auth:
   user: 
     - username: watson
       password: 12345
+      id: 1
     - username: zhouhs
       password: 12345
+      id: 2
 ```
-
 + 编程式
-
-```java
-bootstrap.setFixUser(Collections.singletonList(new TlUser("mqtt","mqtt")))
-```
-
-##### 3.3 基于http接口
-```java
-ArrayList<HttpEntityInfo> httpEntityInfos = new ArrayList<>();
-bootstrap.setHttpEntity(httpEntityInfos);
-```
-
-##### 3.4 基于mysql数据库认证
-```yaml
-bootstrap.setSqlEntity(new ArrayList<SqlEntityInfo>())
-```
-
-##### 3.5 自定义认证
-继承AbstractTlAuthentication方法
-
-```yaml
-public class NoneA extends AbstractTlAuthentication {
-    @Override
-    public boolean authenticate(String username, String password) {
-        return true;
-    }
-
-    @Override
-    public boolean enabled() {
-        return true;
-    }
-
-    @Override
-    public void add(Object object) {
-
-    }
-}
-bootstrap.addAuthentication(new NoneA());
-```
 
 #### 4 ACL权限控制(tl-auth的resource目录下)
 tlmqtt自定义了一套专属的acl文件格式 并通过初始化时进行解析,具体格式如下
@@ -166,49 +157,6 @@ ip: 127.0.0.1 | topic: a/b | pub | deny
 user: * | topic: * | * | allow
 ```
 
-#### 5. 数据桥接
-tlmqtt目前支持将消息转发到mysql和kafka中，并提供接口用于用户自定义数据桥接
-
-##### 5.1 数据库
-```java
-TlMySqlInfo mySqlInfo = new TlMySqlInfo();
-mySqlInfo.setHost("127.0.0.1");
-mySqlInfo.setPort(3306);
-mySqlInfo.setUsername("root");
-mySqlInfo.setPassword("kangni");
-mySqlInfo.setDatabase("watson");
-mySqlInfo.setTable("mqtt_msg");
-mySqlInfo.setDriverClassName("com.mysql.cj.jdbc.Driver");
-bootstrap.addBridgeMysql(mySqlInfo);
-```
-
-##### 5.2 kafka
-```java
-
-TlKafkaInfo kafkaInfo = new TlKafkaInfo("ws", "172.28.33.102:9092",
-"org.apache.kafka.common.serialization.StringSerializer",
-"org.apache.kafka.common.serialization.StringSerializer");
-bootstrap.addBridgeKafka(kafkaInfo);
-```
-
-#### 6. 存储
-``tlmqtt``默认会话与消息都存储在内存中,当然用户也可以实现接口自定义
-
-+ SessionService 会话存储接口
-+ PublishService publish消息与遗嘱消息接口
-+ PubRelService pubrel消息接口
-+ RetainService 保留消息接口
-
-```java
-// 自定义存储为redis
-bootstrap.setSessionService(redisSessionService).setPublishService(redisPublishService)
-```
-
-#### 7. 保留消息
-设置发布的消息为保留消息后，当有客户端订阅这个主题时，就会收到保留消息
-
-#### 8. 遗嘱消息
-在客户端非正常断开后 发送遗嘱消息
 
 # 感谢项目
 + [https://github.com/Wizzercn/MqttWk](https://github.com/Wizzercn/MqttWk)

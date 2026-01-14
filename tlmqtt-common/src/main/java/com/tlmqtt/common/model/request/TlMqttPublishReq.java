@@ -9,7 +9,6 @@ import com.tlmqtt.common.model.payload.TlMqttPublishPayload;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
 import io.netty.buffer.ByteBuf;
 import lombok.*;
-import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.slf4j.Slf4j;
 
@@ -166,7 +165,8 @@ public class TlMqttPublishReq extends AbstractTlMessage  {
         TlMqttPublishVariableHead newVariableHead = TlMqttPublishVariableHead.builder()
             .topic(this.variableHead.getTopic())
             .messageId(this.variableHead.getMessageId())
-            .userProperties(this.variableHead.getUserProperties()) // 注意：Properties 如果包含复杂对象也需深拷
+            // 注意：Properties 如果包含复杂对象也需深拷
+            .userProperties(this.variableHead.getUserProperties())
             .build();
 
         // 3. 复制 Payload (最关键：处理 ByteBuf)

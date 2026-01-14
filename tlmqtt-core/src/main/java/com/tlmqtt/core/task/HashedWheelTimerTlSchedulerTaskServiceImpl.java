@@ -40,8 +40,8 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
             // 如果 expirySeconds 为 0，应该立即清理 (由 Handler 判断或这里判断)
             if (delay <= 0) {
                 task.subscribe(
-                    v -> log.debug("Scheduled task [{}] executed.", key),
-                    e -> log.error("Scheduled task [{}] failed.", key, e)
+                    v -> log.debug("【TLMQTT】Scheduled task [{}] executed.", key),
+                    e -> log.error("【TLMQTT】Scheduled task [{}] failed.", key, e)
                 );
             }else{
 
@@ -61,8 +61,8 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
                         // 2. 执行业务逻辑
                         task.subscribeOn(Schedulers.parallel())
                             .subscribe(
-                            unused -> log.debug("任务 [{}] 执行成功", key),
-                            error -> log.error("任务 [{}] 执行失败", key, error)
+                            unused -> log.debug("【TLMQTT】 task [{}] execute success", key),
+                            error -> log.error("tlmqtt】 task [{}] execute fail", key, error)
                         );
                     }, delay, unit);
 
@@ -85,11 +85,11 @@ public class HashedWheelTimerTlSchedulerTaskServiceImpl implements TlSchedulerTa
                 return Mono.empty();
             }
 
-            log.debug("任务 [{}] 存在，当前状态: cancelled={}, expired={}", key, timeout.isCancelled(), timeout.isExpired());
+            log.debug("【TLMQTT】task [{}] exits，current state: cancelled={}, expired={}", key, timeout.isCancelled(), timeout.isExpired());
 
             if (!timeout.isCancelled()) {
                 timeout.cancel();
-                log.debug("任务 [{}] 已成功调用 cancel()", key);
+                log.debug("【TLMQTT】 task [{}] is cancel", key);
             }
 
             return Mono.empty();

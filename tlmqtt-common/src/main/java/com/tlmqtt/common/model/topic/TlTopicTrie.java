@@ -154,54 +154,6 @@ public class TlTopicTrie {
     }
 
     /**
-     * 根据 clientId 删除该客户端订阅的所有主题信息
-     * @param clientId 客户端 ID
-     */
-    public void removeAll(String clientId) {
-        removeByClientIdRecursive(root, clientId);
-    }
-
-    /**
-     * 递归删除指定 clientId 的客户端信息，并清理空节点
-     * @param node 当前节点
-     * @param clientId 客户端 ID
-     */
-    private void removeByClientIdRecursive(TlTopicNode node, String clientId) {
-        // 删除当前节点中指定 clientId 的客户端信息
-        node.getClients().remove(clientId);
-
-        // 递归处理普通子节点
-        for (TlTopicNode child : node.getChildrenMap().values()) {
-            removeByClientIdRecursive(child, clientId);
-        }
-
-        // 递归处理单层通配符子节点
-        if (node.getSingleWildcardNode() != null) {
-            removeByClientIdRecursive(node.getSingleWildcardNode(), clientId);
-        }
-
-        // 递归处理多层通配符子节点
-        if (node.getMultiWildcardNode() != null) {
-            removeByClientIdRecursive(node.getMultiWildcardNode(), clientId);
-        }
-
-        // 清理空节点
-        if (node.getClients().isEmpty() && node.getChildrenMap().isEmpty()
-            && node.getSingleWildcardNode() == null && node.getMultiWildcardNode() == null) {
-            TlTopicNode parent = node.getParent();
-            if (parent != null) {
-                if (parent.getChildrenMap().containsValue(node)) {
-                    parent.getChildrenMap().entrySet().removeIf(entry -> entry.getValue() == node);
-                } else if (parent.getSingleWildcardNode() == node) {
-                    parent.setSingleWildcardNode(null);
-                } else if (parent.getMultiWildcardNode() == node) {
-                    parent.setMultiWildcardNode(null);
-                }
-            }
-        }
-    }
-
-    /**
      * 从叶子节点向上清理空节点
      * @param node 当前待清理节点
      * @param pathStack 路径栈（从根到当前节点的父节点）
@@ -296,7 +248,9 @@ public class TlTopicTrie {
      * @return 分割后的字符串数组
      */
     private String[] splitTopic(String topic) {
-        if (topic == null || topic.isEmpty()) return new String[0];
+        if (topic == null || topic.isEmpty()) {
+            return new String[0];
+        }
         return topic.split(SLASH);
     }
 }

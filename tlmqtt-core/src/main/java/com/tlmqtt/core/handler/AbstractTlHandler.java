@@ -11,7 +11,6 @@ import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.store.service.PublishService;
-import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
 import com.tlmqtt.store.service.ShareSubscribeService;
 import com.tlmqtt.store.service.SubscriptionService;
@@ -38,7 +37,6 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
     protected  SessionService sessionService;
     protected  SubscriptionService subscriptionService;
     protected  PublishService publishService;
-    protected  PubrelService pubrelService;
     protected  RetainService retainService;
     protected  ShareSubscribeService shareSubscribeService;
     protected  TlChannelService channelService;
@@ -64,7 +62,7 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
                 publishReq = interceptor.intercept(ctx, publishReq, session);
                 // 如果某个拦截器返回 null，表示终止后续处理和 Handler 执行
                 if (publishReq == null) {
-                    log.debug("Message processing terminated by interceptor: {}", interceptor.getClass().getSimpleName());
+                    log.debug("【TLMQTT】Message processing terminated by interceptor: {}", interceptor.getClass().getSimpleName());
                     return;
                 }
             }

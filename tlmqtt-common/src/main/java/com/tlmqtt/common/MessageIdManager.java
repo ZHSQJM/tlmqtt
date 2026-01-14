@@ -56,8 +56,8 @@ public class MessageIdManager {
 
             // 如果绕了一圈回到起点，说明 ID 耗尽
             if (candidate == startId) {
-                log.error("Critical: All 65535 Message IDs are in-flight. Potential leak or extreme load.");
-                throw new RuntimeException("No available Message ID (Protocol Limit Reached)");
+                log.error("【TLMQTT】Critical: All 65535 Message IDs are in-flight. Potential leak or extreme load.");
+                throw new RuntimeException("【TLMQTT】 No available Message ID (Protocol Limit Reached)");
             }
         }
     }

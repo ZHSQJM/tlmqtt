@@ -2,6 +2,7 @@ package com.tlmqtt.store.service.impl;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.tlmqtt.common.model.request.TlMqttPubRelReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.store.service.PublishService;
 import lombok.extern.slf4j.Slf4j;
@@ -28,7 +29,7 @@ public class DefaultPublishServiceImpl implements PublishService {
                                                                                     // 离线消息最多保留1天
                                                                                     .expireAfterAccess(1, TimeUnit.DAYS)
                                                                                     // 最大保存1万个客户端的待确认消息
-                                                                                    .maximumSize(10000)
+                                                                                    .maximumSize(100000000)
                                                                                     .build();
 
     /**
@@ -39,6 +40,19 @@ public class DefaultPublishServiceImpl implements PublishService {
     private final Cache<String, TlMqttPublishReq> willCache = Caffeine.newBuilder()
         .expireAfterAccess(1, TimeUnit.DAYS)
         .build();
+
+
+
+    /**
+     * Key: clientId
+     * Value: Map<messageId, PubRelRequest>
+     */
+    private final Cache<String, Map<Long, TlMqttPubRelReq>> pubrelCache = Caffeine.newBuilder()
+        // QoS 2 流程通常很快，如果 1 小时都没处理完，基本可以判定为客户端异常或链路中断
+        .expireAfterAccess(1, TimeUnit.HOURS)
+        .maximumSize(100000000)
+        .build();
+
 
     @Override
     public Mono<TlMqttPublishReq> save(String clientId, Long messageId, TlMqttPublishReq req) {
@@ -63,14 +77,6 @@ public class DefaultPublishServiceImpl implements PublishService {
         });
     }
 
-    @Override
-    public Mono<Boolean> clearAll(String clientId) {
-        return Mono.fromSupplier(() -> {
-            boolean existed = unackedCache.getIfPresent(clientId) != null;
-            unackedCache.invalidate(clientId); // 直接从 Caffeine 中移除
-            return existed;
-        });
-    }
 
     @Override
     public Mono<TlMqttPublishReq> find(String clientId, Long messageId) {
@@ -90,7 +96,7 @@ public class DefaultPublishServiceImpl implements PublishService {
     @Override
     public Mono<Boolean> saveWill(String clientId, TlMqttPublishReq req) {
         return Mono.fromSupplier(() -> {
-            log.debug("客户端【{}】保存遗嘱消息",clientId);
+            log.debug("【TLMQTT】client【{}】save will task",clientId);
             willCache.put(clientId, req);
             return true;
         });
@@ -104,7 +110,7 @@ public class DefaultPublishServiceImpl implements PublishService {
     @Override
     public Mono<Boolean> clearWill(String clientId) {
         return Mono.fromSupplier(() -> {
-            log.debug("客户端【{}】清除遗嘱消息",clientId);
+            log.debug("【TLMQTT】client【{}】clear will message",clientId);
             boolean existed = willCache.getIfPresent(clientId) != null;
             willCache.invalidate(clientId);
             return existed;
@@ -122,7 +128,46 @@ public class DefaultPublishServiceImpl implements PublishService {
             unackedCache.invalidate(clientId);
             // 2. 清理遗嘱消息
             willCache.invalidate(clientId);
-            log.debug("客户端【{}】清除publish与will消息",clientId);
+            // 3. 清理 pubrel
+            pubrelCache.invalidate(clientId);
+            log.debug("【TLMQTT】 client【{}】clear publish and will message",clientId);
         }).then();
+    }
+
+    @Override
+    public Mono<TlMqttPubRelReq> savePubrel(String clientId, Long messageId, TlMqttPubRelReq req) {
+        return Mono.fromSupplier(() -> {
+            Map<Long, TlMqttPubRelReq> messageMap = pubrelCache.get(clientId, k -> new ConcurrentHashMap<>(10));
+            if (messageMap != null) {
+                messageMap.put(messageId, req);
+            }
+            return req;
+        });
+    }
+
+    @Override
+    public Mono<TlMqttPubRelReq> clearPubrel(String clientId, Long messageId) {
+        return Mono.fromSupplier(() -> {
+            Map<Long, TlMqttPubRelReq> messageMap = pubrelCache.getIfPresent(clientId);
+            if (messageMap != null) {
+                return messageMap.remove(messageId);
+            }
+            return null;
+        });
+    }
+
+    @Override
+    public Mono<TlMqttPubRelReq> findPubrel(String clientId, Long messageId) {
+        return Mono.justOrEmpty(pubrelCache.getIfPresent(clientId))
+            .mapNotNull(map -> map.get(messageId));
+    }
+
+    @Override
+    public Flux<TlMqttPubRelReq> findAllPubrel(String clientId) {
+        Map<Long, TlMqttPubRelReq> messageMap = pubrelCache.getIfPresent(clientId);
+        if (messageMap == null || messageMap.isEmpty()) {
+            return Flux.empty();
+        }
+        return Flux.fromIterable(messageMap.values());
     }
 }

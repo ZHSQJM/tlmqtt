@@ -25,7 +25,6 @@ import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.core.service.ForwardMessageService;
 import com.tlmqtt.core.task.TlSchedulerTaskService;
 import com.tlmqtt.store.service.PublishService;
-import com.tlmqtt.store.service.PubrelService;
 import com.tlmqtt.store.service.RetainService;
 import com.tlmqtt.store.service.session.SessionService;
 import io.netty.channel.Channel;
@@ -53,12 +52,11 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
     private final TlSchedulerTaskService schedulerTaskService;
     private final  ForwardMessageService forwardMessageService;
 
-    public TlConnectHandler(SessionService sessionService, PublishService publishService, PubrelService pubrelService,
+    public TlConnectHandler(SessionService sessionService, PublishService publishService,
         RetainService retainService, TlChannelService channelService, AuthenticationManager authenticationManager,
         MqttConfiguration mqttConfiguration,TlSchedulerTaskService schedulerTaskService,ForwardMessageService forwardMessageService) {
         super.setSessionService(sessionService);
         super.setPublishService(publishService);
-        super.setPubrelService(pubrelService);
         super.setRetainService(retainService);
         super.setAuthenticationManager(authenticationManager);
         super.setChannelService(channelService);
@@ -73,18 +71,17 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
         MqttVersion version = MqttVersion.valueOf((byte) variableHead.getProtocolVersion());
         // 1. 解析ClientId
         String clientId = resolveClientId(req, version);
-        // 1. 认证检查
+        log.debug("【TLMQTT】Handling 【CONNECT】 event from client:【{}】", clientId);
+        // 2. 认证检查
         if (!authenticate(req)) {
-            log.warn("Authentication failed for client: [{}]", clientId);
+            log.warn("【TLMQTT】 Authentication failed for client: [{}]", clientId);
             ctx.fireExceptionCaught(new TlAuthenticationException(true,MqttMessageType.CONNECT,MqttMessageType.CONNACK));
             return;
         }
 
-        // 2. 开启响应式处理流水线
+        // 3. 开启响应式处理流水线
         processConnection(clientId,ctx, req, version)
-            //// 防止数据库挂起导致连接卡死
-            //.timeout(Duration.ofSeconds(30))
-            .doOnError(error -> log.error("Connection processing failed for [{}]: {}", clientId, error.getMessage()))
+            .doOnError(error -> log.error("【TLMQTT】Connection processing failed for [{}]: {}", clientId, error.getMessage()))
             .subscribe(); // 在Netty Handler中，这是链路的终点
     }
 
@@ -136,6 +133,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
      * @return: reactor.core.publisher.Mono<com.tlmqtt.common.model.TlMqttSession>
      **/
     private Mono<TlMqttSession> handleExistingSession(TlMqttSession oldSession , boolean cleanSession) {
+        log.debug("【TLMQTT】Found existing session for client: [{}]", oldSession.getClientId());
         String clientId = oldSession.getClientId();
         Mono<Void> kickOutAction = Mono.empty();
         //如果上次的连接还存在并且还在连接 那么就把山谷的连接给关闭掉 保持唯一连接
@@ -148,12 +146,15 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
             return kickOutAction
                 .then(sessionService.clearAll(clientId))
                 .then(Mono.defer(() -> {
+
+                    log.debug("【TLMQTT】Cancelling all tasks for client: [{}]", clientId);
                     // 也要取消所有可能的定时任务，防止清理后还有残留任务被触发
                     return cancelAllTasks(clientId);
                 }))
                 .then(Mono.empty());
         } else {
             // 3. 如果是 CleanSession=0，恢复旧会话
+            log.debug("【TLMQTT】Restoring existing session for client: [{}]", clientId);
             return kickOutAction.then(cancelAllTasks(clientId)).thenReturn(oldSession.setFromStore(true));
         }
     }
@@ -165,9 +166,9 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
         // 使用 Flux.merge 确保并行触发，并收集结果
         return Flux.merge(
             schedulerTaskService.cancel(clientId + Constant.WILL)
-                .doOnSuccess(v -> log.debug("遗嘱任务清理指令已发出: {}", clientId)),
+                .doOnSuccess(v ->log.debug("【TLMQTT】Will task cancel: 【{}】", clientId)),
             schedulerTaskService.cancel(clientId + Constant.MQTT_SESSION)
-                .doOnSuccess(v -> log.debug("Session清理任务清理指令已发出: {}", clientId))
+                .doOnSuccess(v ->log.debug("【TLMQTT】Session task cancel 【{}】", clientId))
         ).then(); // 确保所有 cancel 执行完毕后再返回 Void
     }
     private Mono<Void> saveAndResponse(ChannelHandlerContext ctx, TlMqttConnectReq req, TlMqttSession session, boolean sessionPresent) {
@@ -192,7 +193,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
             .then(sessionService.save(session))
             .then(handleWillMessage(req))
             .then(handleRepublish(session, cleanSessionFromReq(req)))
-            .doOnSuccess(v -> log.debug("客户端 [{}] 连接成功", session.getClientId()));
+            .doOnSuccess(v -> log.debug("【TLMQTT】 client [{}] connect success", session.getClientId()));
     }
 
     //offlineMessageService.triggerRedelivery(session, ctx.channel());
@@ -215,7 +216,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
         Flux<Void> pubFlow = publishService.findAll(clientId)
             .concatMap(pub -> republishSinglePublish(clientId, pub));
 
-        Flux<Void> relFlow = pubrelService.findAll(clientId)
+        Flux<Void> relFlow = publishService.findAllPubrel(clientId)
             .concatMap(rel -> republishSinglePubRel(clientId, rel));
 
         return Flux.concat(pubFlow, relFlow).then();
@@ -260,128 +261,127 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
         return clientId;
     }
 
-        private Mono<TlMqttSession> createNewSession(String clientId) {
-            return Mono.just(
-                TlMqttSession.builder()
-                    .clientId(clientId)
-                    .topics(new HashSet<>())
-                    .fromStore(false)
-                    .build());
-        }
+    private Mono<TlMqttSession> createNewSession(String clientId) {
 
-        private void registerToChannel(Channel channel, TlMqttSession session) {
-            channel.attr(Constant.DISCONNECT_KEY).set(false);
-            channel.attr(Constant.SESSION_KEY).set(session);
-            channelService.put(session.getClientId(), channel);
-        }
+        return Mono.just(
+            TlMqttSession.builder()
+                .clientId(clientId)
+                .topics(new HashSet<>())
+                .fromStore(false)
+                .build());
+    }
 
-        private Mono<Void> closeChannel(TlMqttSession oldSession) {
-            return Mono.create(sink -> {
-                Channel channel = oldSession.getCtx().channel();
-                if(oldSession.isVersion5()){
-                    TlMqttDisconnectReq disconnect = TlMqttDisconnectReq.build(MqttErrorCode.CONNECTION_REFUSED_CONNECTION_RATE_EXCEEDED);
-                    oldSession.getCtx().channel().writeAndFlush(disconnect)
-                        .addListener(f -> sink.success());
-                }else{
-                     channel.close().addListener(f -> sink.success());
-                }
+    private void registerToChannel(Channel channel, TlMqttSession session) {
+        channel.attr(Constant.DISCONNECT_KEY).set(false);
+        channel.attr(Constant.SESSION_KEY).set(session);
+        channelService.put(session.getClientId(), channel);
+    }
 
+    private Mono<Void> closeChannel(TlMqttSession oldSession) {
+        return Mono.create(sink -> {
+            Channel channel = oldSession.getCtx().channel();
+            if(oldSession.isVersion5()){
+                TlMqttDisconnectReq disconnect = TlMqttDisconnectReq.build(MqttErrorCode.CONNECTION_REFUSED_CONNECTION_RATE_EXCEEDED);
+                oldSession.getCtx().channel().writeAndFlush(disconnect)
+                    .addListener(f -> sink.success());
+            }else {
+                channel.close().addListener(f -> sink.success());
 
-            });
-
-
-        }
-
-        private boolean isExpired(TlMqttPublishReq req) {
-            if (req.getMqttVersion() != MqttVersion.MQTT_5) {
-                return false;
             }
-            Integer expiry = req.getVariableHead().getMessageExpiryInterval();
-            if (expiry == null || req.getAcceptTime() == null) {
-                return false;
-            }
-            return (System.currentTimeMillis() / 1000) > (req.getAcceptTime() + expiry);
+        });
+    }
+
+    private boolean isExpired(TlMqttPublishReq req) {
+        if (req.getMqttVersion() != MqttVersion.MQTT_5) {
+            return false;
         }
-
-        private boolean cleanSessionFromReq(TlMqttConnectReq req) {
-            return req.getVariableHead().getCleanSession() != 0;
+        Integer expiry = req.getVariableHead().getMessageExpiryInterval();
+        if (expiry == null || req.getAcceptTime() == null) {
+            return false;
         }
+        return (System.currentTimeMillis() / 1000) > (req.getAcceptTime() + expiry);
+    }
 
-        private void updateSessionInfo(TlMqttSession session, TlMqttConnectReq req, ChannelHandlerContext ctx,
-            MqttVersion version, boolean cleanSession) {
-            InetSocketAddress adder = (InetSocketAddress) ctx.channel().remoteAddress();
-            TlMqttConnectVariableHead vHead = req.getVariableHead();
+    private boolean cleanSessionFromReq(TlMqttConnectReq req) {
+        return req.getVariableHead().getCleanSession() != 0;
+    }
 
-            session.setMqttVersion(version)
-                .setCleanSession(cleanSession)
-                .setKeepAlive(vHead.getKeepAlive())
-                .setIp(adder.getAddress().getHostAddress())
-                .setCtx(ctx)
-                .setUsername(req.getPayload().getUsername());
-            if (version == MqttVersion.MQTT_5) {
-                fillSession(session, vHead);
-            }
+    private void updateSessionInfo(TlMqttSession session, TlMqttConnectReq req, ChannelHandlerContext ctx,
+        MqttVersion version, boolean cleanSession) {
+        InetSocketAddress adder = (InetSocketAddress) ctx.channel().remoteAddress();
+        TlMqttConnectVariableHead vHead = req.getVariableHead();
+
+        session.setMqttVersion(version)
+            .setCleanSession(cleanSession)
+            .setKeepAlive(vHead.getKeepAlive())
+            .setIp(adder.getAddress().getHostAddress())
+            .setCtx(ctx)
+            .setUsername(req.getPayload().getUsername());
+        if (version == MqttVersion.MQTT_5) {
+            fillSession(session, vHead);
         }
+    }
 
 
 
 
-        /**
-         * 填充session的属性
-         *
-         * @param session 会话
-         * @param variableHead 变量头
-         **/
-        private void fillSession(TlMqttSession session, TlMqttConnectVariableHead variableHead) {
-            session.setReceiveMaximum(
-                    variableHead.getReceiveMaximum() == null ? Short.MAX_VALUE : variableHead.getReceiveMaximum())
-                .setMaximumPacketSize(variableHead.getMaximumPacketSize())
-                .setTopicMaxAlias(variableHead.getTopicMaxAlias())
-                .setRequestProblemInformation(variableHead.isRequestProblemInformation())
-                .setSessionExpiryInterval(variableHead.getSessionExpiryInterval())
-                .setUserProperties(variableHead.getUserProperty())
-                .setRequestResponseInformation(variableHead.isRequestResponseInformation());
+    /**
+     * 填充session的属性
+     *
+     * @param session 会话
+     * @param variableHead 变量头
+     **/
+    private void fillSession(TlMqttSession session, TlMqttConnectVariableHead variableHead) {
+        session.setReceiveMaximum(
+                variableHead.getReceiveMaximum() == null ? Short.MAX_VALUE : variableHead.getReceiveMaximum())
+            .setMaximumPacketSize(variableHead.getMaximumPacketSize())
+            .setTopicMaxAlias(variableHead.getTopicMaxAlias())
+            .setRequestProblemInformation(variableHead.isRequestProblemInformation())
+            .setSessionExpiryInterval(variableHead.getSessionExpiryInterval())
+            .setUserProperties(variableHead.getUserProperty())
+            .setRequestResponseInformation(variableHead.isRequestResponseInformation());
+    }
+
+    /**
+     * 添加心跳
+     *
+     * @param ctx 通道
+     * @param keepAlive 心跳间隔
+     **/
+    private void setupHeartBeat(ChannelHandlerContext ctx, short keepAlive) {
+        //todo 如果保持连接的值非零，并且服务端在1.5倍的保持连接时间内没有收到客户端的控制报文，它必须断开客户端的网络连接，并判定网络连接已断开 [MQTT-3.1.2-22]。 mqtt5
+        ctx.pipeline().addLast(new IdleStateHandler(0, 0, keepAlive, TimeUnit.SECONDS));
+    }
+
+    /**
+     * 处理遗嘱消息
+     *
+     * @param req 连接报文
+     * @return Mono<Void> 处理结果
+     **/
+    private Mono<Boolean> handleWillMessage(TlMqttConnectReq req) {
+        TlMqttConnectVariableHead variableHead = req.getVariableHead();
+        if (variableHead.getWillFlag() != 1) {
+            return Mono.empty();
         }
+        log.debug("【TLMQTT】build will message");
+        TlMqttConnectPayload payload = req.getPayload();
+        MqttQoS mqttQoS = MqttQoS.valueOf(variableHead.getWillQos());
 
-        /**
-         * 添加心跳
-         *
-         * @param ctx 通道
-         * @param keepAlive 心跳间隔
-         **/
-        private void setupHeartBeat(ChannelHandlerContext ctx, short keepAlive) {
-            //todo 如果保持连接的值非零，并且服务端在1.5倍的保持连接时间内没有收到客户端的控制报文，它必须断开客户端的网络连接，并判定网络连接已断开 [MQTT-3.1.2-22]。 mqtt5
-            ctx.pipeline().addLast(new IdleStateHandler(0, 0, keepAlive, TimeUnit.SECONDS));
-        }
+        TlMqttPublishVariableHead pubVariableHead = TlMqttPublishVariableHead.builder()
+            .topic(payload.getWillTopic()).payloadFormatIndicator(payload.getPayloadFormatIndicator())
+            .messageExpiryInterval(payload.getMessageExpiryInterval()).responseTopic(payload.getResponseTopic())
+            .correlationData(payload.getCorrelationData()).userProperties(payload.getUserProperty())
+            .contentType(payload.getContentType()).willDelayInterval(payload.getWillDelayInterval()).build();
 
-        /**
-         * 处理遗嘱消息
-         *
-         * @param req 连接报文
-         * @return Mono<Void> 处理结果
-         **/
-        private Mono<Boolean> handleWillMessage(TlMqttConnectReq req) {
-            TlMqttConnectVariableHead variableHead = req.getVariableHead();
-            if (variableHead.getWillFlag() != 1) {
-                return Mono.empty();
-            }
-            TlMqttConnectPayload payload = req.getPayload();
-            MqttQoS mqttQoS = MqttQoS.valueOf(variableHead.getWillQos());
-
-            TlMqttPublishVariableHead pubVariableHead = TlMqttPublishVariableHead.builder()
-                .topic(payload.getWillTopic()).payloadFormatIndicator(payload.getPayloadFormatIndicator())
-                .messageExpiryInterval(payload.getMessageExpiryInterval()).responseTopic(payload.getResponseTopic())
-                .correlationData(payload.getCorrelationData()).userProperties(payload.getUserProperty())
-                .contentType(payload.getContentType()).willDelayInterval(payload.getWillDelayInterval()).build();
-
-            TlMqttPublishPayload pubPayload = TlMqttPublishPayload.builder().content(payload.getWillMessage()).build();
-            TlMqttFixedHead fixedHead = TlMqttFixedHead.builder().messageType(MqttMessageType.PUBLISH).qos(mqttQoS)
-                .retain(variableHead.getWillRetain() == 1).build();
-            TlMqttPublishReq publishReq = TlMqttPublishReq.build(fixedHead, pubVariableHead, pubPayload,
-                MqttVersion.MQTT_5);
-            return saveWillMessage(publishReq, payload.getClientId(), variableHead.getWillRetain() == 1,
-                payload.getWillTopic());
-        }
+        TlMqttPublishPayload pubPayload = TlMqttPublishPayload.builder().content(payload.getWillMessage()).build();
+        TlMqttFixedHead fixedHead = TlMqttFixedHead.builder().messageType(MqttMessageType.PUBLISH).qos(mqttQoS)
+            .retain(variableHead.getWillRetain() == 1).build();
+        TlMqttPublishReq publishReq = TlMqttPublishReq.build(fixedHead, pubVariableHead, pubPayload,
+            MqttVersion.MQTT_5);
+        return saveWillMessage(publishReq, payload.getClientId(), variableHead.getWillRetain() == 1,
+            payload.getWillTopic());
+    }
 
         /**
          * 存储遗嘱消息
@@ -398,6 +398,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
             ? retainService.save(willTopic, req)
             : Mono.just(true);
 
+        log.debug("【TLMQTT】save will message");
         return publishService.saveWill(clientId, req)
             .flatMap(saved -> retainAction);
     }

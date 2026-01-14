@@ -4,7 +4,6 @@ import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.model.payload.TlMqttUnSubscribePayload;
 import com.tlmqtt.common.model.variable.TlMqttUnSubscribeVariableHead;
 import lombok.*;
-import lombok.experimental.Accessors;
 import lombok.experimental.SuperBuilder;
 
 /**

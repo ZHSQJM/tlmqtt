@@ -31,8 +31,9 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.WriteBufferWaterMark;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpContentCompressor;
@@ -52,8 +53,8 @@ import lombok.extern.slf4j.Slf4j;
 public  class  TlMqttServer  {
 
     private final TlMqttServerProperties properties;
-    private final NioEventLoopGroup bossGroup;
-    private final NioEventLoopGroup workerGroup;
+    private final MultiThreadIoEventLoopGroup bossGroup;
+    private final MultiThreadIoEventLoopGroup workerGroup;
 
     private MqttComponentContainer container;
     private DynamicTrafficShaper trafficShaper;
@@ -71,8 +72,8 @@ public  class  TlMqttServer  {
 
     public TlMqttServer(TlMqttServerProperties properties) {
         this.properties = properties;
-        this.bossGroup = new NioEventLoopGroup(1);
-        this.workerGroup = new NioEventLoopGroup();
+        this.bossGroup = new MultiThreadIoEventLoopGroup(properties.getBossThreadSize(), NioIoHandler.newFactory());
+        this.workerGroup = new MultiThreadIoEventLoopGroup(properties.getWorkThreadSize(), NioIoHandler.newFactory());
     }
 
     public synchronized void setup(MqttComponentContainer container) {
@@ -116,10 +117,10 @@ public  class  TlMqttServer  {
     private void bind(ServerBootstrap b, int port, String name) {
         try {
             ChannelFuture f = b.bind(port).sync();
-            log.debug("{} Server started on port: {}", name, port);
+            log.debug("【TLMQTT】{} Server started on port: {}", name, port);
             shutdownHook.registerShutdownHook(f.channel());
         } catch (Exception e) {
-            log.error("{} Server bind failed on port: {}", name, port, e);
+            log.error("【TLMQTT】{} Server bind failed on port: {}", name, port, e);
         }
     }
 

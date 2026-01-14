@@ -30,5 +30,5 @@ public interface TlAuthenticationProvider {
      * @author zhouhs
      * @return: java.lang.String
      **/
-    String name();
+    AuthenticationType name();
 }

@@ -6,10 +6,6 @@ package com.tlmqtt.core.alias;
  * @since 0.1.0
  **/
 public interface AliasService {
-
-
-
-
     /**
      * 保存别名
      * @author zhouhs

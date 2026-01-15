@@ -40,7 +40,6 @@ public class TlPubRelHandler extends AbstractTlHandler<TlMqttPubRelReq> {
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap(publishReq -> {
                 log.debug("【TLMQTT】Client [{}] QoS 2 message [{}] ready to forward", clientId, messageId);
-
                 // 2. 触发分发流程：将这条消息发给所有订阅了该 Topic 的人
                 // 注意：这里转发的是 publishReq（包含原始 Topic, Payload 等）
                 return forwardMessageService.publish(publishReq, clientId, mqttVersion)

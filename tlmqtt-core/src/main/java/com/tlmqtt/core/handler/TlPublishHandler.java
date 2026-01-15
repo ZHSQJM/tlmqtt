@@ -58,7 +58,7 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
         TlMqttFixedHead fixedHead = req.getFixedHead();
         TlMqttPublishVariableHead variableHead = req.getVariableHead();
         Long messageId = variableHead.getMessageId();
-        log.debug("【TLMQTT】Handling 【PUBACK】 event from client:【{}】, messageId: [{}]", clientId, messageId);
+        log.debug("【TLMQTT】Handling 【PUBLISH】 event from client:【{}】, messageId: [{}]", clientId, messageId);
         MqttQoS messageQos = fixedHead.getQos();
         String topic = variableHead.getTopic();
         boolean retain = fixedHead.isRetain();

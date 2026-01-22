@@ -44,11 +44,6 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslHandler;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.net.ssl.SSLPeerUnverifiedException;
-import javax.net.ssl.SSLSession;
-import java.security.cert.Certificate;
-import java.security.cert.X509Certificate;
-
 /**
  * @author zhouhs
  * @version 0.1.0
@@ -146,39 +141,7 @@ public  class  TlMqttServer  {
                 cp.addFirst( sslHandler);
 
                 sslHandler.setHandshakeTimeoutMillis(10000);//10s超时时间
-                // 在SSL Handler中添加证书验证日志
-                sslHandler.handshakeFuture().addListener(future -> {
-                    if (future.isSuccess()) {
-                        SSLSession session = sslHandler.engine().getSession();
-                        log.info("SSL握手成功，远程地址: {}, 使用的协议: {}", ch.remoteAddress(), session.getProtocol());
 
-                        // 打印客户端证书信息
-                        try {
-                            Certificate[] clientCerts = session.getPeerCertificates();
-                            log.info("客户端证书数量: " + clientCerts.length);
-                            for (Certificate cert : clientCerts) {
-                                if (cert instanceof X509Certificate) {
-                                    X509Certificate x509 = (X509Certificate) cert;
-                                    log.info("客户端证书序列号: " + x509.getSerialNumber().toString(16));
-                                }
-                            }
-                        } catch (SSLPeerUnverifiedException e) {
-                            log.warn("无法获取对等证书，远程地址: {}", ch.remoteAddress(), e);
-                        }
-                    } else {
-
-                        // 详细记录异常链
-                        Throwable cause = future.cause();
-                        int depth = 0;
-                        while (cause != null && depth < 10) {
-                            log.error("异常链[{}]: {} - {}", depth,
-                                cause.getClass().getName(), cause.getMessage());
-                            cause = cause.getCause();
-                            depth++;
-                        }
-                        //logger.error("SSL握手失败，远程地址: {}", ch.remoteAddress(), future.cause());
-                    }
-                });
             }
 
             // 2. 流量整形层 (动态调整)

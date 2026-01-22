@@ -29,13 +29,13 @@ public class TlMqttPubRelDecoder extends AbstractTlMqttDecoder{
 
     @Override
     public TlMqttPubRelReq build(ByteBuf buf, int type,int remainingLength, TlMqttSession session) {
-        TlMqttFixedHead fixedHead = decodeFixedHeader(type,remainingLength);
+        TlMqttFixedHead fixedHead = decodeFixedHeader(remainingLength);
         TlMqttPubRelVariableHead variableHead = decodeVariableHeader(buf,session);
      return TlMqttPubRelReq.builder().fixedHead(fixedHead).variableHead(variableHead).build();
 
     }
 
-    TlMqttFixedHead decodeFixedHeader(int type,int remainingLength) {
+    TlMqttFixedHead decodeFixedHeader(int remainingLength) {
 
         return TlMqttFixedHead.builder().messageType(MqttMessageType.PUBREL)
             .length(remainingLength).build();

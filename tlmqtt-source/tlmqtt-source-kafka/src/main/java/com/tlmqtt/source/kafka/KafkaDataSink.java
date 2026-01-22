@@ -13,7 +13,6 @@ import org.apache.kafka.clients.producer.ProducerRecord;
  * @author hszhou
  */
 
-@EqualsAndHashCode(callSuper = true)
 @Data
 @AllArgsConstructor
 @NoArgsConstructor

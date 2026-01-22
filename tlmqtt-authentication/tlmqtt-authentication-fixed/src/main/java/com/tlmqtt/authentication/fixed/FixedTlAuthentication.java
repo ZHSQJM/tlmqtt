@@ -4,8 +4,6 @@ import com.tlmqtt.common.authentication.AuthenticationType;
 import com.tlmqtt.common.authentication.TlAuthenticationSubject;
 import com.tlmqtt.common.model.entity.TlAuthUser;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.Collections;
 import java.util.List;
 
 /**

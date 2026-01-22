@@ -63,11 +63,7 @@ public class TlUnSubscribeHandler extends AbstractTlHandler<TlMqttUnSubscribeReq
                 // MQTT 3.1.1 不支持 Reason Codes，只有 MessageId
                 // MQTT 5.0 需要返回每个 Topic 的处理结果
                 TlMqttUnSubAck res = build(messageId, reasonCodes, mqttVersion);
-                ctx.writeAndFlush(res).addListener(future -> {
-                    if (future.isSuccess()) {
-                       // log.debug("客户端【{}】取消订阅主题的长度【{}】 ,", clientId, topics.size());
-                    }
-                });
+                ctx.writeAndFlush(res);
             });
     }
 

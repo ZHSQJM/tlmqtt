@@ -4,8 +4,6 @@ import com.tlmqtt.common.authentication.AbstractTlAuthentication;
 import com.tlmqtt.common.authentication.AuthenticationType;
 import com.tlmqtt.common.authentication.TlAuthenticationProvider;
 
-import java.util.ArrayList;
-
 /**
  * @author zhouhs
  **/

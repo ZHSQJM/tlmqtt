@@ -112,8 +112,8 @@ public enum MqttErrorCode {
 
     private final byte byteValue;
 
-    private MqttErrorCode(byte byteValue) {
-        this.byteValue = byteValue;
+     MqttErrorCode(byte byteValue) {
+         this.byteValue = byteValue;
     }
 
     public byte byteValue() {

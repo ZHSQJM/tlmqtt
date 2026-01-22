@@ -1,8 +1,6 @@
 package com.tlmqtt.common.authentication;
 
 import lombok.Data;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.util.Objects;
 
@@ -22,10 +20,12 @@ public class TlAuthenticationSubject {
 
     @Override
     public boolean equals(Object object) {
-        if (this == object)
+        if (this == object) {
             return true;
-        if (object == null || getClass() != object.getClass())
+        }
+        if (object == null || getClass() != object.getClass()) {
             return false;
+        }
         TlAuthenticationSubject that = (TlAuthenticationSubject) object;
         return Objects.equals(id, that.id) && authenticationType == that.authenticationType;
     }

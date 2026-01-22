@@ -17,5 +17,9 @@ public interface DataSinkProvider {
     DataSink createSink(Map<String, Object> config);
 
 
+    /**
+     * 获取类型
+     * @return 类型
+     **/
     SinkType getType();
 }

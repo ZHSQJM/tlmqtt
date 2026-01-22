@@ -126,16 +126,7 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
         builder.cleanSession(clearSession);
         int willFlag = (connectFlag >> 2) & 1;
         builder.willFlag(willFlag);
-        int willQos = (connectFlag >> 3) & 3;
-        if(willQos == Constant.ERROR_QOS){
-            //  不支持的QoS等级
-            throw new TlMalformedPacketException(MqttMessageType.CONNECT,MqttMessageType.CONNACK);
-        }
-
-        //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。
-        if(maximumQos <willQos && version == MqttVersion.MQTT_5.getLevel()){
-            throw new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,true,MqttMessageType.CONNECT,null, MqttMessageType.CONNACK);
-        }
+        int willQos = getWillQos(connectFlag, version);
         builder.willQos(willQos);
         int willRetain = (connectFlag >> 5) & 1;
         //如果服务端收到一个包含保留标志位1的遗嘱消息的CONNECT报文且服务端不支持保留消息，服务端必须拒绝此连接请求，且应该发送包含原因码为0x9A（不支持保留）的CONNACK报文，随后必须关闭网络连接 [MQTT-3.2.2-13]
@@ -156,6 +147,20 @@ public class TlMqttConnectDecoder extends AbstractTlMqttDecoder{
             processVariableProperty(buf,variableHead);
         }
         return variableHead ;
+    }
+
+    private int getWillQos(int connectFlag, short version) {
+        int willQos = (connectFlag >> 3) & 3;
+        if(willQos == Constant.ERROR_QOS){
+            //  不支持的QoS等级
+            throw new TlMalformedPacketException(MqttMessageType.CONNECT,MqttMessageType.CONNACK);
+        }
+
+        //如果服务端收到包含遗嘱的QoS超过服务端处理能力的CONNECT报文，服务端必须拒绝此连接。服务端应该使用包含原因码为0x9B（不支持的QoS等级）的CONNACK报文进行错误处理，随后必须关闭网络连接。
+        if(maximumQos <willQos && version == MqttVersion.MQTT_5.getLevel()){
+            throw new TlMqttException(MqttErrorCode.CONNECTION_REFUSED_QOS_NOT_SUPPORTED,true,MqttMessageType.CONNECT,null, MqttMessageType.CONNACK);
+        }
+        return willQos;
     }
 
     /**

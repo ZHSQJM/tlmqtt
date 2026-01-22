@@ -7,8 +7,6 @@ import io.netty.handler.ssl.SslProvider;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
-import java.io.InputStream;
-import java.nio.file.Files;
 
 /**
  * @author zhouhs

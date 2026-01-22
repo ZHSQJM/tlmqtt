@@ -1,6 +1,6 @@
 package com.tlmqtt.source.mysql;
 
-import com.tlmqtt.common.source.AbstractTlSourceBean;
+import com.tlmqtt.common.sink.DataSink;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -15,7 +15,7 @@ import lombok.experimental.Accessors;
 @AllArgsConstructor
 @NoArgsConstructor
 @Accessors(chain = true)
-public class TlMySqlInfo extends AbstractTlSourceBean {
+public class TlMySqlInfo extends DataSink {
 
     /**ip*/
     private String host;

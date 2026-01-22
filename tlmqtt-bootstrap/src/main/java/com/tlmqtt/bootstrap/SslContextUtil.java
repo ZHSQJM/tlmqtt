@@ -37,17 +37,16 @@ public class SslContextUtil {
         if (sslProperties.getPrivatePath() == null || sslProperties.getPrivatePath().isEmpty()) {
             throw new IllegalArgumentException("【TLMQTT】 SSL private path is null");
         }
-
         File certFile = new File(sslProperties.getCertPath());
         File privateKeyFile = new File(sslProperties.getPrivatePath());
 
-        try (InputStream certIn = Files.newInputStream(certFile.toPath());
-            InputStream keyIn = Files.newInputStream(privateKeyFile.toPath())) {
-            return SslContextBuilder.forServer(certIn, keyIn)
+        try {
+            return SslContextBuilder.forServer(certFile, privateKeyFile)
                 .sslProvider(SslProvider.JDK)
+                // 如果追求性能且环境支持，建议使用 SslProvider.OPENSSL
                 .build();
         } catch (Exception e) {
-            throw new RuntimeException("【TLMQTT】 SSL fail", e);
+            throw new RuntimeException("【TLMQTT】构建 SSL 上下文失败，请检查证书文件格式和证书链", e);
         }
     }
 }

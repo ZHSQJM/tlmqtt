@@ -1,7 +1,8 @@
 package com.tlmqtt.source.mysql;
 
-import com.tlmqtt.common.source.AbstractTlSourceBean;
-import com.tlmqtt.common.source.TlSourceProvider;
+import com.tlmqtt.common.sink.DataSink;
+import com.tlmqtt.common.sink.SinkType;
+import com.tlmqtt.common.sink.DataSinkProvider;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import lombok.extern.slf4j.Slf4j;
@@ -16,13 +17,14 @@ import java.sql.SQLException;
  * @since 0.1.0
  **/
 @Slf4j
-public class MySqlSourceProvider implements TlSourceProvider {
+public class MySqlSourceProvider implements DataSinkProvider {
 
     private Connection connection ;
 
     private String sql;
+
     @Override
-    public boolean init(AbstractTlSourceBean mysqlInfo) {
+    public boolean init(DataSink mysqlInfo) {
         if(!(mysqlInfo instanceof TlMySqlInfo)){
             return false;
         }
@@ -64,5 +66,10 @@ public class MySqlSourceProvider implements TlSourceProvider {
                 throw new RuntimeException(e);
             }
         }
+    }
+
+    @Override
+    public SinkType name() {
+        return SinkType.SQL;
     }
 }

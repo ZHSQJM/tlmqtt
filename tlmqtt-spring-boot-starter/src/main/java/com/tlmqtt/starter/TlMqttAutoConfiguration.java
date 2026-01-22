@@ -36,7 +36,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -183,7 +182,7 @@ public class TlMqttAutoConfiguration {
         TlBusinessProperties businessProperties = properties.getBusiness();
 
         ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().setNamePrefix("tl-pool-%d").build();
-      return   new ThreadPoolExecutor(
+       return   new ThreadPoolExecutor(
             businessProperties.getCorePoolSize(),
             businessProperties.getMaxPoolSize(),
             businessProperties.getKeepAliveSeconds(),
@@ -191,6 +190,17 @@ public class TlMqttAutoConfiguration {
             new java.util.concurrent.LinkedBlockingQueue<>(businessProperties.getQueueCapacity()),namedThreadFactory);
     }
 
+    @ConditionalOnMissingBean(SourceService.class)
+    @Bean
+    public SourceService sourceService(){
+        return new DefaultSourceServiceImpl();
+    }
+//
+//    @Bean
+//    public SourceManager sourceService(@Autowired SourceService sourceService){
+//        return new SourceManager(sourceService);
+//    }
+//
     @Bean
     public MqttConfiguration mqttConfiguration(){
        return new MqttConfiguration();

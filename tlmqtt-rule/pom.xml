@@ -9,4 +9,12 @@
     <artifactId>tlmqtt-rule</artifactId>
     <name>tlmqtt-rule</name>
     <url>http://maven.apache.org</url>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.zhsqjm</groupId>
+            <artifactId>tlmqtt-source-base</artifactId>
+            <version>1.2.0</version>
+        </dependency>
+    </dependencies>
 </project>

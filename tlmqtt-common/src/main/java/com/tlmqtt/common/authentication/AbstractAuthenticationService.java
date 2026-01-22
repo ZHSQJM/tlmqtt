@@ -9,10 +9,6 @@ import java.util.Map;
  **/
 public abstract class AbstractAuthenticationService {
 
-
-
-
-
     /**
      * 初始化认证对象
      * @return Map<AuthenticationType, List<TlAuthenticationSubject>

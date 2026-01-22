@@ -1,7 +1,8 @@
 package com.tlmqtt.source.kafka;
 
-import com.tlmqtt.common.source.AbstractTlSourceBean;
-import com.tlmqtt.common.source.TlSourceProvider;
+import com.tlmqtt.common.sink.DataSink;
+import com.tlmqtt.common.sink.SinkType;
+import com.tlmqtt.common.sink.DataSinkProvider;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -9,6 +10,7 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 
+import java.util.Map;
 import java.util.Properties;
 
 /**
@@ -18,19 +20,28 @@ import java.util.Properties;
  **/
 @Data
 @Slf4j
-public class KafkaSourceProvider implements TlSourceProvider {
-
-    KafkaProducer<String, Object> producer;
-
-    private String topic;
-
+public class KafkaDataSinkProvider implements DataSinkProvider {
 
     @Override
-    public boolean init(AbstractTlSourceBean tlSourceBean) {
-        if( !(tlSourceBean instanceof TlKafkaInfo)){
+    public SinkType getType() {
+        return SinkType.KAFKA;
+    }
+
+    @Override
+    public DataSink createSink(Map<String, Object> config) {
+        String bootstrapServers = (String) config.get("bootstrap.servers");
+        String topic = (String) config.get("topic");
+        String id = (String) config.get("id"); // 区分不同 Kafka 实例的 ID
+
+        return new KafkaDataSink(id, bootstrapServers, topic);
+    }
+
+    @Override
+    public boolean init(DataSink tlSourceBean) {
+        if( !(tlSourceBean instanceof KafkaDataSink)){
             return false;
         }
-        TlKafkaInfo kafkaInfo = (TlKafkaInfo) tlSourceBean;
+        KafkaDataSink kafkaInfo = (KafkaDataSink) tlSourceBean;
         Properties props = new Properties();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaInfo.getBootstrapServers());
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -39,6 +50,7 @@ public class KafkaSourceProvider implements TlSourceProvider {
         props.put(ProducerConfig.RETRIES_CONFIG, 3);
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
         this.producer = new KafkaProducer<>(props);
+        this.topic = kafkaInfo.getTopic();
         return true;
     }
 
@@ -56,5 +68,10 @@ public class KafkaSourceProvider implements TlSourceProvider {
         if(producer != null){
             producer.close();
         }
+    }
+
+    @Override
+    public SinkType name() {
+        return SinkType.KAFKA;
     }
 }

@@ -190,11 +190,11 @@ public class TlMqttAutoConfiguration {
             new java.util.concurrent.LinkedBlockingQueue<>(businessProperties.getQueueCapacity()),namedThreadFactory);
     }
 
-    @ConditionalOnMissingBean(SourceService.class)
-    @Bean
-    public SourceService sourceService(){
-        return new DefaultSourceServiceImpl();
-    }
+//    @ConditionalOnMissingBean(SourceService.class)
+//    @Bean
+//    public SourceService sourceService(){
+//        return new DefaultSourceServiceImpl();
+//    }
 //
 //    @Bean
 //    public SourceManager sourceService(@Autowired SourceService sourceService){

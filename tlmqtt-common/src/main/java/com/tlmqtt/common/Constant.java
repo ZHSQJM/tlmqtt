@@ -42,6 +42,7 @@ public class Constant {
      * 订阅通配符
      */
     public static final String TOPIC_WILDCARD = "+";
+
     /**
      * 订阅的分隔符
      */

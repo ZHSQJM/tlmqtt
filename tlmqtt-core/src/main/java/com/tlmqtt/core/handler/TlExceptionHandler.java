@@ -2,6 +2,7 @@ package com.tlmqtt.core.handler;
 
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.config.MqttConfiguration;
+import com.tlmqtt.common.enums.MqttDataSource;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
@@ -13,6 +14,8 @@ import com.tlmqtt.common.model.request.TlMqttPubRelReq;
 import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.response.TlMqttPubAck;
+import com.tlmqtt.common.rule.EventContext;
+import com.tlmqtt.common.rule.RuleEngineDispatcher;
 import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.core.service.ForwardMessageService;
 import com.tlmqtt.core.task.TlSchedulerTaskService;
@@ -43,6 +46,7 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
     private final SubscriptionService subscriptionService;
     private final ForwardMessageService forwardMessageService;
     private final TlSchedulerTaskService schedulerTaskService;
+    private final RuleEngineDispatcher ruleEngineDispatcher;
     private final int EXPIRY_INTERVAL;
 
     @Override
@@ -55,6 +59,10 @@ public class TlExceptionHandler extends ChannelInboundHandlerAdapter {
         }
 
         String clientId = session.getClientId();
+
+        EventContext eventContext = EventContext.builder().dataSource(MqttDataSource.CLIENT_DISCONNECTED).clientId(clientId)
+            .ip("127.0.0.1").timestamp(System.currentTimeMillis()).build();
+        ruleEngineDispatcher.dispatch(eventContext);
         // 1. 判定是否为“冲突剔除”。如果是，不触发遗嘱和清理逻辑
         if (channelService.getChannel(clientId) != channel) {
             log.debug("【TLMQTT】Channel for client: [{}] has been replaced, skip cleanup", clientId);

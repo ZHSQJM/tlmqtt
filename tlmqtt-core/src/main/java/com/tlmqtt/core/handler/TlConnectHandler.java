@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.config.MqttConfiguration;
+import com.tlmqtt.common.enums.MqttDataSource;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttMessageType;
 import com.tlmqtt.common.enums.MqttQoS;
@@ -21,6 +22,8 @@ import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import com.tlmqtt.common.model.response.TlMqttConnackAck;
 import com.tlmqtt.common.model.variable.TlMqttConnectVariableHead;
 import com.tlmqtt.common.model.variable.TlMqttPublishVariableHead;
+import com.tlmqtt.common.rule.EventContext;
+import com.tlmqtt.common.rule.RuleEngineDispatcher;
 import com.tlmqtt.core.channel.TlChannelService;
 import com.tlmqtt.core.service.ForwardMessageService;
 import com.tlmqtt.core.task.TlSchedulerTaskService;
@@ -51,10 +54,12 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
 
     private final TlSchedulerTaskService schedulerTaskService;
     private final  ForwardMessageService forwardMessageService;
+    private final RuleEngineDispatcher ruleEngineDispatcher;
 
     public TlConnectHandler(SessionService sessionService, PublishService publishService,
         RetainService retainService, TlChannelService channelService, AuthenticationManager authenticationManager,
-        MqttConfiguration mqttConfiguration,TlSchedulerTaskService schedulerTaskService,ForwardMessageService forwardMessageService) {
+        MqttConfiguration mqttConfiguration,TlSchedulerTaskService schedulerTaskService,ForwardMessageService forwardMessageService,
+        RuleEngineDispatcher ruleEngineDispatcher) {
         super.setSessionService(sessionService);
         super.setPublishService(publishService);
         super.setRetainService(retainService);
@@ -63,6 +68,7 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
         super.setMqttConfiguration(mqttConfiguration);
         this.schedulerTaskService = schedulerTaskService;
         this.forwardMessageService = forwardMessageService;
+        this.ruleEngineDispatcher = ruleEngineDispatcher;
     }
 
     @Override
@@ -83,6 +89,11 @@ public class TlConnectHandler extends AbstractTlHandler<TlMqttConnectReq> {
         processConnection(clientId,ctx, req, version)
             .doOnError(error -> log.error("【TLMQTT】Connection processing failed for [{}]: {}", clientId, error.getMessage()))
             .subscribe(); // 在Netty Handler中，这是链路的终点
+
+        EventContext eventContext = EventContext.builder().dataSource(MqttDataSource.CLIENT_CONNECTED).clientId(clientId)
+            .ip("127.0.0.1").timestamp(System.currentTimeMillis()).build();
+        ruleEngineDispatcher.dispatch(eventContext);
+
     }
 
     /**

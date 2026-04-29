@@ -1,6 +1,4 @@
-package com.tlmqtt.rule.sink;
-
-import java.util.Map;
+package com.tlmqtt.common.sink;
 
 /**
  * @author zhouhs
@@ -11,11 +9,11 @@ import java.util.Map;
 public interface ActionSink {
 
     /**
-     *
+     * 收到消息的处理
      * @author zhouhs 
      * @param: data
      * @param: params 
      **/
     
-    void process(Map<String, Object> data, Map<String, Object> params);
+    void process();
 }

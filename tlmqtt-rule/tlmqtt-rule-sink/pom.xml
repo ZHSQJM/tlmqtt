@@ -1,0 +1,21 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.zhsqjm</groupId>
+        <artifactId>tlmqtt-rule</artifactId>
+        <version>1.2.0</version>
+    </parent>
+    <artifactId>tlmqtt-rule-sink</artifactId>
+    <name>tlmqtt-rule-sink</name>
+    <packaging>pom</packaging>
+    <url>http://maven.apache.org</url>
+
+    <modules>
+        <module>tlmqtt-sink-kafka</module>
+        <module>tlmqtt-sink-mysql</module>
+        <module>tlmqtt-sink-clickhouse</module>
+        <module>tlmqtt-sink-influxdb</module>
+        <module>tlmqtt-sink-http</module>
+    </modules>
+</project>

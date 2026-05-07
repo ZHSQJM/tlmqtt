@@ -1,37 +1,50 @@
 package com.tlmqtt.common.rule;
 
-import com.tlmqtt.common.sink.ActionSink;
-
-import java.util.ArrayList;
-import java.util.List;
+import com.tlmqtt.common.enums.MqttDataSource;
 
 /**
  * @author zhouhs
  * @version 0.1.0
  * @since 0.1.0
  **/
-public abstract class BaseSourceRule {
+public interface BaseSourceRule {
 
 
-    /**该规则关联的动作列表*/
-    private List<ActionSink> sinks = new ArrayList<>();
-    /***
-     * 是否处理该数据源
+
+    /**
+     * 是否处理
      * @author zhouhs
-     * @param: context
-     * @return: boolean
+     * @param: mqttDataSource 数据源类型
+     * @return: boolean 是否能处理
      **/
 
-    public abstract boolean shouldProcess(EventContext context);
+    boolean shouldProcess(MqttDataSource mqttDataSource);
 
 
-    public void  process(EventContext context){
-        if(shouldProcess(context)){
-            sinks.forEach(e->e.process());
-        }
-    }
 
-    public void addSink(ActionSink sink){
-        sinks.add(sink);
-    }
+    /**
+     * 获取数据源的名称
+     * @author zhouhs
+     * @return: com.tlmqtt.common.enums.MqttDataSource
+     **/
+
+    MqttDataSource getName();
+
+
+    /**
+     * 处理
+     * @author zhouhs
+     * @param: ex 上下文
+     **/
+
+    void process(EventContext ex);
+
+
+    /**
+     * 添加规则
+     * @author zhouhs
+     * @param: ruleDefinition 自定义规则
+     **/
+
+    void addRuleDefinition(RuleDefinition ruleDefinition);
 }

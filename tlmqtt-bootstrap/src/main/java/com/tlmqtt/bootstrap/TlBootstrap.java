@@ -36,7 +36,7 @@ public class TlBootstrap {
     public TlBootstrap mqttServerProperties(TlMqttServerProperties props) {
         this.properties = props;
         this.containerBuilder = MqttComponentContainer.builder();
-        this.containerBuilder.properties(props);
+        this.containerBuilder.properties(props).ruleEngineDispatcher(new RuleEngineDispatcher());
 
         return this;
     }

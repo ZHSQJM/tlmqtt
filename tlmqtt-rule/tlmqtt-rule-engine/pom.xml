@@ -6,23 +6,20 @@
         <artifactId>tl-mqtt</artifactId>
         <version>1.2.0</version>
     </parent>
-    <artifactId>tlmqtt-bootstrap</artifactId>
-    <name>tlmqtt-bootstrap</name>
+    <artifactId>tlmqtt-rule-engine</artifactId>
+    <name>tlmqtt-rule-engine</name>
     <url>http://maven.apache.org</url>
 
     <dependencies>
         <dependency>
             <groupId>io.github.zhsqjm</groupId>
-            <artifactId>tlmqtt-core</artifactId>
+            <artifactId>tlmqtt-rule-connect</artifactId>
             <version>1.2.0</version>
         </dependency>
-
         <dependency>
             <groupId>io.github.zhsqjm</groupId>
-            <artifactId>tlmqtt-common</artifactId>
+            <artifactId>tlmqtt-rule-disconnect</artifactId>
             <version>1.2.0</version>
         </dependency>
-
-
     </dependencies>
 </project>

@@ -1,6 +1,7 @@
 package com.tlmqtt.common.rule;
 
 import com.tlmqtt.common.enums.MqttDataSource;
+import com.tlmqtt.common.model.request.TlMqttPublishReq;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,4 +25,6 @@ public class EventContext {
     private String ip;
 
     private Long timestamp;
+
+    private TlMqttPublishReq req;
 }

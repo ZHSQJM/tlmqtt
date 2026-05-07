@@ -1,7 +1,7 @@
 package com.tlmqtt.common.rule;
 
 import com.tlmqtt.common.enums.MqttDataSource;
-import com.tlmqtt.common.sink.ActionSink;
+import com.tlmqtt.common.sink.SinkProvider;
 import lombok.Data;
 
 import java.util.List;
@@ -26,5 +26,5 @@ public class RuleDefinition {
     private String condition;
 
     /**[{"type":"mysql","table":"logs"},{"type:kafka",topic:"logs"}]*/
-    private List<ActionSink> sinks;
+    private List<SinkProvider> sinks;
 }

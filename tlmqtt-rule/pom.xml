@@ -7,8 +7,16 @@
         <version>1.2.0</version>
     </parent>
     <artifactId>tlmqtt-rule</artifactId>
+    <packaging>pom</packaging>
+    <modules>
+        <module>tlmqtt-rule-sink</module>
+        <module>tlmqtt-rule-source</module>
+        <module>tlmqtt-rule-engine</module>
+    </modules>
+    <version>1.2.0</version>
     <name>tlmqtt-rule</name>
-    <url>http://maven.apache.org</url>
+
+
 
     <dependencies>
 

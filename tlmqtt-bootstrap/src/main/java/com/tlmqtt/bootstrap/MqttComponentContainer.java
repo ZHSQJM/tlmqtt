@@ -32,7 +32,6 @@ import lombok.Getter;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-
 /**
  * @author zhouhs
  * @version 0.1.0
@@ -70,6 +69,7 @@ public class MqttComponentContainer {
     private TlSubscribeHandler subscribeHandler;
     private TlUnSubscribeHandler unSubscribeHandler;
     private TlExceptionHandler exceptionHandler;
+    private RuleEngineDispatcher ruleEngineDispatcher;
 
     public void initHandlers() {
         TlSessionProperties sessionProperties = properties.getSession();
@@ -78,9 +78,9 @@ public class MqttComponentContainer {
             subscriptionService, sessionService, publishService, channelService, schedulerTaskService, sessionProperties.getDelay(), sessionProperties.getMaxRetry());
 
         // 实例化 Handler
-        this.exceptionHandler = new TlExceptionHandler(publishService, channelService, sessionService,mqttConfiguration,subscriptionService,forwardService,schedulerTaskService,sessionProperties.getTimeout());
+        this.exceptionHandler = new TlExceptionHandler(publishService, channelService, sessionService,mqttConfiguration,subscriptionService,forwardService,schedulerTaskService,ruleEngineDispatcher,sessionProperties.getTimeout());
         this.connectHandler = new TlConnectHandler(sessionService, publishService, retainService,
-            channelService, authenticationManager,mqttConfiguration,schedulerTaskService,forwardService);
+            channelService, authenticationManager,mqttConfiguration,schedulerTaskService,forwardService,ruleEngineDispatcher);
         this.disconnectHandler = new TlDisconnectHandler();
         this.heartBeatHandler = new TlHeartBeatHandler();
         this.pubAckHandler = new TlPubAckHandler(publishService, forwardService);

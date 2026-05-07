@@ -13,7 +13,6 @@
         <module>tlmqtt-core</module>
         <module>tlmqtt-store</module>
         <module>tlmqtt-authentication</module>
-        <module>tlmqtt-source</module>
         <module>tlmqtt-demo</module>
         <module>tlmqtt-spring-boot-starter</module>
         <module>tlmqtt-rule</module>

@@ -1,6 +1,7 @@
 package com.tlmqtt.source.mysql;
 
 import com.tlmqtt.common.sink.DataSink;
+import com.tlmqtt.common.sink.SinkType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -10,12 +11,12 @@ import lombok.experimental.Accessors;
 /**
  * @author hszhou
  */
-@EqualsAndHashCode(callSuper = true)
+@EqualsAndHashCode(callSuper = false)
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Accessors(chain = true)
-public class TlMySqlInfo extends DataSink {
+public class TlMySqlInfo implements DataSink {
 
     /**ip*/
     private String host;
@@ -34,4 +35,19 @@ public class TlMySqlInfo extends DataSink {
     /**sql*/
     private String sql;
 
+    public String getId() {
+        return null;
+    }
+
+    public void send(String data) {
+
+    }
+
+    public void close() {
+
+    }
+
+    public SinkType getType() {
+        return null;
+    }
 }

@@ -15,8 +15,16 @@ public enum AuthenticationType {
     /**
      * http
      */
-    HTTP("http"),
-    SQL("sql"),
-    FIXED("fixed"), NONE("none");
+    HTTP("HTTP"),
+    /**
+     * SQL
+     */
+    SQL("SQL"),
+
+    /**
+     * FIXED
+     */
+    FIXED("FIXED"),
+    ;
     private final String type;
 }

@@ -3,11 +3,11 @@ package com.tlmqtt.authentication.base;
 
 import cn.hutool.core.collection.CollUtil;
 import com.tlmqtt.common.authentication.AbstractTlAuthentication;
-import com.tlmqtt.common.authentication.AbstractAuthenticationService;
 import com.tlmqtt.common.authentication.AuthenticationType;
 import com.tlmqtt.common.authentication.TlAuthenticationProvider;
 import com.tlmqtt.common.authentication.TlAuthenticationSubject;
 import com.tlmqtt.common.model.entity.TlAuthUser;
+import com.tlmqtt.store.service.AuthenticationService;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
@@ -25,21 +25,28 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AuthenticationManager  {
 
-    private final AbstractTlAuthentication head;
+    /** 责任链头节点 */
+    private AbstractTlAuthentication head;
+
+
+
     /**用于快速查找某个类型的认证器实例*/
     private final Map<AuthenticationType, AbstractTlAuthentication> PROCESSOR_MAP = new HashMap<>();
 
-    public AuthenticationManager(boolean authEnabled,List<TlAuthUser> users, AbstractAuthenticationService authService) {
-        // 1. 初始化空头（处理全局开关）
-        this.head = new NoneAuthenticationService(() -> authEnabled);
+    public AuthenticationManager(boolean authEnabled, List<TlAuthUser> users, AuthenticationService authenticationService) {
+        // 1. 创建认证开关控制器作为链头
+        NoneTlAuthentication noneAuth = new NoneTlAuthentication(authEnabled);
         // 2. SPI 加载并构建链
-        loadAndBuildChain();
-        // 3. 核心：将 Service 中的数据同步到对应的处理器中
-        syncDataFromService(authService,users);
+        buildChain(noneAuth);
+        // 3. 从持久化存储加载 HTTP、SQL 等数据
+        syncFromPersistence(authenticationService);
+
+        // 4. 将配置文件中的用户注入 Fixed 认证器
+        syncFixedUsers(users);
     }
 
 
-    private void loadAndBuildChain() {
+    private void buildChain(AbstractTlAuthentication head ) {
         List<TlAuthenticationProvider> providers = new ArrayList<>();
         ServiceLoader.load(TlAuthenticationProvider.class).forEach(providers::add);
 
@@ -56,28 +63,27 @@ public class AuthenticationManager  {
             current.setNext(instance);
             current = instance;
         }
+        this.head = head;
     }
 
-    private void syncDataFromService(AbstractAuthenticationService authService,List<TlAuthUser> users) {
-        // 初始化加载 Service 里的数据
+    private void syncFixedUsers(List<TlAuthUser> users) {
+        if (CollUtil.isNotEmpty(users)) {
+            AbstractTlAuthentication fixed = PROCESSOR_MAP.get(AuthenticationType.FIXED);
+            if (fixed != null) {
+                users.forEach(fixed::add);
+            }
+        }
+    }
+    private void syncFromPersistence(AuthenticationService authService) {
         Map<AuthenticationType, List<TlAuthenticationSubject>> data = authService.init();
         data.forEach((type, subjects) -> {
             AbstractTlAuthentication processor = PROCESSOR_MAP.get(type);
-            if (processor != null) {
-                subjects.forEach(processor::add);
+            if (processor != null && subjects != null) {
+                processor.init(subjects);
+                log.info("【TLMQTT】Loaded {} auth subjects for type: {}", subjects.size(), type);
             }
         });
-
-        if(CollUtil.isNotEmpty(users)){
-            AbstractTlAuthentication abstractTlAuthentication = PROCESSOR_MAP.get(AuthenticationType.FIXED);
-            if(abstractTlAuthentication != null){
-                users.forEach(abstractTlAuthentication::add);
-            }
-
-        }
-
     }
-
     /**
      * 认证
      * @author zhouhs
@@ -88,6 +94,9 @@ public class AuthenticationManager  {
 
 
     public boolean authenticate(String username, String password) {
+        if (head == null) {
+            return true;
+        }
         return head.execute(username, password);
     }
 

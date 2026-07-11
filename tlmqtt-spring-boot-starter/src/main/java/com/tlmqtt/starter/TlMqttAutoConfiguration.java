@@ -4,8 +4,6 @@ import cn.hutool.core.thread.ThreadFactoryBuilder;
 import com.tlmqtt.authentication.base.AuthenticationManager;
 import com.tlmqtt.authorization.base.AuthorizationManager;
 import com.tlmqtt.bootstrap.TlBootstrap;
-import com.tlmqtt.common.authentication.AbstractAuthenticationService;
-import com.tlmqtt.common.authentication.DefaultAuthenticationService;
 import com.tlmqtt.common.config.MqttConfiguration;
 import com.tlmqtt.common.interceptor.PublishInterceptor;
 import com.tlmqtt.common.properties.TlAuthProperties;
@@ -19,14 +17,8 @@ import com.tlmqtt.core.share.IShareSubscribeClientChoose;
 import com.tlmqtt.core.share.RandomSubscribeClientChoose;
 import com.tlmqtt.core.task.HashedWheelTimerTlSchedulerTaskServiceImpl;
 import com.tlmqtt.core.task.TlSchedulerTaskService;
-import com.tlmqtt.store.service.PublishService;
-import com.tlmqtt.store.service.RetainService;
-import com.tlmqtt.store.service.ShareSubscribeService;
-import com.tlmqtt.store.service.SubscriptionService;
-import com.tlmqtt.store.service.impl.DefaultPublishServiceImpl;
-import com.tlmqtt.store.service.impl.DefaultRetainServiceImpl;
-import com.tlmqtt.store.service.impl.DefaultShareSubscribeServiceImpl;
-import com.tlmqtt.store.service.impl.DefaultSubscriptionServiceImpl;
+import com.tlmqtt.store.service.*;
+import com.tlmqtt.store.service.impl.*;
 import com.tlmqtt.store.service.session.DefaultSessionServiceImpl;
 import com.tlmqtt.store.service.session.SessionService;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +66,7 @@ public class TlMqttAutoConfiguration {
         sessionService.addListener(retainService);
         sessionService.addListener(subscriptionService);
         sessionService.addListener(shareSubscribeService);
-       return bootstrap.mqttServerProperties(mqttProperties)
+        return bootstrap.mqttServerProperties(mqttProperties)
                  .socket()
                  .websocket()
                  .sessionService(sessionService)
@@ -89,7 +81,7 @@ public class TlMqttAutoConfiguration {
                  .authenticationManager(authenticationManager)
                  .authorizationManager(authorizationManager)
                  .mqttConfiguration(mqttConfiguration)
-           .executorService(executor)
+                 .executorService(executor)
                  .interceptors(interceptors)
                  .start();
     }
@@ -161,14 +153,15 @@ public class TlMqttAutoConfiguration {
     }
 
 
-    @ConditionalOnMissingBean(AbstractAuthenticationService.class)
+    @ConditionalOnMissingBean(AuthenticationService.class)
     @Bean
-    public AbstractAuthenticationService defaultAuthenticationService(){
-        return new DefaultAuthenticationService();
+    public AuthenticationService defaultAuthenticationService(){
+        return new DefaultAuthenticationServiceImpl();
     }
+
     @Bean
-    public AuthenticationManager authenticationManager(@Autowired TlAuthProperties authProperties,@Autowired AbstractAuthenticationService abstractAuthenticationService){
-        return new AuthenticationManager(authProperties.isEnabled(), authProperties.getUser(),abstractAuthenticationService);
+    public AuthenticationManager authenticationManager(@Autowired TlAuthProperties authProperties,@Autowired AuthenticationService defaultAuthenticationService){
+        return new AuthenticationManager(authProperties.isEnabled(), authProperties.getUser(),defaultAuthenticationService);
     }
 
     @Bean
@@ -182,7 +175,7 @@ public class TlMqttAutoConfiguration {
         TlBusinessProperties businessProperties = properties.getBusiness();
 
         ThreadFactory namedThreadFactory = new ThreadFactoryBuilder().setNamePrefix("tl-pool-%d").build();
-       return   new ThreadPoolExecutor(
+        return   new ThreadPoolExecutor(
             businessProperties.getCorePoolSize(),
             businessProperties.getMaxPoolSize(),
             businessProperties.getKeepAliveSeconds(),
@@ -190,17 +183,7 @@ public class TlMqttAutoConfiguration {
             new java.util.concurrent.LinkedBlockingQueue<>(businessProperties.getQueueCapacity()),namedThreadFactory);
     }
 
-//    @ConditionalOnMissingBean(SourceService.class)
-//    @Bean
-//    public SourceService sourceService(){
-//        return new DefaultSourceServiceImpl();
-//    }
-//
-//    @Bean
-//    public SourceManager sourceService(@Autowired SourceService sourceService){
-//        return new SourceManager(sourceService);
-//    }
-//
+
     @Bean
     public MqttConfiguration mqttConfiguration(){
        return new MqttConfiguration();

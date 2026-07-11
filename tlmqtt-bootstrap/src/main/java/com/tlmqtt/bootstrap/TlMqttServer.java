@@ -122,7 +122,7 @@ public  class  TlMqttServer  {
     private void bind(ServerBootstrap b, int port, String name) {
         try {
             ChannelFuture f = b.bind(port).sync();
-            log.debug("【TLMQTT】{} Server started on port: {}", name, port);
+            log.info("【TLMQTT】{} Server started on port: {}", name, port);
             shutdownHook.registerShutdownHook(f.channel());
         } catch (Exception e) {
             log.error("【TLMQTT】{} Server bind failed on port: {}", name, port, e);

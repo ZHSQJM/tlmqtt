@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -14,7 +14,6 @@
         <module>tlmqtt-store</module>
         <module>tlmqtt-authentication</module>
         <module>tlmqtt-source</module>
-        <module>tlmqtt-demo</module>
         <module>tlmqtt-spring-boot-starter</module>
         <module>tlmqtt-rule</module>
         <module>tlmqtt-bootstrap</module>
@@ -70,6 +69,8 @@
         <slf4j.version>1.7.36</slf4j.version>
         <hutool.version>5.8.24</hutool.version>
         <caffeine.version>3.2.0</caffeine.version>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
 
     <dependencyManagement>
@@ -203,9 +204,8 @@
                             <encoding>UTF-8</encoding>
                             <charset>UTF-8</charset>
                             <docencoding>UTF-8</docencoding>
-                            <additionalOptions>-Xdoclint:none</additionalOptions><!---
-                            这里是为了跳过doc一些验证error变成warn警告 允许通过
-                            -->
+                            <additionalOptions>-Xdoclint:none</additionalOptions> 
+
                         </configuration>
                         <executions>
                             <execution>

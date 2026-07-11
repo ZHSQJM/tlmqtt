@@ -32,29 +32,29 @@ public class DefaultSourceServiceImpl implements SourceService {
     @Override
     public void add(DataSink sourceBean) {
 
-        cache.asMap().compute(sourceBean.getSinkType(), (key, existingList) -> {
-            if (existingList == null) {
-                // 如果不存在，创建一个新的可变列表
-                List<DataSink> newList = new ArrayList<>();
-                newList.add(sourceBean);
-                return newList;
-            } else {
-                // 如果存在，直接追加（注意：前提是缓存里的 List 必须是可变的）
-                existingList.add(sourceBean);
-                return existingList;
-            }
-        });
+//        cache.asMap().compute(sourceBean.getSinkType(), (key, existingList) -> {
+//            if (existingList == null) {
+//                // 如果不存在，创建一个新的可变列表
+//                List<DataSink> newList = new ArrayList<>();
+//                newList.add(sourceBean);
+//                return newList;
+//            } else {
+//                // 如果存在，直接追加（注意：前提是缓存里的 List 必须是可变的）
+//                existingList.add(sourceBean);
+//                return existingList;
+//            }
+//        });
     }
 
     @Override
     public void remove(DataSink sourceBean) {
-        SinkType type = sourceBean.getSinkType();
-        // 使用 asMap().computeIfPresent 确保原子性地更新
-        cache.asMap().computeIfPresent(type, (key, existingList) -> {
-            existingList.removeIf(item -> item.getId().equals(sourceBean.getId()));
-            // 如果删除后列表为空，可以返回 null 将该 Key 从缓存中彻底移除
-            return existingList.isEmpty() ? null : existingList;
-        });
+//        SinkType type = sourceBean.getSinkType();
+//        // 使用 asMap().computeIfPresent 确保原子性地更新
+//        cache.asMap().computeIfPresent(type, (key, existingList) -> {
+//            existingList.removeIf(item -> item.getId().equals(sourceBean.getId()));
+//            // 如果删除后列表为空，可以返回 null 将该 Key 从缓存中彻底移除
+//            return existingList.isEmpty() ? null : existingList;
+//        });
     }
 
     @Override

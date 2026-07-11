@@ -30,5 +30,11 @@
             <artifactId>tlmqtt-common</artifactId>
             <version>1.2.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>io.github.zhsqjm</groupId>
+            <artifactId>tlmqtt-store</artifactId>
+            <version>1.2.0</version>
+        </dependency>
     </dependencies>
 </project>

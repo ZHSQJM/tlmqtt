@@ -2,9 +2,10 @@ package com.tlmqtt.bootstrap;
 
 import com.tlmqtt.common.Constant;
 import io.netty.channel.Channel;
-import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
+import io.netty.channel.nio.NioEventLoop;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -21,12 +22,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ShutDownGracefully {
 
     private final ChannelGroup allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-    private final MultiThreadIoEventLoopGroup bossGroup;
-    private final MultiThreadIoEventLoopGroup workerGroup;
+    private final NioEventLoopGroup bossGroup;
+    private final NioEventLoopGroup workerGroup;
     private final ExecutorService executorService;
     private final AtomicBoolean isShuttingDown = new AtomicBoolean(false);
 
-    public ShutDownGracefully(MultiThreadIoEventLoopGroup boss, MultiThreadIoEventLoopGroup worker, ExecutorService executor) {
+    public ShutDownGracefully(NioEventLoopGroup boss, NioEventLoopGroup worker, ExecutorService executor) {
         this.bossGroup = boss;
         this.workerGroup = worker;
         this.executorService = executor;

@@ -1,6 +1,7 @@
 package com.tlmqtt.bootstrap;
 
-import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioEventLoop;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.traffic.GlobalTrafficShapingHandler;
 import lombok.Getter;
 
@@ -12,7 +13,7 @@ public class DynamicTrafficShaper {
 
     private final GlobalTrafficShapingHandler handler;
 
-    public DynamicTrafficShaper(MultiThreadIoEventLoopGroup workerGroup, long writeLimit, long readLimit,long checkInterval,long maxTime) {
+    public DynamicTrafficShaper(NioEventLoopGroup workerGroup, long writeLimit, long readLimit, long checkInterval, long maxTime) {
         // Netty 官方建议：GlobalTrafficShapingHandler 应该是全局单例的
         this.handler = new GlobalTrafficShapingHandler(workerGroup, writeLimit, readLimit, checkInterval, maxTime);
     }

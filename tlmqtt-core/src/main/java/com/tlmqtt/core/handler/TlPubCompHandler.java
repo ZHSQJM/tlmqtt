@@ -27,11 +27,7 @@ public class TlPubCompHandler extends AbstractTlHandler<TlMqttPubCompReq> {
         // 强制转换为 int 以适配 MessageIdManager 的 16 位逻辑
         int messageId = req.getVariableHead().getMessageId().intValue();
         log.debug("【TLMQTT】Handling 【PUBCOMP】 event from client:【{}】, messageId: [{}]", clientId, messageId);
-        // 2. 取消调度并清理持久化数据
-        forwardMessageService.cancel(clientId, Constant.PUBREL, messageId)
-
-            // 3. 维护窗口和 ID 释放 (复用 ForwardMessageService 的 handleAck 逻辑)
-            .doOnSuccess(v -> forwardMessageService.handleAck(clientId,Constant.PUBREL, messageId))
-            .subscribe();
+        // handleAck 内部会完成 cancel + clearPubrel + 释放窗口 + 触发队列
+        forwardMessageService.handleAck(clientId, Constant.PUBREL, messageId);
     }
 }

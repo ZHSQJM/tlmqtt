@@ -29,7 +29,7 @@ public class DefaultPublishServiceImpl implements PublishService {
                                                                                     // 离线消息最多保留1天
                                                                                     .expireAfterAccess(1, TimeUnit.DAYS)
                                                                                     // 最大保存1万个客户端的待确认消息
-                                                                                    .maximumSize(100000000)
+                                                                                    .maximumSize(10000)
                                                                                     .build();
 
     /**
@@ -50,7 +50,18 @@ public class DefaultPublishServiceImpl implements PublishService {
     private final Cache<String, Map<Long, TlMqttPubRelReq>> pubrelCache = Caffeine.newBuilder()
         // QoS 2 流程通常很快，如果 1 小时都没处理完，基本可以判定为客户端异常或链路中断
         .expireAfterAccess(1, TimeUnit.HOURS)
-        .maximumSize(100000000)
+        .maximumSize(10000)
+        .build();
+
+    /**
+     * QoS2 入站暂存缓存（客户端发布、等待 PUBREL 后转发的原始报文）
+     * Key: clientId
+     * Value: Map<messageId, PublishRequest>
+     * 与出站 unackedCache 隔离，避免自订阅场景下客户端 messageId 与 Broker 分配的 messageId 冲突
+     */
+    private final Cache<String, Map<Long, TlMqttPublishReq>> inboundCache = Caffeine.newBuilder()
+        .expireAfterAccess(1, TimeUnit.HOURS)
+        .maximumSize(10000)
         .build();
 
 
@@ -94,6 +105,34 @@ public class DefaultPublishServiceImpl implements PublishService {
     }
 
     @Override
+    public Mono<TlMqttPublishReq> saveInbound(String clientId, Long messageId, TlMqttPublishReq req) {
+        return Mono.fromSupplier(() -> {
+            Map<Long, TlMqttPublishReq> messageMap = inboundCache.get(clientId, k -> new ConcurrentHashMap<>(10));
+            if (messageMap != null) {
+                messageMap.put(messageId, req);
+            }
+            return req;
+        });
+    }
+
+    @Override
+    public Mono<TlMqttPublishReq> findInbound(String clientId, Long messageId) {
+        return Mono.justOrEmpty(inboundCache.getIfPresent(clientId))
+            .mapNotNull(map -> map.get(messageId));
+    }
+
+    @Override
+    public Mono<TlMqttPublishReq> clearInbound(String clientId, Long messageId) {
+        return Mono.fromSupplier(() -> {
+            Map<Long, TlMqttPublishReq> messageMap = inboundCache.getIfPresent(clientId);
+            if (messageMap != null) {
+                return messageMap.remove(messageId);
+            }
+            return null;
+        });
+    }
+
+    @Override
     public Mono<Boolean> saveWill(String clientId, TlMqttPublishReq req) {
         return Mono.fromSupplier(() -> {
             log.debug("【TLMQTT】client【{}】save will task",clientId);
@@ -130,6 +169,8 @@ public class DefaultPublishServiceImpl implements PublishService {
             willCache.invalidate(clientId);
             // 3. 清理 pubrel
             pubrelCache.invalidate(clientId);
+            // 4. 清理 QoS2 入站暂存
+            inboundCache.invalidate(clientId);
             log.debug("【TLMQTT】 client【{}】clear publish and will message",clientId);
         }).then();
     }

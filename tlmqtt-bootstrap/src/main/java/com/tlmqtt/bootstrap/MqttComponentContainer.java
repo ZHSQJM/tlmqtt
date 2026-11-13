@@ -56,9 +56,7 @@ public class MqttComponentContainer {
     private final AuthenticationManager authenticationManager;
     private final AuthorizationManager authorizationManager;
     private final MqttConfiguration mqttConfiguration;
-
     private final List<PublishInterceptor> interceptors;
-
     private TlConnectHandler connectHandler;
     private TlDisconnectHandler disconnectHandler;
     private TlHeartBeatHandler heartBeatHandler;

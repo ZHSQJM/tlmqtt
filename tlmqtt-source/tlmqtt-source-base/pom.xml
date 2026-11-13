@@ -4,7 +4,7 @@
     <parent>
         <groupId>io.github.zhsqjm</groupId>
         <artifactId>tlmqtt-source</artifactId>
-        <version>1.2.0</version>
+        <version>${revision}</version>
     </parent>
     <artifactId>tlmqtt-source-base</artifactId>
     <name>tlmqtt-source-base</name>
@@ -15,12 +15,12 @@
         <dependency>
             <groupId>io.github.zhsqjm</groupId>
             <artifactId>tlmqtt-source-kafka</artifactId>
-            <version>1.2.0</version>
+            <version>${revision}</version>
         </dependency>
         <dependency>
             <groupId>io.github.zhsqjm</groupId>
             <artifactId>tlmqtt-source-mysql</artifactId>
-            <version>1.2.0</version>
+            <version>${revision}</version>
         </dependency>
     </dependencies>
 </project>

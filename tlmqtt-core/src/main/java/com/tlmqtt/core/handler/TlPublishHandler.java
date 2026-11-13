@@ -22,7 +22,6 @@ import com.tlmqtt.store.service.RetainService;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -81,12 +80,15 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
         switch (messageQos) {
             case AT_MOST_ONCE:
                 log.debug("【TLMQTT】Publish message from client:【{}】, topic: [{}]", clientId, topic);
-                forwardMessageService.publish(req, clientId, mqttVersion);
+                // Reactor 冷流必须显式订阅，否则转发链不会执行
+                forwardMessageService.publish(req, clientId, mqttVersion)
+                    .subscribe(null, e -> log.error("【TLMQTT】Publish forward failed for client [{}], topic [{}]", clientId, topic, e));
                 break;
 
             case AT_LEAST_ONCE:
                 // 先执行转发，确保消息送达订阅者
-                forwardMessageService.publish(req, clientId, mqttVersion);
+                forwardMessageService.publish(req, clientId, mqttVersion)
+                    .subscribe(null, e -> log.error("【TLMQTT】Publish forward failed for client [{}], topic [{}]", clientId, topic, e));
                 // 再回复客户端 PUBACK
                 sendAck(messageId, ctx.channel(), mqttVersion);
                 break;
@@ -107,14 +109,11 @@ public class TlPublishHandler extends AbstractTlHandler<TlMqttPublishReq> {
     private void handleQoS2Inbound (ChannelHandlerContext ctx, TlMqttPublishReq req, String clientId, Long
     messageId, MqttVersion version){
         log.debug("【TLMQTT】Handling QoS 2 inbound message from client:【{}】, messageId: [{}]", clientId, messageId);
-        // 关键：增加引用计数，防止 Netty 在异步存储完成前回收内存
-        ReferenceCountUtil.retain(req);
-        publishService.save(clientId, messageId, req)
+        // payload content 为 String（非 ByteBuf），无需引用计数管理
+        // 使用独立的 inboundCache，与出站未确认消息隔离，避免自订阅场景 messageId 冲突
+        publishService.saveInbound(clientId, messageId, req)
             .subscribeOn(Schedulers.boundedElastic())
-            .doFinally(signal -> {
-                // 存储操作结束后释放引用
-                ReferenceCountUtil.release(req);
-            }).subscribe(v -> {
+            .subscribe(v -> {
                 // 存储成功，回复 PUBREC
                 sendRec(messageId, ctx.channel(), version);
             }, e -> {

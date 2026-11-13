@@ -52,6 +52,27 @@ public interface PublishService extends SessionEventListener {
      */
     Flux<TlMqttPublishReq> findAll(String clientId);
 
+    /**
+     * 保存 QoS2 入站暂存消息（客户端发布、等待 PUBREL 后转发的原始报文）
+     * 与出站未确认消息（unackedCache）隔离，避免自订阅场景下 messageId 冲突
+     *
+     * @param clientId  发布者 clientId
+     * @param messageId 客户端分配的 messageId
+     * @param req       原始 PUBLISH 报文
+     * @return 保存后的报文
+     */
+    Mono<TlMqttPublishReq> saveInbound(String clientId, Long messageId, TlMqttPublishReq req);
+
+    /**
+     * 查找 QoS2 入站暂存消息
+     */
+    Mono<TlMqttPublishReq> findInbound(String clientId, Long messageId);
+
+    /**
+     * 清除 QoS2 入站暂存消息
+     */
+    Mono<TlMqttPublishReq> clearInbound(String clientId, Long messageId);
+
 
     /**
      * 保存客户端的遗嘱消息

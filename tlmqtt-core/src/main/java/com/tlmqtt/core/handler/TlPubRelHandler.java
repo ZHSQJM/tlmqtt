@@ -35,15 +35,15 @@ public class TlPubRelHandler extends AbstractTlHandler<TlMqttPubRelReq> {
         log.debug("【TLMQTT】Handling 【PUBREL】 event from client:【{}】,【{}】", clientId,messageId);
 
         // 1. 获取并移除暂存的消息 (防止重复转发)
-        // 这个 publishReq 是在之前的 TlPublishHandler (QoS 2) 中存入 pubrelService 的
-        publishService.find(clientId, messageId)
+        // 这个 publishReq 是在之前的 TlPublishHandler (QoS 2) 中存入 inboundCache 的
+        publishService.findInbound(clientId, messageId)
             .subscribeOn(Schedulers.boundedElastic())
             .flatMap(publishReq -> {
                 log.debug("【TLMQTT】Client [{}] QoS 2 message [{}] ready to forward", clientId, messageId);
                 // 2. 触发分发流程：将这条消息发给所有订阅了该 Topic 的人
                 // 注意：这里转发的是 publishReq（包含原始 Topic, Payload 等）
                 return forwardMessageService.publish(publishReq, clientId, mqttVersion)
-                    .then(publishService.clear(clientId, messageId))
+                    .then(publishService.clearInbound(clientId, messageId))
                     .thenReturn(true);
             })
             // 如果找不到消息，说明可能是客户端重发的 PUBREL

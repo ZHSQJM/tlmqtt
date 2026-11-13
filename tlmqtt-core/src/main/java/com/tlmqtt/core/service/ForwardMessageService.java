@@ -22,7 +22,6 @@ import com.tlmqtt.store.service.ShareSubscribeService;
 import com.tlmqtt.store.service.SubscriptionService;
 import com.tlmqtt.store.service.session.SessionService;
 import io.netty.channel.Channel;
-import io.netty.util.ReferenceCountUtil;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -80,11 +79,6 @@ public class ForwardMessageService {
             topic = handleTopicAlias(publisherId, variableHead.getTopicAlias(), topic);
             variableHead.setTopic(topic);
         }
-        // 引用计数 +1，防止在 Flux 遍历期间被释放
-        if (req.getPayload() != null && req.getPayload().getContent() != null) {
-            ReferenceCountUtil.retain(req.getPayload().getContent());
-        }
-
         // 2. 汇聚订阅者（普通订阅 + 共享订阅）
         String finalTopic = topic;
         Flux<TlSubClient> normalSubs = Flux.defer(() ->subscriptionService.find(finalTopic));
@@ -104,12 +98,6 @@ public class ForwardMessageService {
             // 防止重复订阅导致重复发送
             .distinct(TlSubClient::getClientId)
             .flatMap(subClient -> doForward(req, subClient, publisherId))
-            .doFinally(signal -> {
-                // 最终释放 Payload
-                if (req.getPayload() != null && req.getPayload().getContent() != null) {
-                    ReferenceCountUtil.safeRelease(req.getPayload().getContent());
-                }
-            })
             .then();
     }
 
@@ -147,6 +135,11 @@ public class ForwardMessageService {
                     return processWithTrafficControl(session, targetReq);
                 }
 
+            })
+            // 隔离单个订阅者的失败，避免一个离线/异常的订阅者拖垮整条转发链
+            .onErrorResume(e -> {
+                log.warn("【TLMQTT】Forward to client [{}] failed, skip: {}", targetClientId, e.getMessage());
+                return Mono.empty();
             });
     }
 
@@ -225,17 +218,16 @@ public class ForwardMessageService {
         // 2. 生成唯一的调度 Key (例如: clientId:PUBLISH:1001)
         String retryKey = buildScheduleKey(clientId, type, messageId);
 
-        // 3. 检查重试次数限制
+        // 3. 检查重试次数限制：超限后必须回收资源，否则 messageId / In-Flight 窗口会泄漏，最终耗尽 65535 个 ID
         if (count > maxRetries) {
-            log.warn("【TLMQTT】Task [{}] reached max retries ({}), dropping message.", retryKey, maxRetries);
-            // 这里可以根据业务需求增加持久化清理逻辑
-            return Mono.empty();
+            log.warn("【TLMQTT】Task [{}] reached max retries ({}), dropping and releasing resources.", retryKey, maxRetries);
+            return cleanup(type, clientId, (int) messageId);
         }
 
         // 4. 执行发送逻辑
         return Mono.defer(() -> {
-            // 只有 PUBLISH 报文在重发(count > 1)时需要设置 DUP 标志
-            if (count > 1 && message instanceof TlMqttPublishReq) {
+            // 重发(count > 1)时设置 DUP 标志，PUBLISH 与 PUBREL 均需设置
+            if (count > 1) {
                 message.getFixedHead().setDup(true);
             }
             // 这里会执行所有类型的消息发送，包括 TlMqttPublishReq 和 TlMqttPubRelReq
@@ -266,15 +258,6 @@ public class ForwardMessageService {
         return Mono.create(sink -> {
             Channel channel = channelService.getChannel(clientId);
             if (channel != null && channel.isActive()) {
-                // 注意：ByteBuf 的引用计数在重试场景下非常危险
-                // 如果 msg 包含 ByteBuf，Netty 发送后会自动释放。
-                // 建议重试时使用 retain() 或者发送不释放的副本
-                if (msg instanceof TlMqttPublishReq ) {
-                    // 增加引用计数，确保 Netty 发送完一次后，内存不被彻底回收，供下一次重试使用
-                    TlMqttPublishReq publishReq = (TlMqttPublishReq) msg;
-                    ReferenceCountUtil.retain(publishReq.getPayload().getContent());
-                }
-
                 channel.writeAndFlush(msg).addListener(f -> {
                     if (f.isSuccess()) {
                         sink.success();
@@ -283,7 +266,9 @@ public class ForwardMessageService {
                     }
                 });
             } else {
-                sink.error(new RuntimeException("【TLMQTT】Channel inactive for client: " + clientId));
+                // 订阅者离线：不视为错误，交由重试机制兜底（QoS 1/2），QoS 0 直接丢弃
+                log.debug("【TLMQTT】Channel inactive for client: [{}], skip send", clientId);
+                sink.success();
             }
         });
     }
@@ -299,19 +284,25 @@ public class ForwardMessageService {
             .doOnSuccess(v -> log.debug("【TLMQTT】Stopped retry for client: [{}], type: [{}], id: [{}]", clientId, type, messageId))
             .subscribe();
 
-        // 2. 根据业务类型执行后续清理
+        // 2. 根据业务类型执行后续清理（清理持久化 -> 释放窗口 -> 触发队列）
+        cleanup(type, clientId, messageId).subscribe();
+    }
+
+    /**
+     * 统一的资源回收逻辑：清理持久化消息、释放 messageId、减小 In-Flight 窗口、触发队列中的下一条消息
+     * 用于 ACK 确认与重试超限两种场景，避免 messageId / In-Flight 窗口泄漏
+     */
+    private Mono<Void> cleanup(String type, String clientId, int messageId) {
         if (Constant.PUBLISH.equals(type)) {
-            // QoS 1 流程：清理持久化消息 -> 释放窗口 -> 触发队列
-            publishService.clear(clientId, (long) messageId)
-                .then(processNextInQueue(clientId, messageId))
-                .subscribe();
+            // QoS 1 流程
+            return publishService.clear(clientId, (long) messageId)
+                .then(processNextInQueue(clientId, messageId));
         } else if (Constant.PUBREL.equals(type)) {
-            // QoS 2 流程：清理 PUBREL 持久化 -> 释放窗口 -> 触发队列
-            // 注意：此时 PUBLISH 已经在收到 PUBREC 时被清理过了
-            publishService.clearPubrel(clientId, (long) messageId)
-                .then(processNextInQueue(clientId, messageId))
-                .subscribe();
+            // QoS 2 流程：此时 PUBLISH 已经在收到 PUBREC 时被清理过了
+            return publishService.clearPubrel(clientId, (long) messageId)
+                .then(processNextInQueue(clientId, messageId));
         }
+        return Mono.empty();
     }
 
     /**
@@ -353,8 +344,21 @@ public class ForwardMessageService {
     }
 
     private int calculateSize(TlMqttPublishReq req) {
-        // 简化的长度计算逻辑，实际需根据编码后的字节数组长度判定
-        return req.getFixedHead().getLength();
+        // fixedHead.length 已由 TlMqttPublishReq.build() 精确计算为剩余长度（remainingLength），
+        // 这里再补上固定头（1 字节）与变长长度字段的字节数，得到整包大小，供 MaximumPacketSize 校验。
+        int remainingLength = req.getFixedHead().getLength();
+        return 1 + variableByteIntegerLength(remainingLength) + remainingLength;
+    }
+
+    /**
+     * 计算变长字节整数（Variable Byte Integer）占用的字节数
+     */
+    private int variableByteIntegerLength(int value) {
+        int length = 1;
+        while ((value /= 128) > 0) {
+            length++;
+        }
+        return length;
     }
 
 

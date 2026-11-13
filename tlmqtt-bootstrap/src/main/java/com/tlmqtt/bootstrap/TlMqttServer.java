@@ -26,14 +26,8 @@ import com.tlmqtt.core.codec.encoder.TlMqttSubAckEncoder;
 import com.tlmqtt.core.codec.encoder.TlMqttUnSubAckEncoder;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.MultiThreadIoEventLoopGroup;
-import io.netty.channel.WriteBufferWaterMark;
-import io.netty.channel.nio.NioIoHandler;
+import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpContentCompressor;
@@ -58,8 +52,8 @@ import java.security.cert.X509Certificate;
 public  class  TlMqttServer  {
 
     private final TlMqttServerProperties properties;
-    private final MultiThreadIoEventLoopGroup bossGroup;
-    private final MultiThreadIoEventLoopGroup workerGroup;
+    private final NioEventLoopGroup bossGroup;
+    private final NioEventLoopGroup workerGroup;
 
     private MqttComponentContainer container;
     private DynamicTrafficShaper trafficShaper;
@@ -77,8 +71,8 @@ public  class  TlMqttServer  {
 
     public TlMqttServer(TlMqttServerProperties properties) {
         this.properties = properties;
-        this.bossGroup = new MultiThreadIoEventLoopGroup(properties.getBossThreadSize(), NioIoHandler.newFactory());
-        this.workerGroup = new MultiThreadIoEventLoopGroup(properties.getWorkThreadSize(), NioIoHandler.newFactory());
+        this.bossGroup = new NioEventLoopGroup(properties.getBossThreadSize());
+        this.workerGroup = new NioEventLoopGroup(properties.getWorkThreadSize());
     }
 
     public synchronized void setup(MqttComponentContainer container) {

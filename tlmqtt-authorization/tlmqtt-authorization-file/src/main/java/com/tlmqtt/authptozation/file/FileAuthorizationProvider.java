@@ -28,7 +28,7 @@ public class FileAuthorizationProvider implements TlAuthorizationProvider {
     @Override
     public boolean checkPublishPermission(String clientId, String username, String ip, String topic) {
         TlAclRequest request = TlAclRequest.builder().ip(ip).username(username)
-            .client(clientId).action(Action.SUB).topic(topic).build();
+            .client(clientId).action(Action.PUB).topic(topic).build();
         return localAclValidator.checkPublish(request);
     }
 

@@ -6,7 +6,7 @@
 
     <groupId>io.github.zhsqjm</groupId>
     <artifactId>tl-mqtt</artifactId>
-    <version>1.2.0</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
     <modules>
         <module>tlmqtt-common</module>
@@ -54,7 +54,8 @@
     </licenses>
 
     <properties>
-        <netty.version>4.2.8.Final</netty.version>
+        <revision>1.2.0.1</revision>
+        <netty.version>4.1.8.Final</netty.version>
         <projectreactor.version>3.4.34</projectreactor.version>
         <hikaricp.version>4.0.3</hikaricp.version>
         <mysql.version>8.0.33</mysql.version>
@@ -196,6 +197,32 @@
 
     <build>
         <plugins>
+            <!-- 统一版本管理：${revision} 占位符，发布时解析为真实版本 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>flatten</id>
+                        <phase>process-resources</phase>
+                        <goals>
+                            <goal>flatten</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>flatten.clean</id>
+                        <phase>clean</phase>
+                        <goals>
+                            <goal>clean</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

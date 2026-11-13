@@ -1,6 +1,7 @@
 package com.tlmqtt.core.handler;
 
 import com.tlmqtt.authorization.base.AuthorizationManager;
+import com.tlmqtt.common.Constant;
 import com.tlmqtt.common.enums.MqttErrorCode;
 import com.tlmqtt.common.enums.MqttQoS;
 import com.tlmqtt.common.model.TlMqttSession;
@@ -131,11 +132,11 @@ public class TlSubscribeHandler extends AbstractTlHandler<TlMqttSubscribeReq> {
                 // 如果是 QoS 1/2，需要持久化并处理流量窗口
                 if (realQos != MqttQoS.AT_MOST_ONCE) {
                     return publishService.save(session.getClientId(), targetMessage.getVariableHead().getMessageId(), targetMessage)
-                        .doOnSuccess(v -> {
-                            // 占用 In-Flight 窗口并发送
+                        .then(Mono.defer(() -> {
+                            // 占用 In-Flight 窗口，并进入与普通转发一致的重试流水线
                             session.getInFlightCount().incrementAndGet();
-                            ctx.writeAndFlush(targetMessage);
-                        }).then();
+                            return forwardMessageService.scheduleWithRetry(Constant.PUBLISH, session.getClientId(), targetMessage, 1);
+                        }));
                 } else {
                     ctx.writeAndFlush(targetMessage);
                     return Mono.empty();

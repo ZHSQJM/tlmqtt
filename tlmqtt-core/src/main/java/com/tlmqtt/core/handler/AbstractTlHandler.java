@@ -43,8 +43,21 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
     protected  AuthenticationManager authenticationManager;
     protected  AuthorizationManager authorizationManager;
     protected  MqttConfiguration mqttConfiguration;
-    protected List<PublishInterceptor> interceptors = new ArrayList<>();
+    protected  List<PublishInterceptor> interceptors = new ArrayList<>();
 
+    /**
+     * 【核心改写】：自定义 setInterceptors 方法
+     * 无论子类或者外部传进来的是不是 null，这里都进行拦截和兜底。
+     * 如果传入 null，自动转为空集合，确保 interceptors 永远不会是 null。
+     */
+    public void setInterceptors(List<PublishInterceptor> interceptors) {
+        if (interceptors != null) {
+            this.interceptors = interceptors;
+        } else {
+            this.interceptors = new ArrayList<>();
+        }
+    }
+    
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, T req) throws Exception {
 
@@ -54,6 +67,8 @@ public abstract class AbstractTlHandler <T extends AbstractTlMessage> extends Si
         if (mqttSession!= null) {
             session = (TlMqttSession) mqttSession;
         }
+
+
 
         if (req.getFixedHead().getMessageType() == MqttMessageType.PUBLISH && !interceptors.isEmpty()) {
             // 强转为 Publish 请求进行拦截

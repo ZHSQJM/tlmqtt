@@ -93,7 +93,7 @@ public class TlBootstrap {
             CompletableFuture.runAsync(() -> tlServer.startSocket(properties.getSsl().isEnabled()?properties.getPort().getSslMqtt():properties.getPort().getMqtt()));
         }
         if (enableWebSocket) {
-            CompletableFuture.runAsync(() -> tlServer.startSocket(properties.getSsl().isEnabled()?properties.getPort().getSslWebsocket():properties.getPort().getWebsocket()));
+            CompletableFuture.runAsync(() -> tlServer.startWebsocket(properties.getSsl().isEnabled()?properties.getPort().getSslWebsocket():properties.getPort().getWebsocket()));
         }
         return this;
     }
